@@ -148,7 +148,7 @@ Contributions back to the project are very welcome, but never required.
 
 ```bash
 apt-get update && apt-get install -y git
-git clone https://github.com/OWNER/havoc-web-panel.git
+git clone https://github.com/webolyecom/havoc-web-panel.git
 cd havoc-web-panel
 sudo bash install/install.sh
 ```
