@@ -1,0 +1,42 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+// Privileged helper. Invoked only through sudo by the panel user: havocctl <action>  (JSON on stdin)
+if (PHP_SAPI !== 'cli' || posix_geteuid() !== 0) {
+    fwrite(STDERR, "havocctl must run as root via sudo\n");
+    exit(1);
+}
+define('HAVOC_ROOT', dirname(__DIR__));
+spl_autoload_register(static function (string $c): void {
+    if (str_starts_with($c, 'Havoc\\Ctl\\')) {
+        require __DIR__ . '/lib/' . substr($c, 10) . '.php';
+    }
+});
+umask(022);
+use Havoc\Ctl\Actions;
+
+$action = $argv[1] ?? '';
+try {
+    if (!in_array($action, Actions::ALLOWED, true)) {
+        throw new InvalidArgumentException('Unknown action');
+    }
+    $args = json_decode((string)stream_get_contents(STDIN), true);
+    $args = is_array($args) ? $args : [];
+    if ($action === 'fs.cat') {
+        exit((new Actions())->fsCatPassthrough($args));        // raw stream, not JSON
+    }
+    if ($action === 'log.cat') {
+        exit(Havoc\Ctl\Logs::catPassthrough($args));
+    }
+    $data = (new Actions())->{str_replace('.', '_', $action)}($args);
+    echo json_encode(['ok' => true, 'data' => $data]);
+} catch (Throwable $e) {
+    openlog('havocctl', LOG_PID, LOG_AUTH);
+    syslog(LOG_WARNING, "$action failed: " . $e->getMessage());
+    if ($action === 'fs.cat' || $action === 'log.cat') {
+        echo 'ERR ', str_replace("\n", ' ', $e->getMessage()), "\n";
+        exit(2);
+    }
+    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    exit(2);
+}

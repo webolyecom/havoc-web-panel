@@ -1,0 +1,76 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+// Panel CLI. Run as the panel user:  runuser -u havoc -- php /opt/havoc/bin/havoc <command>
+define('HAVOC_ROOT', dirname(__DIR__));
+require HAVOC_ROOT . '/src/bootstrap.php';
+use Havoc\Core\{Auth, Config, DB};
+
+$cmd = $argv[1] ?? 'help';
+switch ($cmd) {
+    case 'migrate':
+        DB::migrate();
+        echo "Database ready.\n";
+        break;
+    case 'admin:create':
+        [$user, $email, $pass] = [$argv[2] ?? 'admin', $argv[3] ?? 'admin@localhost.localdomain', $argv[4] ?? bin2hex(random_bytes(9))];
+        DB::migrate();
+        if (DB::one('SELECT id FROM users WHERE username = ?', [$user])) {
+            fwrite(STDERR, "User exists.\n");
+            exit(1);
+        }
+        DB::insert('users', ['role' => 'admin', 'username' => $user, 'email' => $email, 'password' => Auth::hash($pass)]);
+        echo "ADMIN_USER=$user\nADMIN_PASS=$pass\n";
+        break;
+    case 'admin:reset':
+        $pass = $argv[3] ?? bin2hex(random_bytes(9));
+        DB::q('UPDATE users SET password = ?, totp_enabled = 0, totp_secret = NULL WHERE username = ? AND role = ?', [Auth::hash($pass), $argv[2] ?? 'admin', 'admin']);
+        echo "New password: $pass (2FA disabled)\n";
+        break;
+    case 'backup:run':
+        \Havoc\Services\BackupService::run((int)($argv[2] ?? 0));
+        break;
+    case 'backup:restore':
+        \Havoc\Services\BackupService::restore((int)($argv[2] ?? 0), (string)($argv[3] ?? 'full'));
+        break;
+    case 'backup:due':
+        \Havoc\Services\BackupService::runDue();
+        break;
+    case 'usage:scan':
+        \Havoc\Services\SslService::retryDue();
+        \Havoc\Services\UsageService::scan();
+        break;
+    case 'ssl:auto':
+        \Havoc\Services\SslService::run((int)($argv[2] ?? 0), ($argv[3] ?? '') === 'force');
+        break;
+    case 'webserver:switch':
+        \Havoc\Services\WebServerService::run((string)($argv[2] ?? ''));
+        break;
+    case 'cron:sync':
+        // rewrite every account's crontab in the current format (used after upgrades)
+        foreach (DB::all('SELECT DISTINCT user_id FROM cron_jobs') as $r) {
+            try {
+                \Havoc\Services\CronService::sync((int)$r['user_id']);
+                echo "ok    hv{$r['user_id']}\n";
+            } catch (\Throwable $e) {
+                echo "FAIL  hv{$r['user_id']}: " . $e->getMessage() . "\n";
+            }
+        }
+        break;
+    case 'domains:reapply':
+        // re-render every vhost + PHP-FPM unit (used after upgrades); prints one line per domain
+        foreach (DB::all("SELECT * FROM domains WHERE type != 'alias' AND status = 'active' ORDER BY id") as $d) {
+            try {
+                \Havoc\Services\DomainService::reapply($d);
+                echo "ok    {$d['name']}\n";
+            } catch (\Throwable $e) {
+                echo "FAIL  {$d['name']}: " . $e->getMessage() . "\n";
+            }
+        }
+        break;
+    case 'version':
+        echo Config::get('app.version'), "\n";
+        break;
+    default:
+        echo "Usage: havoc migrate | domains:reapply | cron:sync | ssl:auto <id> | admin:create [user] [email] [pass] | admin:reset <user> [pass] | version\n";
+}

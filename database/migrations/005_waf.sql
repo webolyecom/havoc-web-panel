@@ -1,0 +1,11 @@
+CREATE TABLE waf_rules(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  domain_id INTEGER REFERENCES domains(id) ON DELETE CASCADE,     -- NULL = global (admin only)
+  type TEXT NOT NULL CHECK(type IN('exclude','block')),
+  target TEXT NOT NULL DEFAULT '',
+  op TEXT NOT NULL DEFAULT '',
+  value TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

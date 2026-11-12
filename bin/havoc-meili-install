@@ -1,0 +1,94 @@
+#!/bin/bash
+# Installs the latest Meilisearch release binary from GitHub and runs it as a hardened systemd service.
+# Started by `havocctl meili.install` through systemd-run (output goes to the journal; the master key is never printed).
+set -euo pipefail
+umask 022
+
+case "$(dpkg --print-architecture)" in
+  amd64) asset=meilisearch-linux-amd64 ;;
+  arm64) asset=meilisearch-linux-aarch64 ;;
+  *) echo "Unsupported architecture: $(dpkg --print-architecture)"; exit 1 ;;
+esac
+glibc=$(ldd --version | head -1 | grep -oE '[0-9]+\.[0-9]+$')
+if [ "$(printf '%s\n2.35\n' "$glibc" | sort -V | head -1)" != "2.35" ]; then echo "glibc $glibc is too old (2.35+ required)"; exit 1; fi
+mem=$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo)
+
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+echo "Looking up the latest Meilisearch release..."
+curl -fsSL --proto '=https' --tlsv1.2 -H 'Accept: application/vnd.github+json' \
+  https://api.github.com/repos/meilisearch/meilisearch/releases/latest -o "$tmp/release.json"
+read -r tag digest < <(php -r '
+  $j = json_decode(file_get_contents($argv[1]), true) ?: [];
+  $d = "";
+  foreach ($j["assets"] ?? [] as $a) { if (($a["name"] ?? "") === $argv[2]) { $d = (string)($a["digest"] ?? ""); } }
+  echo ($j["tag_name"] ?? ""), " ", ($d === "" ? "-" : $d), "\n";' "$tmp/release.json" "$asset")
+[[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Unexpected release tag: $tag"; exit 1; }
+echo "Downloading Meilisearch $tag ($asset)..."
+curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/meilisearch" \
+  "https://github.com/meilisearch/meilisearch/releases/download/$tag/$asset"
+if [[ "$digest" == sha256:* ]]; then
+  echo "${digest#sha256:}  $tmp/meilisearch" | sha256sum -c - >/dev/null || { echo "SHA-256 mismatch, aborting"; exit 1; }
+  echo "SHA-256 verified."
+else
+  echo "No SHA-256 digest published by GitHub for this asset; aborting for safety."; exit 1
+fi
+chmod 755 "$tmp/meilisearch"
+"$tmp/meilisearch" --version
+
+id meilisearch >/dev/null 2>&1 || useradd --system --home-dir /var/lib/meilisearch --shell /usr/sbin/nologin meilisearch
+install -d -o meilisearch -g meilisearch -m 750 /var/lib/meilisearch /var/lib/meilisearch/data /var/lib/meilisearch/dumps /var/lib/meilisearch/snapshots
+install -d -o root -g meilisearch -m 750 /etc/meilisearch
+if [ ! -f /etc/meilisearch/config.toml ]; then
+  key=$(openssl rand -hex 24)
+  idx=$((mem / 4)); [ "$idx" -lt 128 ] && idx=128; [ "$idx" -gt 2048 ] && idx=2048
+  cat > /etc/meilisearch/config.toml <<CFG
+# Managed by Havoc WEB Panel
+env = "production"
+master_key = "$key"
+db_path = "/var/lib/meilisearch/data"
+dump_dir = "/var/lib/meilisearch/dumps"
+snapshot_dir = "/var/lib/meilisearch/snapshots"
+http_addr = "127.0.0.1:7700"
+max_indexing_memory = "$idx MiB"
+no_analytics = true
+CFG
+  chown root:meilisearch /etc/meilisearch/config.toml; chmod 640 /etc/meilisearch/config.toml
+fi
+install -m 755 -o root -g root "$tmp/meilisearch" /usr/local/bin/meilisearch
+
+cat > /etc/systemd/system/meilisearch.service <<'UNIT'
+[Unit]
+Description=Meilisearch (managed by Havoc WEB Panel)
+After=network.target
+
+[Service]
+User=meilisearch
+Group=meilisearch
+WorkingDirectory=/var/lib/meilisearch
+ExecStart=/usr/local/bin/meilisearch --config-file-path /etc/meilisearch/config.toml
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=65535
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/meilisearch
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable meilisearch
+systemctl restart meilisearch
+for i in $(seq 1 30); do
+  if curl -fsS -m 2 http://127.0.0.1:7700/health 2>/dev/null | grep -q available; then
+    echo "Meilisearch $tag is running on 127.0.0.1:7700."; exit 0
+  fi
+  sleep 1
+done
+echo "Meilisearch was installed but did not become healthy; check: journalctl -u meilisearch"
+exit 1

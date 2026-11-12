@@ -1,0 +1,109 @@
+#!/bin/bash
+# Installs a web server for Havoc WEB Panel without activating it (the panel switches sites over afterwards).
+#   havoc-ws-install nginx
+#   havoc-ws-install ols
+#   havoc-ws-install lsws [SERIAL|TRIAL]
+# Started by `havocctl webserver.install` through systemd-run; output goes to the journal (unit havoc-ws-install).
+# OpenLiteSpeed and LiteSpeed Enterprise both live in /usr/local/lsws: installing one removes the other.
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+TYPE="${1:-}"
+LICENSE="${2:-TRIAL}"
+LSWS_VER="${HAVOC_LSWS_VERSION:-6.3.6}"   # the installer upgrades to the latest 6.x release afterwards (lsup.sh)
+ACTIVE=$(cat /etc/havoc/webserver 2>/dev/null || echo nginx)
+
+# keep apt from starting the new server's service (it would fight the active one for ports 80/443)
+no_autostart() { printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d; chmod 755 /usr/sbin/policy-rc.d; }
+allow_autostart() { rm -f /usr/sbin/policy-rc.d; }
+trap allow_autostart EXIT
+
+remove_lsws_tree() {
+  # whichever LiteSpeed is installed in /usr/local/lsws goes away (sites are re-created when a server is activated)
+  [ "$ACTIVE" = "nginx" ] || { echo "The active web server is $ACTIVE; activate Nginx first."; exit 1; }
+  if dpkg-query -W -f='${Status}' openlitespeed 2>/dev/null | grep -q 'install ok installed'; then
+    echo "Removing OpenLiteSpeed..."
+    systemctl disable --now lshttpd 2>/dev/null || true
+    apt-get purge -y openlitespeed
+  fi
+  if [ -x /usr/local/lsws/bin/lshttpd ] || [ -d /usr/local/lsws ]; then
+    echo "Removing the previous LiteSpeed installation in /usr/local/lsws..."
+    /usr/local/lsws/bin/lswsctrl stop 2>/dev/null || true
+    systemctl disable --now lsws lshttpd 2>/dev/null || true
+    rm -f /etc/systemd/system/lsws.service /etc/systemd/system/lshttpd.service
+    systemctl daemon-reload
+    rm -rf /usr/local/lsws
+  fi
+}
+
+case "$TYPE" in
+  nginx)
+    no_autostart
+    apt-get update -y
+    apt-get install -y nginx
+    apt-get install -y libnginx-mod-http-modsecurity modsecurity-crs || echo "Note: ModSecurity packages not installed."
+    allow_autostart
+    rm -f /etc/nginx/sites-enabled/default
+    [ "$ACTIVE" = "nginx" ] || systemctl disable --now nginx 2>/dev/null || true
+    echo "Nginx $(nginx -v 2>&1 | grep -oE '[0-9.]+$') is installed."
+    ;;
+
+  ols)
+    [ -f /usr/local/lsws/bin/openlitespeed ] && { echo "OpenLiteSpeed is already installed."; exit 0; }
+    remove_lsws_tree
+    echo "Adding the LiteSpeed repository..."
+    curl -fsSL --proto '=https' --tlsv1.2 https://repo.litespeed.sh -o /tmp/litespeed-repo.sh
+    bash /tmp/litespeed-repo.sh; rm -f /tmp/litespeed-repo.sh
+    apt-get update -y
+    no_autostart
+    apt-get install -y openlitespeed
+    allow_autostart
+    systemctl disable --now lshttpd 2>/dev/null || true
+    /usr/local/lsws/bin/lswsctrl stop 2>/dev/null || true
+    echo "OpenLiteSpeed $(cat /usr/local/lsws/VERSION 2>/dev/null) is installed (not active yet)."
+    ;;
+
+  lsws)
+    [ -f /usr/local/lsws/bin/lshttpd ] && [ ! -f /usr/local/lsws/bin/openlitespeed ] && { echo "LiteSpeed Enterprise is already installed."; exit 0; }
+    case "$(uname -m)" in x86_64|amd64) ARCH=x86_64 ;; aarch64|arm64) ARCH=aarch64 ;; *) echo "Unsupported CPU: $(uname -m)"; exit 1 ;; esac
+    remove_lsws_tree
+    tmp=$(mktemp -d); trap 'rm -rf "$tmp"; allow_autostart' EXIT
+    cd "$tmp"
+    echo "Downloading LiteSpeed Enterprise $LSWS_VER ($ARCH)..."
+    curl -fsSL --proto '=https' --tlsv1.2 -o lsws.tgz "https://www.litespeedtech.com/packages/6.0/lsws-${LSWS_VER}-ent-${ARCH}-linux.tar.gz"
+    tar -xzf lsws.tgz --no-same-owner && cd lsws-*
+    if [ "$LICENSE" = "TRIAL" ]; then
+      echo "Requesting a trial license..."
+      curl -fsSL --proto '=https' --tlsv1.2 -o trial.key https://license.litespeedtech.com/reseller/trial.key
+    else
+      echo "$LICENSE" > serial.no
+    fi
+    ADMINPASS=$(openssl rand -hex 12)
+    # non-interactive answers, the same way LiteSpeed's own one-click script (lsws1clk) drives install.sh
+    sed -i '/^license$/d' install.sh
+    sed -i 's/read TMPS/TMPS=0/g; s/read TMP_YN/TMP_YN=N/g' install.sh
+    sed -i '/read [A-Z]/d; s/^[[:space:]]*read -r /#&/' functions.sh
+    sed -i 's/HTTP_PORT=$TMP_PORT/HTTP_PORT=8088/g; s/ADMIN_PORT=$TMP_PORT/ADMIN_PORT=7080/g; s/$TMP_PORT -eq $HTTP_PORT/$ADMIN_PORT -eq $HTTP_PORT/g' functions.sh
+    sed -i "/^license()/i\\
+    PASS_ONE=${ADMINPASS}\\
+    PASS_TWO=${ADMINPASS}\\
+    TMP_USER=www-data\\
+    TMP_GROUP=www-data\\
+    TMP_PORT=''\\
+    TMP_DEST=''\\
+    ADMIN_USER=admin\\
+    ADMIN_EMAIL=root@localhost\\
+    " functions.sh
+    echo "Running the LiteSpeed installer..."
+    bash install.sh
+    [ -x /usr/local/lsws/bin/lshttpd ] || { echo "LiteSpeed installation failed."; exit 1; }
+    /usr/local/lsws/admin/misc/lsup.sh -f || echo "Note: could not upgrade to the latest 6.x release, keeping $LSWS_VER."
+    /usr/local/lsws/bin/lswsctrl stop 2>/dev/null || true
+    systemctl disable --now lsws lshttpd 2>/dev/null || true
+    umask 077; echo "admin / $ADMINPASS" > /usr/local/lsws/admin/havoc-webadmin-password.txt
+    echo "LiteSpeed Enterprise $(cat /usr/local/lsws/VERSION 2>/dev/null) is installed (not active yet)."
+    echo "WebAdmin console: https://<server>:7080, credentials in /usr/local/lsws/admin/havoc-webadmin-password.txt"
+    ;;
+
+  *)
+    echo "usage: havoc-ws-install nginx|ols|lsws [SERIAL|TRIAL]"; exit 64 ;;
+esac

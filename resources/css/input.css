@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .h1 { @apply mb-6 text-2xl font-bold tracking-tight; }
+  .h2 { @apply text-lg font-semibold; }
+  .card { @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900; }
+  .label { @apply mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400; }
+  .input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/30 dark:border-slate-700 dark:bg-slate-950; }
+  .btn { @apply inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:opacity-90; }
+  .btn-ghost { @apply rounded-lg px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800; }
+  .btn-danger { @apply rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700; }
+  /* sidebar: dark in both themes, accent follows the (reseller) brand colour */
+  .sidebar { @apply border-r border-white/[0.06] text-ink-300; background: linear-gradient(180deg, #10172a 0%, #0c1222 100%); }
+  .dark .sidebar { background: linear-gradient(180deg, #0c1222 0%, #080c18 100%); }
+  .brand-mark { @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[15px] font-bold text-white;
+    background: linear-gradient(135deg, var(--brand-hi), rgb(var(--brand)));
+    box-shadow: 0 6px 18px -6px rgb(var(--brand) / .7), inset 0 1px 0 rgb(255 255 255 / .25); }
+  .nav-search { @apply flex items-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.04] px-2.5 py-1.5 text-ink-400 transition focus-within:border-white/20 focus-within:bg-white/[0.07]; }
+  .nav-summary { @apply flex cursor-pointer select-none list-none items-center justify-between rounded-md px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[.12em] text-ink-500 transition hover:text-ink-300; }
+  .nav-items { @apply space-y-0.5; }
+  .nav-link { @apply relative flex items-center gap-3 rounded-lg px-3 py-[7px] text-[13.5px] text-ink-300 transition-colors hover:bg-white/[0.05] hover:text-white; }
+  .nav-ico { @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-400 transition-colors; }
+  .nav-link:hover .nav-ico { @apply text-white; }
+  .nav-active { @apply font-medium text-white; background: linear-gradient(90deg, rgb(var(--brand) / .28), rgb(var(--brand) / .06)); }
+  .nav-active::before { content: ''; @apply absolute -left-3 bottom-1.5 top-1.5 w-[3px] rounded-r-full; background: var(--brand-hi); box-shadow: 0 0 12px var(--brand-hi); }
+  .nav-active .nav-ico { color: var(--brand-hi); background: rgb(var(--brand) / .22); }
+  .avatar { @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ring-2 ring-white/10;
+    background: linear-gradient(135deg, var(--brand-hi), rgb(var(--brand))); }
+  .nav-scroll { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .12) transparent; }
+  .table { @apply w-full text-left text-sm; }
+  .table th button { text-transform: inherit; letter-spacing: inherit; font-weight: inherit; }
+  .table th { @apply border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800; }
+  .table td { @apply border-b border-slate-100 px-4 py-3 dark:border-slate-800/60; }
+  .badge { @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium; }
+  .badge-ok { @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300; }
+  .badge-warn { @apply bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300; }
+}
+
+@layer base {
+  :root { --brand-hi: color-mix(in oklch, rgb(var(--brand)) 62%, #a5f3fc); }
+  summary::-webkit-details-marker { display: none; }
+  [hidden] { display: none !important; }
+  .sidebar-open #sidebar { transform: none; }
+  /* compact rail (desktop only), remembered per browser */
+  @media (min-width: 768px) {
+    .nav-compact #sidebar { width: 76px; }
+    .nav-compact #sidebar .nav-label, .nav-compact #sidebar kbd { display: none; }
+    .nav-compact #sidebar .nav-link { justify-content: center; padding-left: 0; padding-right: 0; }
+    .nav-compact #sidebar .nav-summary { height: 1px; padding: 0; margin: 0 .75rem; background: rgb(255 255 255 / .07); pointer-events: none; }
+    .nav-compact #sidebar .nav-group { margin-top: .75rem; }
+    .nav-compact #sidebar .nav-group > .nav-items { margin-top: .75rem; }
+    .nav-compact #sidebar > div:first-child { justify-content: center; padding-left: 0; padding-right: 0; }
+    .nav-compact #nav-compact .nav-ico svg { transform: scaleX(-1); }
+  }
+}

@@ -1,0 +1,18 @@
+#!/bin/bash
+# Self-update. Started by `havocctl panel.update` through systemd-run (so restarting the panel does not kill it).
+# The update URL is read from a root-owned file; the panel user cannot influence it.
+set -euo pipefail
+[ -r /etc/havoc/update.conf ] && . /etc/havoc/update.conf
+: "${HAVOC_UPDATE_URL:?HAVOC_UPDATE_URL not set in /etc/havoc/update.conf}"
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/pkg.tar.gz" "$HAVOC_UPDATE_URL"
+curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/pkg.sha256" "$HAVOC_UPDATE_URL.sha256"
+( cd "$tmp" && echo "$(cut -d' ' -f1 pkg.sha256)  pkg.tar.gz" | sha256sum -c - )
+mkdir "$tmp/new" && tar -xzf "$tmp/pkg.tar.gz" -C "$tmp/new" --strip-components=1
+[ -f "$tmp/new/public/index.php" ] || { echo "bad package"; exit 1; }
+rm -rf /opt/havoc.old && cp -a /opt/havoc /opt/havoc.old
+rsync -a --delete "$tmp/new/" /opt/havoc/
+chown -R root:root /opt/havoc && chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install && chmod 755 /opt/havoc/bin/havoc-cronwrap /opt/havoc/ctl/fsworker
+runuser -u havoc -- php /opt/havoc/bin/havoc migrate
+systemctl restart havoc-panel-fpm havoc-panel-nginx
+echo "Havoc updated to $(runuser -u havoc -- php /opt/havoc/bin/havoc version)"

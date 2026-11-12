@@ -1,0 +1,4 @@
+ALTER TABLE ftp_accounts ADD COLUMN protocol TEXT NOT NULL DEFAULT 'ftp';
+ALTER TABLE ftp_accounts ADD COLUMN domain_id INTEGER REFERENCES domains(id) ON DELETE CASCADE;
+ALTER TABLE ftp_accounts ADD COLUMN subdir TEXT NOT NULL DEFAULT '';
+ALTER TABLE ftp_accounts ADD COLUMN allowed_ips TEXT NOT NULL DEFAULT '';

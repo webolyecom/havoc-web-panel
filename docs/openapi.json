@@ -1,0 +1,26 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Havoc WEB Panel API", "version": "1.0.0", "description": "Token authentication: create a token under Settings > API, then send `Authorization: Bearer hvc_...`. All calls are tenant-scoped (admin: all, reseller: own customers, user: self)." },
+  "servers": [{ "url": "/api/v1" }],
+  "components": {
+    "securitySchemes": { "bearer": { "type": "http", "scheme": "bearer" } },
+    "schemas": {
+      "Domain": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "owner": { "type": "string" }, "php_version": { "type": "string", "enum": ["8.1", "8.2", "8.3", "8.4"] }, "ssl_mode": { "type": "string" }, "force_https": { "type": "boolean" }, "waf": { "type": "boolean" }, "status": { "type": "string" } } },
+      "Error": { "type": "object", "properties": { "error": { "type": "string" } } }
+    }
+  },
+  "security": [{ "bearer": [] }],
+  "paths": {
+    "/me": { "get": { "summary": "Current token owner", "responses": { "200": { "description": "OK" }, "401": { "description": "Invalid token" } } } },
+    "/domains": {
+      "get": { "summary": "List domains in scope", "responses": { "200": { "description": "OK" } } },
+      "post": { "summary": "Create a domain", "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string", "example": "example.com" }, "php_version": { "type": "string", "example": "8.3" }, "user_id": { "type": "integer", "description": "Admin/reseller only" } } } } } }, "responses": { "201": { "description": "Created" }, "422": { "description": "Validation or quota error" } } }
+    },
+    "/domains/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+      "get": { "summary": "Get a domain", "responses": { "200": { "description": "OK" }, "404": { "description": "Not found (or outside your scope)" } } },
+      "delete": { "summary": "Delete a domain", "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "purge": { "type": "boolean" } } } } } }, "responses": { "204": { "description": "Deleted" } } }
+    },
+    "/server/stats": { "get": { "summary": "CPU, RAM, disk, network, load (admin only)", "responses": { "200": { "description": "OK" }, "403": { "description": "Not an admin" } } } }
+  }
+}

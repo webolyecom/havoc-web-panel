@@ -1,0 +1,36 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+// Runs as the tenant's Linux user (never root). Started by havocctl fs.exec through setpriv.
+if (PHP_SAPI !== 'cli' || posix_geteuid() === 0) {
+    fwrite(STDERR, "fsworker refuses to run as root\n");
+    exit(1);
+}
+spl_autoload_register(static function (string $c): void {
+    if (str_starts_with($c, 'Havoc\\Ctl\\')) {
+        require __DIR__ . '/lib/' . substr($c, 10) . '.php';
+    }
+});
+try {
+    $in = json_decode((string)stream_get_contents(STDIN), true, 8);
+    if (!is_array($in) || !is_string($in['root'] ?? null)) {
+        throw new InvalidArgumentException('Bad request');
+    }
+    $fs = new Havoc\Ctl\Fs($in['root']);
+    if (($in['op'] ?? '') === 'cat') {
+        // streaming download: one header line, then the raw bytes
+        $f = $fs->fileForStream((string)($in['args']['path'] ?? ''));
+        $fh = fopen($f, 'rb');
+        echo 'OK ', filesize($f), ' ', rawurlencode(basename($f)), "\n";
+        fpassthru($fh);
+        exit(0);
+    }
+    echo json_encode(['ok' => true, 'data' => $fs->run((string)$in['op'], (array)($in['args'] ?? []))]);
+} catch (Throwable $e) {
+    if (($in['op'] ?? '') === 'cat') {
+        echo 'ERR ', str_replace("\n", ' ', $e->getMessage()), "\n";
+        exit(2);
+    }
+    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    exit(2);
+}
