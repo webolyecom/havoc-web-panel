@@ -17,7 +17,7 @@ Security problems are **not** reported in public issues; see [SECURITY.md](SECUR
 You need PHP 8.2+ (with `pdo_sqlite`, `mbstring`, `sodium`), Node.js 18+ for the CSS/editor build, and a Debian 12/13 **test VM** for anything that touches the system (the root helper in `ctl/`).
 
 ```bash
-git clone https://github.com/OWNER/havoc-web-panel.git
+git clone https://github.com/webolyecom/havoc-web-panel.git
 cd havoc-web-panel
 npm install
 npm run build          # Tailwind -> public/assets/app.css
