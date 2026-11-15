@@ -37,7 +37,7 @@ final class McpController extends Controller
         if ($this->req->method !== 'POST') {
             return new Response('', 405, ['Allow' => 'POST']);
         }
-        $raw = (string)file_get_contents('php://input', false, null, 0, 16 * 1024 * 1024);
+        $raw = (string)file_get_contents('php://input', false, null, 0, 40 * 1024 * 1024);
         $msg = json_decode($raw, true);
         if (!is_array($msg)) {
             return Response::json(self::error(null, -32700, 'Parse error'), 400);
@@ -84,7 +84,10 @@ final class McpController extends Controller
                 return self::ok($id, ['protocolVersion' => $v, 'capabilities' => ['tools' => ['listChanged' => false]],
                     'serverInfo' => ['name' => 'havoc-web-panel', 'title' => 'Havoc WEB Panel', 'version' => UpdateService::current()],
                     'instructions' => 'Manages websites on a Havoc WEB Panel server as the account "' . $user['username'] . '". '
-                        . 'Typical flow: add_domain -> (DNS points here) issue_ssl -> install_wordpress, or write_file to publish pages. '
+                        . 'Typical flow: add_domain -> (DNS points here) issue_ssl -> install_wordpress, or write_file(s) to publish pages. '
+                        . 'To change code cheaply: search_files, read_file with start_line/end_line, then edit_file (only the changed text). '
+                        . 'Large uploads: the user uploads a zip in the panel file manager (or gives an https link for download_file), then extract_archive. '
+                        . 'Every file Claude changes keeps its previous version (list_file_history, restore_file). '
                         . 'Use list_domains first to see what exists. Deleting is not possible through this connector. '
                         . 'Passwords returned by install_wordpress and create_database are shown only once: always give them to the user.']);
             case 'ping':
@@ -100,8 +103,9 @@ final class McpController extends Controller
                 $args = is_array($p['arguments'] ?? null) ? $p['arguments'] : [];
                 try {
                     $res = (new McpTools($user, $scopes))->call($name, $args);
-                    return self::ok($id, ['content' => [['type' => 'text', 'text' => json_encode($res, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE)]],
-                        'structuredContent' => $res, 'isError' => false]);
+                    // compact JSON, once: every character of a result costs the user tokens
+                    return self::ok($id, ['content' => [['type' => 'text', 'text' => json_encode($res, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE)]],
+                        'isError' => false]);
                 } catch (\Throwable $e) {
                     if (!$e instanceof \DomainException && !$e instanceof \InvalidArgumentException && !$e instanceof \RuntimeException) {
                         error_log('[havoc mcp] ' . $e);

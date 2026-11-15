@@ -9,6 +9,8 @@ namespace Havoc\Ctl;
  */
 final class Fs
 {
+    use FsCode;
+
     private const MAX_EDIT = 2 * 1024 * 1024;
     private const MAX_B64  = 24000000;
     private string $root;
@@ -92,6 +94,17 @@ final class Fs
             'untar'    => $this->untar((string)($a['path'] ?? ''), (string)($a['dest'] ?? '')),
             'chunk'    => $this->chunk((string)($a['path'] ?? ''), (string)($a['b64'] ?? ''), (int)($a['offset'] ?? -1), !empty($a['final'])),
             'preview'  => $this->preview((string)($a['path'] ?? '')),
+            // used by the Claude connector (see FsCode)
+            'put'          => $this->put((string)($a['path'] ?? ''), self::decode($a)),
+            'mkdirp'       => (function () use ($a) { $this->mkdirp((string)($a['path'] ?? '')); return ['path' => $this->clean((string)($a['path'] ?? ''))]; })(),
+            'putmany'      => $this->putMany((array)($a['files'] ?? [])),
+            'edit'         => $this->edit((string)($a['path'] ?? ''), (array)($a['edits'] ?? [])),
+            'readrange'    => $this->readRange((string)($a['path'] ?? ''), (int)($a['from'] ?? 1), (int)($a['to'] ?? 0)),
+            'grep'         => $this->grep((string)($a['path'] ?? ''), (string)($a['q'] ?? ''), !empty($a['regex']), !empty($a['icase']), (string)($a['glob'] ?? ''), (int)($a['max'] ?? 100)),
+            'hist_list'    => $this->historyList((string)($a['path'] ?? '')),
+            'hist_restore' => $this->historyRestore((string)($a['path'] ?? ''), (string)($a['version'] ?? '')),
+            'extract'      => $this->extract((string)($a['path'] ?? ''), (string)($a['dest'] ?? ''), !empty($a['overwrite']), !empty($a['strip'])),
+            'fetch'        => $this->fetch((string)($a['url'] ?? ''), (string)($a['path'] ?? ''), !empty($a['overwrite'])),
             default    => throw new \InvalidArgumentException('Unknown operation'),
         };
     }
