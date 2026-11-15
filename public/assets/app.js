@@ -114,12 +114,14 @@
     const fmt = (b) => { const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; while (b >= 1024 && i < 4) { b /= 1024; i++; } return b.toFixed(i ? 1 : 0) + ' ' + u[i]; };
     const up = (s) => `${Math.floor(s / 86400)}d ${Math.floor(s % 86400 / 3600)}h ${Math.floor(s % 3600 / 60)}m`;
     const poll = async () => {
+      if (document.hidden && last) return;          // no polling in a background tab
       try {
         const s = await (await fetch(mon.dataset.url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })).json();
         set('cpu', s.cpu + '%'); bar('cpu', s.cpu);
         set('mem', `${s.mem.pct}% · ${fmt(s.mem.used)} / ${fmt(s.mem.total)}`); bar('mem', s.mem.pct);
         set('disk', `${s.disk.pct}% · ${fmt(s.disk.used)} / ${fmt(s.disk.total)}`); bar('disk', s.disk.pct);
-        set('load', s.load.join(' · '));
+        set('load', s.load.map((l) => l.toFixed(2)).join(' · '));
+        set('nettotal', `↓ ${fmt(s.net.rx)} · ↑ ${fmt(s.net.tx)}`);
         set('uptime', up(s.uptime));
         if (last) {
           const dt = Math.max(1, s.time - last.time);

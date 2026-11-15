@@ -29,6 +29,11 @@ $navGroups = [
         ['/firewall', 'nav.firewall', 'wall', 'admin'],
         ['/limits', 'nav.limits', 'gauge', 'user'],
     ]],
+    ['accounts', 'nav.g_accounts', [
+        ['/users', 'nav.users', 'users', 'reseller'],
+        ['/packages', 'nav.packages', 'box', 'reseller'],
+        ['/branding', 'nav.branding', 'brush', 'reseller'],
+    ]],
     ['server', 'nav.g_server', [
         ['/server', 'nav.monitor', 'pulse', 'admin'],
         ['/server/processes', 'nav.processes', 'list', 'admin'],
@@ -36,11 +41,6 @@ $navGroups = [
         ['/services', 'nav.services', 'server', 'admin'],
         ['/stack', 'nav.redis', 'stack', 'admin'],
         ['/server/settings', 'nav.panel_settings', 'cog', 'admin'],
-    ]],
-    ['accounts', 'nav.g_accounts', [
-        ['/users', 'nav.users', 'users', 'reseller'],
-        ['/packages', 'nav.packages', 'box', 'reseller'],
-        ['/branding', 'nav.branding', 'brush', 'reseller'],
     ]],
 ];
 

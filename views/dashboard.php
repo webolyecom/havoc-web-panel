@@ -15,12 +15,23 @@
     <h2 class="h2 mb-0"><?= e(t('dash.server')) ?> <span class="ml-1 font-mono text-sm font-normal text-slate-500"><?= e($info['hostname']) ?></span></h2>
     <span class="flex gap-3 text-sm"><a class="link" href="/server"><?= e(t('nav.monitor')) ?></a><a class="link" href="/server/processes"><?= e(t('nav.processes')) ?></a></span>
   </div>
+  <div id="monitor" data-url="/server/stats" class="mb-5 grid gap-3 sm:grid-cols-3">
+    <div class="rounded-xl bg-slate-50 px-4 py-3 dark:bg-white/[0.03]"><p class="text-xs text-slate-500"><?= e(t('dash.cpu_usage')) ?></p>
+      <p class="mt-0.5 text-2xl font-semibold tabular-nums" data-v="cpu">–</p>
+      <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"><div class="h-1.5 rounded-full bg-brand transition-all" data-bar="cpu"></div></div></div>
+    <div class="rounded-xl bg-slate-50 px-4 py-3 dark:bg-white/[0.03]"><p class="text-xs text-slate-500"><?= e(t('dash.load_avg')) ?> <span class="text-slate-400">(1 · 5 · 15 <?= e(t('dash.min')) ?>)</span></p>
+      <p class="mt-0.5 text-2xl font-semibold tabular-nums" data-v="load"><?= e(implode(' · ', array_map(static fn($l) => number_format($l, 2), $info['load']))) ?></p>
+      <p class="mt-1 text-xs text-slate-500"><?= (int)$info['cores'] ?> <?= e(t('dash.cores')) ?></p></div>
+    <div class="rounded-xl bg-slate-50 px-4 py-3 dark:bg-white/[0.03]"><p class="text-xs text-slate-500"><?= e(t('mon.network')) ?></p>
+      <p class="mt-0.5 flex flex-wrap gap-x-4 text-2xl font-semibold tabular-nums"><span><span class="text-emerald-600 dark:text-emerald-400">↓</span> <span data-v="rx">–</span></span><span><span class="text-sky-600 dark:text-sky-400">↑</span> <span data-v="tx">–</span></span></p>
+      <p class="mt-1 text-xs text-slate-500"><?= e(t('dash.net_total')) ?>: <span data-v="nettotal">–</span></p></div>
+  </div>
   <dl class="grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
     <div><dt class="text-xs text-slate-500"><?= e(t('dash.ip')) ?></dt>
       <dd class="mt-0.5 space-y-0.5 font-mono"><?php foreach ($info['ips'] ?: ['–'] as $ip): ?><span class="block select-all break-all"><?= e($ip) ?></span><?php endforeach; ?></dd></div>
     <div><dt class="text-xs text-slate-500"><?= e(t('dash.os')) ?></dt><dd class="mt-0.5 font-medium"><?= e($info['os']) ?></dd><dd class="text-xs text-slate-500"><?= e(t('dash.kernel')) ?> <?= e($info['kernel']) ?> · <?= e($info['arch']) ?></dd></div>
     <div><dt class="text-xs text-slate-500">CPU</dt><dd class="mt-0.5 truncate font-medium" title="<?= e($info['cpu']) ?>"><?= e($info['cpu']) ?></dd>
-      <dd class="text-xs text-slate-500"><?= (int)$info['cores'] ?> <?= e(t('dash.cores')) ?> · <?= e(t('dash.load')) ?> <?= e(implode(' / ', array_map(static fn($l) => number_format($l, 2), $info['load']))) ?></dd></div>
+      <dd class="text-xs text-slate-500"><?= (int)$info['cores'] ?> <?= e(t('dash.cores')) ?></dd></div>
     <div><dt class="text-xs text-slate-500"><?= e(t('dash.uptime')) ?></dt><dd class="mt-0.5 font-medium"><?= e($upText) ?></dd><dd class="text-xs text-slate-500"><?= e(date('Y-m-d H:i', $info['time'])) ?> (<?= e($info['timezone']) ?>)</dd></div>
     <div><dt class="text-xs text-slate-500"><?= e(t('dash.memory')) ?></dt><dd class="mt-0.5"><span class="font-medium"><?= e($gb($info['mem_total'] - $info['mem_used'])) ?></span> <?= e(t('dash.free_of', ['total' => $gb($info['mem_total'])])) ?></dd>
       <?= $bar($memPct) ?><?php if ($info['swap_total']): ?><dd class="mt-1 text-xs text-slate-500">Swap: <?= e($gb($info['swap_used'])) ?> / <?= e($gb($info['swap_total'])) ?></dd><?php endif; ?></div>

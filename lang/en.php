@@ -258,7 +258,7 @@ return [
     'upload.link_hint' => 'Open it in any browser and drop a .zip / .tar.gz. The archive lands in the site\'s hidden .havoc-incoming folder; extract it in the file manager or ask Claude.',
     'nav.processes' => 'Processes', 'dash.server' => 'Server', 'dash.ip' => 'IP addresses', 'dash.os' => 'Operating system', 'dash.kernel' => 'kernel',
     'dash.cores' => 'cores', 'dash.load' => 'load', 'dash.uptime' => 'Uptime', 'dash.memory' => 'Memory', 'dash.disk' => 'Disk',
-    'dash.free_of' => 'free of :total', 'dash.software' => 'Web server', 'dash.panel' => 'Panel', 'dash.d' => 'd', 'dash.h' => 'h', 'dash.m' => 'm',
+    'dash.cpu_usage' => 'CPU usage', 'dash.load_avg' => 'Load average', 'dash.min' => 'min', 'dash.net_total' => 'Since boot', 'dash.free_of' => 'free of :total', 'dash.software' => 'Web server', 'dash.panel' => 'Panel', 'dash.d' => 'd', 'dash.h' => 'h', 'dash.m' => 'm',
     'proc.title' => 'Processes', 'proc.auto' => 'Refresh every 5 seconds', 'proc.count' => 'Processes', 'proc.cpu_total' => 'CPU in use',
     'proc.mem_total' => 'Memory of processes', 'proc.busiest' => 'Busiest user', 'proc.user' => 'User', 'proc.procs' => 'Processes', 'proc.memory' => 'Memory',
     'proc.search' => 'Search command, user or PID', 'proc.all_users' => 'All users', 'proc.kernel' => 'Show kernel threads', 'proc.runtime' => 'Running for',

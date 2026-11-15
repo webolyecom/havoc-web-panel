@@ -2,6 +2,12 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.7.1] – 2026-11-16
+### Added
+- Dashboard server card: live CPU usage (with bar), load average (1 / 5 / 15 min) and network speed (download / upload per second, total since boot), refreshed every 3 seconds like the server monitor; polling pauses in a background tab.
+### Changed
+- Sidebar: the Accounts group now comes before the Server group.
+
 ## [0.7.0] – 2026-11-16
 ### Added
 - **Server overview on the dashboard** (administrators): IP addresses, operating system and kernel, CPU model, cores and load, uptime and server time, free memory and free disk space per volume (with bars), web server, PHP and MariaDB versions, panel version.

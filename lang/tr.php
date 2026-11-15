@@ -258,7 +258,7 @@ return [
     'upload.link_hint' => 'Herhangi bir tarayıcıda açıp bir .zip / .tar.gz bırakın. Arşiv sitenin gizli .havoc-incoming klasörüne gelir; dosya yöneticisinden açabilir ya da Claude\'dan isteyebilirsiniz.',
     'nav.processes' => 'İşlemler', 'dash.server' => 'Sunucu', 'dash.ip' => 'IP adresleri', 'dash.os' => 'İşletim sistemi', 'dash.kernel' => 'çekirdek',
     'dash.cores' => 'çekirdek', 'dash.load' => 'yük', 'dash.uptime' => 'Çalışma süresi', 'dash.memory' => 'Bellek', 'dash.disk' => 'Disk',
-    'dash.free_of' => 'boş · toplam :total', 'dash.software' => 'Web sunucusu', 'dash.panel' => 'Panel', 'dash.d' => 'g', 'dash.h' => 'sa', 'dash.m' => 'dk',
+    'dash.cpu_usage' => 'CPU kullanımı', 'dash.load_avg' => 'Yük ortalaması', 'dash.min' => 'dk', 'dash.net_total' => 'Açılıştan beri', 'dash.free_of' => 'boş · toplam :total', 'dash.software' => 'Web sunucusu', 'dash.panel' => 'Panel', 'dash.d' => 'g', 'dash.h' => 'sa', 'dash.m' => 'dk',
     'proc.title' => 'İşlemler', 'proc.auto' => '5 saniyede bir yenile', 'proc.count' => 'İşlem sayısı', 'proc.cpu_total' => 'Kullanılan CPU',
     'proc.mem_total' => 'İşlemlerin belleği', 'proc.busiest' => 'En yoğun kullanıcı', 'proc.user' => 'Kullanıcı', 'proc.procs' => 'İşlem', 'proc.memory' => 'Bellek',
     'proc.search' => 'Komut, kullanıcı veya PID ara', 'proc.all_users' => 'Tüm kullanıcılar', 'proc.kernel' => 'Çekirdek iş parçacıklarını göster', 'proc.runtime' => 'Süre',
