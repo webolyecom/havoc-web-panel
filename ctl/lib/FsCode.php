@@ -16,6 +16,7 @@ trait FsCode
     private const READ_BYTES    = 262144;
     private const BATCH_BYTES   = 16 * 1024 * 1024;
     private const FETCH_MAX     = 1024 * 1024 * 1024;
+    private const INCOMING      = '.havoc-incoming';            // upload links put archives here (hidden from the web)
 
     private function historyDir(): string
     {
@@ -349,7 +350,7 @@ trait FsCode
      * Extracts an archive that is inside the site. Existing files are only replaced with overwrite=true, and then
      * their previous content goes into the history. strip_top_folder drops a single top folder (e.g. "mysite/").
      */
-    private function extract(string $rel, string $dest, bool $overwrite, bool $strip): array
+    private function extract(string $rel, string $dest, bool $overwrite, bool $strip, bool $cleanup = false): array
     {
         $abs = $this->path($rel);
         $files = $this->archiveEntries($abs);
@@ -413,7 +414,29 @@ trait FsCode
         } finally {
             $this->rmTree($stage);
         }
-        return ['extracted_files' => $moved, 'replaced' => count($conflicts), 'versions_kept' => $kept, 'into' => $dest === '' ? '/' : $dest];
+        // archives that came in through an upload link are removed once they are extracted (nothing else is ever deleted)
+        $removed = false;
+        if ($cleanup && str_starts_with($this->clean($rel), self::INCOMING . '/') && is_file($abs) && !is_link($abs)) {
+            $removed = unlink($abs);
+        }
+        return ['extracted_files' => $moved, 'replaced' => count($conflicts), 'versions_kept' => $kept, 'into' => $dest === '' ? '/' : $dest]
+            + ($removed ? ['archive_removed' => true] : []);
+    }
+
+    /** Removes uploads older than $days from the incoming folder (only there). */
+    private function incomingClean(int $days): array
+    {
+        $dir = $this->root . '/' . self::INCOMING;
+        $n = 0;
+        if (is_dir($dir) && !is_link($dir)) {
+            foreach (scandir($dir) ?: [] as $f) {
+                $p = "$dir/$f";
+                if (is_file($p) && !is_link($p) && filemtime($p) < time() - max(1, $days) * 86400) {
+                    unlink($p) && $n++;
+                }
+            }
+        }
+        return ['removed' => $n];
     }
 
     private function rmTree(string $dir): void

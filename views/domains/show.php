@@ -2,8 +2,15 @@
 <?php $id = (int)$d['id']; ?>
 <div class="mb-6 flex items-center justify-between">
   <h1 class="h1 mb-0"><?= e($d['name']) ?></h1>
-  <span class="flex gap-2"><a class="btn" href="/domains/<?= $id ?>/files"><?= e(t('files.title')) ?></a><a class="btn" href="/domains/<?= $id ?>/logs"><?= e(t('domains.logs')) ?></a></span>
+  <span class="flex gap-2"><form method="post" action="/domains/<?= $id ?>/upload-link"><?= csrf_field() ?><button class="btn-ghost border border-slate-300 dark:border-slate-700"><?= e(t('upload.make_link')) ?></button></form><a class="btn" href="/domains/<?= $id ?>/files"><?= e(t('files.title')) ?></a><a class="btn" href="/domains/<?= $id ?>/logs"><?= e(t('domains.logs')) ?></a></span>
 </div>
+<?php $ul = $_SESSION['upload_link'] ?? null; if ($ul && (int)$ul['domain'] === $id): unset($_SESSION['upload_link']); ?>
+<div class="mb-6 space-y-1 rounded-xl border border-brand/30 bg-brand/5 p-4 text-sm">
+  <p class="font-semibold"><?= e(t('upload.link_ready', ['t' => $ul['expires']])) ?></p>
+  <code class="block select-all break-all rounded bg-white px-2 py-1 font-mono text-xs dark:bg-slate-900"><?= e($ul['url']) ?></code>
+  <p class="text-xs text-slate-500"><?= e(t('upload.link_hint')) ?></p>
+</div>
+<?php endif; ?>
 <div class="grid gap-6 lg:grid-cols-2">
   <div class="card space-y-4 lg:col-span-2" id="apps">
     <div class="flex flex-wrap items-center justify-between gap-2">

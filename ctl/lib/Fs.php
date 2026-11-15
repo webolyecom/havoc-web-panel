@@ -103,7 +103,8 @@ final class Fs
             'grep'         => $this->grep((string)($a['path'] ?? ''), (string)($a['q'] ?? ''), !empty($a['regex']), !empty($a['icase']), (string)($a['glob'] ?? ''), (int)($a['max'] ?? 100)),
             'hist_list'    => $this->historyList((string)($a['path'] ?? '')),
             'hist_restore' => $this->historyRestore((string)($a['path'] ?? ''), (string)($a['version'] ?? '')),
-            'extract'      => $this->extract((string)($a['path'] ?? ''), (string)($a['dest'] ?? ''), !empty($a['overwrite']), !empty($a['strip'])),
+            'extract'      => $this->extract((string)($a['path'] ?? ''), (string)($a['dest'] ?? ''), !empty($a['overwrite']), !empty($a['strip']), !empty($a['cleanup'])),
+            'incoming_clean' => $this->incomingClean((int)($a['days'] ?? 7)),
             'fetch'        => $this->fetch((string)($a['url'] ?? ''), (string)($a['path'] ?? ''), !empty($a['overwrite'])),
             default    => throw new \InvalidArgumentException('Unknown operation'),
         };

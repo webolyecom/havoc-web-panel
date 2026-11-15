@@ -249,4 +249,11 @@ return [
     'claude.need_host' => 'güvenilir sertifikalı bir alan adı gerekir (Panel adresi ve sertifikası)',
     'claude.step1' => 'Claude\'da: Ayarlar → Connectors → Add custom connector.', 'claude.step2' => 'Yukarıdaki bağlayıcı adresini girip ekleyin.',
     'claude.step3' => 'Connect\'e tıklayın, panele giriş yapın ve izin verin.', 'claude.enable' => 'Claude bağlayıcısına izin ver (kapatmak tüm bağlantıları sonlandırır)',
+    'upload.title' => 'Arşiv yükle', 'upload.to' => ':domain sitesine', 'upload.invalid' => 'Bu yükleme bağlantısı artık geçerli değil (kullanıldı, süresi doldu ya da yok). Yeni bir bağlantı isteyin.',
+    'upload.drop' => 'Dosyayı buraya bırakın veya seçmek için tıklayın', 'upload.limits' => '.zip, .tar.gz, .tgz veya .tar, en fazla 2 GB, tek dosya',
+    'upload.bad_type' => 'Tek bir .zip, .tar.gz, .tgz veya .tar dosyası seçin.', 'upload.too_big' => 'Dosya 2 GB\'tan büyük.',
+    'upload.done' => ':path konumuna yüklendi. Bu sayfayı kapatıp Claude\'a yüklendiğini söyleyebilirsiniz.', 'upload.failed' => 'Yükleme başarısız: :msg',
+    'upload.note' => 'Dosya doğrudan sunucuya gider ve sitenin web\'den açılamayan gizli bir klasöründe saklanır; istendiğinde açılır ve sonra (ya da 7 gün sonra) silinir.',
+    'upload.make_link' => 'Yükleme bağlantısı', 'upload.link_ready' => 'Tek kullanımlık yükleme bağlantısı (:t tarihine kadar geçerli):',
+    'upload.link_hint' => 'Herhangi bir tarayıcıda açıp bir .zip / .tar.gz bırakın. Arşiv sitenin gizli .havoc-incoming klasörüne gelir; dosya yöneticisinden açabilir ya da Claude\'dan isteyebilirsiniz.',
 ];

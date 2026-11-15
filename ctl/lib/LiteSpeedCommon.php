@@ -74,6 +74,8 @@ trait LiteSpeedCommon
         if (!empty($vh['suspended'])) {
             return ['RewriteRule .* - [R=503,L]'];
         }
+        // hidden files and folders (.git, .env, the panel's .havoc-incoming uploads ...) are never served, like on Nginx
+        $rules[] = 'RewriteRule (^|/)\.(?!well-known/) - [F,L]';
         if (!empty($vh['force_https']) && $ssl) {
             $rules[] = 'RewriteCond %{HTTPS} !on';
             $rules[] = 'RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/';

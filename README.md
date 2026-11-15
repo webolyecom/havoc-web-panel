@@ -10,7 +10,7 @@ Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, fi
 from one clean interface, with no license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.6.0-0b7fa0.svg)
+![Version](https://img.shields.io/badge/version-0.6.1-0b7fa0.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg)
 ![Debian](https://img.shields.io/badge/Debian-12%20%7C%2013-a81d33.svg)
 ![Status](https://img.shields.io/badge/status-beta-f59e0b.svg)
@@ -154,7 +154,7 @@ Havoc WEB Panel is also an [MCP](https://modelcontextprotocol.io) server, so Cla
 
 **What Claude can do:** list and inspect sites, search code, read files (or just some lines), edit files by changing only the relevant text, write one or many files, extract an uploaded zip / tar.gz, download a file from an https link into a site, undo its own changes (file history), read logs, add domains and subdomains, install WordPress, request SSL, change PHP version / HTTPS redirect, create databases.
 
-**Keeping it cheap:** for large or private code, upload a zip in the panel's file manager and ask Claude to extract it, so the files never pass through Claude. For changes, Claude searches, reads only the lines it needs and edits just those; every changed file keeps its previous version.
+**Keeping it cheap:** for large or private code, ask Claude for an *upload link*: you drop the zip into that page in your browser, it goes straight to the server, and Claude extracts it. The files never pass through Claude. For changes, Claude searches, reads only the lines it needs and edits just those; every changed file keeps its previous version.
 **What Claude cannot do:** delete websites, databases or files. It acts with the rights of the panel user who approved it, so a customer's connection only reaches that customer's sites. Every action is written to the audit log; connections are listed and can be ended under **Settings → Claude connector**, and the administrator can switch the connector off for the whole panel.
 
 Technically: Streamable HTTP MCP endpoint at `/mcp`, OAuth 2.1 with dynamic client registration and PKCE (S256), rotating refresh tokens, tokens stored as hashes.

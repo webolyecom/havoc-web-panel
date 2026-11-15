@@ -4,6 +4,7 @@ declare(strict_types=1);
 use Havoc\Controllers\AppController;
 use Havoc\Controllers\McpController;
 use Havoc\Controllers\OAuthController;
+use Havoc\Controllers\UploadController;
 use Havoc\Controllers\{ApiController, AuthController, BackupController, BrandingController, CronController, DashboardController, DatabaseController, DnsController, DomainController, FileController, FirewallController, FtpController, LimitsController, LogController, PackageController, ServerController, SettingsController, StackController, TrafficController, UserController, WafController, WebServerController};
 use Havoc\Core\Router;
 
@@ -183,6 +184,9 @@ return static function (Router $r): void {
     $r->post('/oauth/authorize', [OAuthController::class, 'decide'], ['auth']);
     $r->post('/oauth/token', [OAuthController::class, 'token']);
     $r->post('/mcp', [McpController::class, 'handle']);
+    $r->get('/upload/{token}', [UploadController::class, 'page']);
+    $r->post('/upload/{token}', [UploadController::class, 'chunk']);
+    $r->post('/domains/{id}/upload-link', [UploadController::class, 'create'], ['auth']);
     $r->get('/mcp', [McpController::class, 'handle']);
     $r->delete('/mcp', [McpController::class, 'handle']);
     $r->get('/api/v1/openapi.json', [ApiController::class, 'openapi']);

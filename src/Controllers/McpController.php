@@ -86,7 +86,7 @@ final class McpController extends Controller
                     'instructions' => 'Manages websites on a Havoc WEB Panel server as the account "' . $user['username'] . '". '
                         . 'Typical flow: add_domain -> (DNS points here) issue_ssl -> install_wordpress, or write_file(s) to publish pages. '
                         . 'To change code cheaply: search_files, read_file with start_line/end_line, then edit_file (only the changed text). '
-                        . 'Large uploads: the user uploads a zip in the panel file manager (or gives an https link for download_file), then extract_archive. '
+                        . 'To bring code or large files into a site, use create_upload_link (the user uploads the zip in the browser, nothing passes through Claude), then list_uploads and extract_archive. '
                         . 'Every file Claude changes keeps its previous version (list_file_history, restore_file). '
                         . 'Use list_domains first to see what exists. Deleting is not possible through this connector. '
                         . 'Passwords returned by install_wordpress and create_database are shown only once: always give them to the user.']);
