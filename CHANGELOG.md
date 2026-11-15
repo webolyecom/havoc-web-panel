@@ -2,6 +2,12 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.7.2] – 2026-11-16
+### Added
+- **Redis install / uninstall** from the panel, like Meilisearch: installs the Debian packages in the background (progress shown on the page), sets a memory limit (1/8 of the RAM), LRU eviction and a random password, and the PHP extension (phpredis) for every installed PHP version. Uninstall keeps the configuration and data unless "also delete" is ticked; reinstalling keeps the existing password.
+- Redis card: version, used memory, number of keys and clients, "Show password".
+- New servers get the phpredis extension for every PHP version.
+
 ## [0.7.1] – 2026-11-16
 ### Added
 - Dashboard server card: live CPU usage (with bar), load average (1 / 5 / 15 min) and network speed (download / upload per second, total since boot), refreshed every 3 seconds like the server monitor; polling pauses in a background tab.

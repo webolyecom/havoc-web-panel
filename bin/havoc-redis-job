@@ -1,0 +1,56 @@
+#!/bin/bash
+# Installs or removes Redis (Debian package). Started by `havocctl redis.install` / `redis.uninstall` through
+# systemd-run, so the output goes to the journal (the password is never printed).
+#   havoc-redis-job install        install redis-server + the PHP extension for every installed PHP version
+#   havoc-redis-job remove         remove the packages, keep configuration and data
+#   havoc-redis-job purge          remove the packages, configuration and all data
+set -euo pipefail
+umask 022
+export DEBIAN_FRONTEND=noninteractive
+APT=(apt-get -y -q -o DPkg::Lock::Timeout=300 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+INC=/etc/redis/havoc.conf
+
+php_versions() { for d in /etc/php/*/fpm; do [ -d "$d" ] && basename "$(dirname "$d")"; done; }
+
+case "${1:-}" in
+install)
+  echo "Installing Redis..."
+  "${APT[@]}" update >/dev/null || true
+  "${APT[@]}" install redis-server redis-tools
+  # managed settings: memory limit (1/8 of RAM, 64 MB - 1 GB), LRU eviction, a random password
+  if [ ! -f "$INC" ] || ! grep -q '^requirepass ' "$INC"; then
+    mem=$(awk '/MemTotal/{print int($2/1024/8)}' /proc/meminfo); [ "$mem" -lt 64 ] && mem=64; [ "$mem" -gt 1024 ] && mem=1024
+    printf '# Managed by Havoc WEB Panel\nmaxmemory %smb\nmaxmemory-policy allkeys-lru\nappendonly no\nrequirepass %s\n' "$mem" "$(openssl rand -hex 16)" > "$INC"
+  fi
+  chown root:redis "$INC"; chmod 640 "$INC"
+  grep -q "^include $INC" /etc/redis/redis.conf || printf '\ninclude %s\n' "$INC" >> /etc/redis/redis.conf
+  # PHP extension (phpredis) for the installed PHP versions, where the package exists
+  for v in $(php_versions); do
+    if apt-cache show "php$v-redis" >/dev/null 2>&1; then
+      "${APT[@]}" install "php$v-redis" && systemctl try-restart "php$v-fpm" || echo "Note: php$v-redis could not be installed."
+    fi
+  done
+  systemctl enable redis-server >/dev/null 2>&1 || true
+  systemctl restart redis-server
+  for i in $(seq 1 20); do
+    if REDISCLI_AUTH="$(sed -n 's/^requirepass //p' "$INC")" redis-cli -h 127.0.0.1 ping 2>/dev/null | grep -q PONG; then
+      echo "Redis $(redis-server --version | grep -oE 'v=[0-9.]+' | cut -d= -f2) is running on 127.0.0.1:6379."; exit 0
+    fi
+    sleep 0.5
+  done
+  echo "Redis was installed but does not answer; check: journalctl -u redis-server"; exit 1
+  ;;
+remove|purge)
+  echo "Stopping Redis..."
+  systemctl disable --now redis-server >/dev/null 2>&1 || true
+  if [ "$1" = purge ]; then
+    "${APT[@]}" purge redis-server redis-tools
+    rm -rf /etc/redis /var/lib/redis /var/log/redis
+    echo "Redis, its configuration and all data were removed."
+  else
+    "${APT[@]}" remove redis-server redis-tools
+    echo "Redis was removed. Configuration (/etc/redis) and data (/var/lib/redis) were kept."
+  fi
+  ;;
+*) echo "usage: havoc-redis-job install|remove|purge"; exit 2 ;;
+esac

@@ -17,7 +17,7 @@ log "Code"
 rm -rf /opt/havoc.old && cp -a /opt/havoc /opt/havoc.old
 rsync -a --delete --exclude node_modules --exclude .git "$SRC/" /opt/havoc/
 chown -R root:root /opt/havoc
-chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
+chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-redis-job /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
 chmod 755 /opt/havoc/bin/havoc /opt/havoc/bin/havoc-cronwrap /opt/havoc/ctl/fsworker
 rm -f /opt/havoc/bin/havoc-es-install
 
