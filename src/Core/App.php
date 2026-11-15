@@ -7,6 +7,7 @@ final class App
 {
     public static function run(): void
     {
+        self::trustPanelProxy();
         $req = new Request();
         if (!empty($_SERVER['HAVOC_AUTH_CHECK'])) {
             self::authCheck($req);                            // nginx auth_request subrequest (phpMyAdmin gate)
@@ -36,6 +37,32 @@ final class App
             $res = self::error($req, 500, $debug ? $e->getMessage() : 'Internal error');
         }
         $res->send();
+    }
+
+    /**
+     * Requests forwarded by the sites' Nginx for https://<panel host>/ (port 443): take the client address and the
+     * public port from the forwarding headers, but only from the loopback address and with the shared secret
+     * (see ctl/lib/PanelHost.php), so nobody else can fake them.
+     */
+    private static function trustPanelProxy(): void
+    {
+        $sent = (string)($_SERVER['HTTP_X_HAVOC_PROXY'] ?? '');
+        unset($_SERVER['HTTP_X_HAVOC_PROXY']);
+        if ($sent === '' || !in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true)) {
+            return;
+        }
+        $secret = trim((string)@file_get_contents('/etc/havoc/proxy-secret'));
+        if (strlen($secret) !== 64 || !hash_equals($secret, $sent)) {
+            return;
+        }
+        $ip = (string)($_SERVER['HTTP_X_REAL_IP'] ?? '');
+        if (filter_var($ip, FILTER_VALIDATE_IP)) {
+            $_SERVER['REMOTE_ADDR'] = $ip;
+        }
+        $port = (string)($_SERVER['HTTP_X_FORWARDED_PORT'] ?? '');
+        if (preg_match('/^\d{1,5}$/D', $port)) {
+            $_SERVER['SERVER_PORT'] = $port;
+        }
     }
 
     private static function hop(): Response

@@ -9,7 +9,7 @@ final class Actions
     public const ALLOWED = [
         'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'php.list', 'php.extensions', 'service.list', 'service.control',
         'account.ensure', 'account.delete', 'domain.apply', 'domain.delete',
-        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status',
+        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply',
         'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
         'fw.status', 'fw.enable', 'fw.disable', 'fw.allow', 'fw.ban', 'fw.whitelist', 'fw.preset', 'fw.delete', 'dns.apply', 'dns.delete', 'ftp.create', 'ftp.update', 'ftp.password', 'ftp.delete', 'backup.create', 'backup.restore', 'backup.delete', 'backup.test', 'fs.exec', 'db.create', 'db.drop', 'db.password', 'db.remote', 'db.bind', 'db.info',
     ];
@@ -107,6 +107,7 @@ final class Actions
             throw new \RuntimeException(WebServerFactory::TYPES[$t] . " could not be activated ($why); " . WebServerFactory::TYPES[$prev] . " was started again.\n" . mb_substr($log, -1500));
         }
         WebServerFactory::setActive($t);
+        try { PanelHost::apply(); } catch (\Throwable) {}              // the 443 forwarding exists only with Nginx
         return ['active' => $t, 'previous' => $prev];
     }
 
@@ -458,20 +459,22 @@ final class Actions
             . "[ \"\$RENEWED_LINEAGE\" = /etc/letsencrypt/live/havoc-panel ] || exit 0\n"
             . "install -m 644 /etc/letsencrypt/live/havoc-panel/fullchain.pem " . self::PANEL_CRT . "\n"
             . "install -m 600 /etc/letsencrypt/live/havoc-panel/privkey.pem " . self::PANEL_KEY . "\n"
-            . "systemctl reload havoc-panel-nginx\n", 0755);
+            . "systemctl reload havoc-panel-nginx\n"
+            . "systemctl is-active --quiet nginx && systemctl reload nginx || true\n", 0755);
         $cur = is_file(self::PANEL_CRT) ? @openssl_x509_parse((string)file_get_contents(self::PANEL_CRT)) : false;
         if (!is_file(self::PANEL_CRT . '.selfsigned') && $cur && !str_contains((string)($cur['issuer']['O'] ?? ''), "Let's Encrypt")) {
             copy(self::PANEL_CRT, self::PANEL_CRT . '.selfsigned');
             copy(self::PANEL_KEY, self::PANEL_KEY . '.selfsigned');
         }
         Sys::ok(['/bin/sh', self::PANEL_HOOK], null, 60, ['RENEWED_LINEAGE' => '/etc/letsencrypt/live/havoc-panel']);
-        Sys::write('/etc/havoc/panel-host', $host . "\n", 0644);
+        Sys::write(PanelHost::HOST_FILE, $host . "\n", 0644);
+        PanelHost::apply();                                              // also on https://<host>/ (port 443)
         return $this->panel_hostname_status([]);
     }
 
     public function panel_hostname_status(array $a): array
     {
-        $host = trim((string)@file_get_contents('/etc/havoc/panel-host'));
+        $host = PanelHost::host();
         $x = @openssl_x509_parse((string)@file_get_contents(self::PANEL_CRT));
         $port = 0;
         if (preg_match('/listen\s+(\d+)\s+ssl/', (string)@file_get_contents('/etc/havoc/nginx/nginx.conf'), $m)) {
@@ -480,7 +483,13 @@ final class Actions
         return ['host' => $host, 'port' => $port, 'issuer' => (string)($x['issuer']['O'] ?? $x['issuer']['CN'] ?? ''),
             'subject' => (string)($x['subject']['CN'] ?? ''), 'expires' => isset($x['validTo_time_t']) ? gmdate('Y-m-d', (int)$x['validTo_time_t']) : '',
             'trusted' => isset($x['issuer']['O']) && str_contains((string)$x['issuer']['O'], "Let's Encrypt"),
-            'webserver' => WebServerFactory::active()];
+            'webserver' => WebServerFactory::active(), 'proxy' => PanelHost::active()];
+    }
+
+    /** Re-creates the port 443 forwarding for the panel host (after updates, port or web server changes). */
+    public function panel_proxy_apply(array $a): array
+    {
+        return PanelHost::apply();
     }
 
     private const UPDATE_UNIT = 'havoc-update';
@@ -851,8 +860,19 @@ final class Actions
 
     public function panel_port_status(array $a): array { return PanelPort::status(); }
     public function panel_port_change(array $a): array { return PanelPort::change($a); }
-    public function panel_port_confirm(array $a): array { return PanelPort::confirm($a); }
-    public function panel_port_revert(array $a): array { return PanelPort::revert($a); }
+    public function panel_port_confirm(array $a): array
+    {
+        $r = PanelPort::confirm($a);
+        try { PanelHost::apply(); } catch (\Throwable) {}
+        return $r;
+    }
+
+    public function panel_port_revert(array $a): array
+    {
+        $r = PanelPort::revert($a);
+        try { PanelHost::apply(); } catch (\Throwable) {}
+        return $r;
+    }
 
     public function pma_status(array $a): array { return Pma::status(); }
     public function pma_install(array $a): array { return Pma::install(); }

@@ -10,7 +10,7 @@ Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, fi
 from one clean interface, with no license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.5.1-0b7fa0.svg)
+![Version](https://img.shields.io/badge/version-0.5.2-0b7fa0.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg)
 ![Debian](https://img.shields.io/badge/Debian-12%20%7C%2013-a81d33.svg)
 ![Status](https://img.shields.io/badge/status-beta-f59e0b.svg)
@@ -148,8 +148,8 @@ Havoc WEB Panel is also an [MCP](https://modelcontextprotocol.io) server, so Cla
 
 **Setup (once):**
 
-1. In the panel: **Panel settings → Panel address and certificate**: give the panel a host name (e.g. `panel.example.com`, A record pointing to the server) and click *Get certificate*. Claude only connects to a trusted certificate.
-2. In Claude: **Settings → Connectors → Add custom connector**, enter `https://panel.example.com:2087/mcp` (shown in the panel) and click *Connect*.
+1. In the panel: **Panel settings → Panel address and certificate**: give the panel a host name (e.g. `panel.example.com`, A record pointing to the server) and click *Get certificate*. Claude only connects to a trusted certificate. Ports 80 and 443 must be reachable (the sites' web server must be Nginx).
+2. In Claude: **Settings → Connectors → Add custom connector**, enter `https://panel.example.com/mcp` (shown in the panel; the panel is also served on port 443 under its host name), choose *Sign in now* and *Register automatically*, and click *Connect*.
 3. Log in to the panel (with 2FA) and approve. You choose whether Claude may make changes or only read.
 
 **What Claude can do:** list and inspect sites, read and write files (text and images), read logs, add domains and subdomains, install WordPress, request SSL, change PHP version / HTTPS redirect, create databases.

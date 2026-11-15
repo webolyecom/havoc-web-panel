@@ -62,7 +62,7 @@ final class ServerController extends Controller
         try {
             $r = Ctl::call('panel.hostname_ssl', ['host' => $host, 'email' => $this->req->str('email') ?: (string)$this->user()['email']], 360);
             Audit::log('panel.hostname', $host);
-            $this->flash('success', t('ph.issued', ['url' => 'https://' . $r['host'] . ':' . $r['port']]));
+            $this->flash('success', t('ph.issued', ['url' => 'https://' . $r['host'] . (!empty($r['proxy']) ? '' : ':' . $r['port'])]));
         } catch (\Throwable $e) {
             $this->flash('error', $e->getMessage());
         }
@@ -118,7 +118,7 @@ final class ServerController extends Controller
         if ($check['checked'] === 0) {
             $check = UpdateService::check();                         // first visit: ask GitHub once
         }
-        $ph = ['host' => '', 'port' => 0, 'issuer' => '', 'subject' => '', 'expires' => '', 'trusted' => false, 'webserver' => ''];
+        $ph = ['host' => '', 'port' => 0, 'issuer' => '', 'subject' => '', 'expires' => '', 'trusted' => false, 'webserver' => '', 'proxy' => false];
         try {
             $ph = Ctl::call('panel.hostname_status');
         } catch (\Throwable) {

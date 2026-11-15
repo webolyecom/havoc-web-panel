@@ -26,11 +26,8 @@ final class McpController extends Controller
         if (!OAuthService::enabled()) {
             return Response::json(['error' => 'connector_disabled'], 404);
         }
-        // DNS rebinding protection: browsers send Origin, Claude's servers do not
-        $origin = $this->req->header('Origin');
-        if ($origin !== null && $origin !== OAuthService::base()) {
-            return Response::json(['error' => 'origin_not_allowed'], 403);
-        }
+        // No Origin check: Claude's connector service may send an Origin header, and a public, token-protected endpoint
+        // without CORS headers gives a browser page nothing to read anyway.
         $auth = OAuthService::authenticate($this->req->bearer(), $this->req->ip());
         if (!$auth) {
             return self::unauthorized();
