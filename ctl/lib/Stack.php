@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Havoc\Ctl;
 
-/** Redis (Debian package, managed through an include file) and Meilisearch (official release binary, installed on demand). */
+/** Redis (Debian package installed and removed on demand, managed through an include file) and Meilisearch (official release binary, installed on demand). */
 final class Stack
 {
     private const RCONF = '/etc/redis/redis.conf';
@@ -21,9 +21,42 @@ final class Stack
         return ['loaded' => ($r['LoadState'] ?? '') === 'loaded', 'active' => $r['ActiveState'] ?? '', 'enabled' => $r['UnitFileState'] ?? ''];
     }
 
+    /** State of a background job unit started with systemd-run, plus its last output while it runs or after it failed. */
+    private static function job(string $unit): array
+    {
+        $st = trim(Sys::run(['systemctl', 'show', $unit, '-p', 'ActiveState', '--value'])[1]);
+        $log = in_array($st, ['active', 'activating', 'failed'], true)
+            ? trim(Sys::run(['journalctl', '-u', $unit, '--no-pager', '-n', '15', '-o', 'cat'])[1]) : '';
+        return [$st, $log];
+    }
+
+    private static function startJob(string $unit, array $cmd): void
+    {
+        [$st] = self::job($unit);
+        if (in_array($st, ['active', 'activating'], true)) {
+            throw new \RuntimeException('Another operation is already running');
+        }
+        if ($st === 'failed') {
+            Sys::run(['systemctl', 'reset-failed', $unit]);
+        }
+        Sys::ok(['systemd-run', '--no-block', '--unit=' . $unit, ...$cmd]);
+    }
+
     private static function memMb(): int
     {
         return preg_match('/MemTotal:\s+(\d+)/', (string)file_get_contents('/proc/meminfo'), $m) ? intdiv((int)$m[1], 1024) : 0;
+    }
+
+    private const RJOB = 'havoc-redis-job';
+
+    private static function redisInstalled(): bool
+    {
+        return str_contains(Sys::run(['dpkg-query', '-W', '-f=${Status}', 'redis-server'])[1], 'install ok installed');
+    }
+
+    private static function redisPassword(): string
+    {
+        return is_readable(self::RINC) && preg_match('/^requirepass (\S+)$/m', (string)file_get_contents(self::RINC), $m) ? $m[1] : '';
     }
 
     public static function redisStatus(): array
@@ -40,7 +73,64 @@ final class Stack
                 $cfg['password'] = true;
             }
         }
-        return ['installed' => is_file('/usr/bin/redis-server'), 'config' => $cfg] + self::state('redis-server');
+        [$job, $log] = self::job(self::RJOB);
+        $installed = self::redisInstalled();
+        $info = [];
+        $st = self::state('redis-server');
+        if ($installed && $st['active'] === 'active') {
+            // INFO through redis-cli; the password goes in the environment, never on the command line
+            $env = ($pw = self::redisPassword()) !== '' ? ['REDISCLI_AUTH' => $pw] : [];
+            [$c, $o] = Sys::run(['redis-cli', '-h', '127.0.0.1', 'INFO'], null, 10, $env);
+            if ($c === 0) {
+                foreach (explode("\n", $o) as $l) {
+                    if (preg_match('/^(redis_version|used_memory|used_memory_peak|connected_clients|uptime_in_seconds|db\d+):(.+)$/', trim($l), $m)) {
+                        $info[$m[1]] = $m[2];
+                    }
+                }
+            }
+        }
+        $keys = 0;
+        foreach ($info as $k => $v) {
+            if (str_starts_with($k, 'db') && preg_match('/keys=(\d+)/', $v, $m)) {
+                $keys += (int)$m[1];
+            }
+        }
+        return ['installed' => $installed, 'config' => $cfg, 'job' => $job, 'log' => $log,
+            'version' => $info['redis_version'] ?? '', 'used_memory' => (int)($info['used_memory'] ?? 0), 'clients' => (int)($info['connected_clients'] ?? 0),
+            'keys' => $keys, 'php_ext' => self::phpRedis()] + $st;
+    }
+
+    /** PHP versions that have the redis extension available. */
+    private static function phpRedis(): array
+    {
+        $v = [];
+        foreach (glob('/etc/php/*/mods-available/redis.ini') ?: [] as $f) {
+            $v[] = basename(dirname($f, 2));
+        }
+        sort($v, SORT_NATURAL);
+        return $v;
+    }
+
+    public static function redisInstall(): array
+    {
+        self::startJob(self::RJOB, ['/opt/havoc/bin/havoc-redis-job', 'install']);
+        return [];
+    }
+
+    /** Removes the packages; configuration and data are deleted only with purge. */
+    public static function redisUninstall(array $a): array
+    {
+        self::startJob(self::RJOB, ['/opt/havoc/bin/havoc-redis-job', !empty($a['purge']) ? 'purge' : 'remove']);
+        return [];
+    }
+
+    public static function redisKey(): array
+    {
+        $pw = self::redisPassword();
+        if ($pw === '') {
+            throw new \RuntimeException('Redis has no password; set one with "generate a new one"');
+        }
+        return ['key' => $pw];
     }
 
     public static function redisSet(array $a): array
@@ -65,6 +155,9 @@ final class Stack
             $pw = $m[1];                                       // keep the current one
         }
         $txt = "# Managed by Havoc WEB Panel\n" . ($mm !== '' ? "maxmemory $mm\n" : '') . "maxmemory-policy $pol\nappendonly $aof\n" . ($pw ? "requirepass $pw\n" : '');
+        if (!self::redisInstalled()) {
+            throw new \RuntimeException('Redis is not installed');
+        }
         Sys::write(self::RINC, $txt, 0640, 'root', 'redis');
         if (is_file(self::RCONF) && !str_contains((string)file_get_contents(self::RCONF), 'include ' . self::RINC)) {
             file_put_contents(self::RCONF, "\ninclude " . self::RINC . "\n", FILE_APPEND);
@@ -114,9 +207,7 @@ final class Stack
 
     public static function meiliStatus(): array
     {
-        $job = trim(Sys::run(['systemctl', 'show', self::MJOB, '-p', 'ActiveState', '--value'])[1]);
-        $log = in_array($job, ['active', 'activating', 'failed'], true)
-            ? trim(Sys::run(['journalctl', '-u', self::MJOB, '--no-pager', '-n', '15', '-o', 'cat'])[1]) : '';
+        [$job, $log] = self::job(self::MJOB);
         $installed = is_file(self::MBIN) && is_file(self::MUNIT);
         $version = '';
         $health = false;
@@ -137,14 +228,7 @@ final class Stack
 
     public static function meiliInstall(): array
     {
-        $job = trim(Sys::run(['systemctl', 'show', self::MJOB, '-p', 'ActiveState', '--value'])[1]);
-        if (in_array($job, ['active', 'activating'], true)) {
-            throw new \RuntimeException('Installation is already running');
-        }
-        if ($job === 'failed') {
-            Sys::run(['systemctl', 'reset-failed', self::MJOB]);
-        }
-        Sys::ok(['systemd-run', '--no-block', '--unit=' . self::MJOB, '/opt/havoc/bin/havoc-meili-install']);
+        self::startJob(self::MJOB, ['/opt/havoc/bin/havoc-meili-install']);
         return [];
     }
 

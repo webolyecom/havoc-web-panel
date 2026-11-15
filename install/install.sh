@@ -32,6 +32,7 @@ apt-get install -y "php$PV-cli" "php$PV-fpm" "php$PV-sqlite3" "php$PV-mbstring" 
 for v in $PHP_VERSIONS; do
   apt-get install -y "php$v-fpm" "php$v-cli" "php$v-mysql" "php$v-curl" "php$v-gd" "php$v-mbstring" "php$v-xml" \
     "php$v-zip" "php$v-intl" "php$v-bcmath" "php$v-opcache" || echo "WARN: php$v not fully installed"
+  apt-get install -y "php$v-redis" || echo "Note: php$v-redis not available"   # client for the shared Redis
   # per-domain FPM masters (havoc-fpm-<id>) replace the distro pools
   systemctl disable --now "php$v-fpm" 2>/dev/null || true
 done
@@ -61,7 +62,7 @@ else
   tar -xzf /tmp/havoc.tgz -C /opt/havoc --strip-components=1
 fi
 chown -R root:root /opt/havoc
-chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
+chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-redis-job /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
 chmod 755 /opt/havoc/bin/havoc-cronwrap /opt/havoc/ctl/fsworker
 chmod 755 /opt/havoc/bin/havoc
 

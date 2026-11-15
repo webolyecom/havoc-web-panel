@@ -5,7 +5,7 @@ namespace Havoc\Controllers;
 
 use Havoc\Core\{Audit, Ctl, Response};
 
-/** Admin-only: Redis and Meilisearch on/off and basic settings. Both are shared, server-wide instances. */
+/** Admin-only: Redis and Meilisearch install / uninstall, on/off and basic settings. Both are shared, server-wide instances. */
 final class StackController extends Controller
 {
     private function call(string $action, array $args = [], int $timeout = 120): ?array
@@ -58,6 +58,34 @@ final class StackController extends Controller
             $this->flash('success', t('common.saved'));
         } else {
             unset($_SESSION['new_secret']);
+        }
+        return $this->to('/stack');
+    }
+
+    public function redisInstall(): Response
+    {
+        if ($this->call('redis.install') !== null) {
+            Audit::log('redis.install');
+            $this->flash('success', t('stack.installing_started'));
+        }
+        return $this->to('/stack');
+    }
+
+    public function redisUninstall(): Response
+    {
+        $purge = (bool)$this->req->post('purge');
+        if ($this->call('redis.uninstall', ['purge' => $purge]) !== null) {
+            Audit::log('redis.uninstall', '', ['purge' => $purge]);
+            $this->flash('success', t('stack.removing_started'));
+        }
+        return $this->to('/stack');
+    }
+
+    public function redisKey(): Response
+    {
+        if (($r = $this->call('redis.key')) !== null) {
+            $_SESSION['new_secret'] = ['label' => 'Redis requirepass', 'value' => $r['key']];
+            Audit::log('redis.key.show');
         }
         return $this->to('/stack');
     }

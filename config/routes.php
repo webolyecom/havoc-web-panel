@@ -126,6 +126,9 @@ return static function (Router $r): void {
     // Redis / Meilisearch / firewall (admin only). Specific routes first.
     $r->get('/stack', [StackController::class, 'index'], ['admin']);
     $r->post('/stack/redis', [StackController::class, 'redisSave'], ['admin']);
+    $r->post('/stack/redis/install', [StackController::class, 'redisInstall'], ['admin']);
+    $r->post('/stack/redis/uninstall', [StackController::class, 'redisUninstall'], ['admin']);
+    $r->post('/stack/redis/key', [StackController::class, 'redisKey'], ['admin']);
     $r->post('/stack/meili/install', [StackController::class, 'meiliInstall'], ['admin']);
     $r->post('/stack/meili/uninstall', [StackController::class, 'meiliUninstall'], ['admin']);
     $r->post('/stack/meili/configure', [StackController::class, 'meiliConfigure'], ['admin']);
