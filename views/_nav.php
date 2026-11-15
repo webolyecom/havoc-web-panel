@@ -31,6 +31,7 @@ $navGroups = [
     ]],
     ['server', 'nav.g_server', [
         ['/server', 'nav.monitor', 'pulse', 'admin'],
+        ['/server/processes', 'nav.processes', 'list', 'admin'],
         ['/server/webserver', 'nav.webserver', 'web', 'admin'],
         ['/services', 'nav.services', 'server', 'admin'],
         ['/stack', 'nav.redis', 'stack', 'admin'],

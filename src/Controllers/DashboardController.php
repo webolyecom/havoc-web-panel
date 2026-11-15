@@ -22,7 +22,8 @@ final class DashboardController extends Controller
             }
         }
         $audit = $u['role'] === 'admin' ? DB::all('SELECT * FROM audit_log ORDER BY id DESC LIMIT 8') : [];
-        return view('dashboard', ['domains' => $count('domains'), 'users' => $u['role'] === 'user' ? 0 : count(Scope::users($u)), 'ws' => $ws, 'audit' => $audit]);
+        $info = $u['role'] === 'admin' ? \Havoc\Services\SystemStats::info() : null;
+        return view('dashboard', ['domains' => $count('domains'), 'users' => $u['role'] === 'user' ? 0 : count(Scope::users($u)), 'ws' => $ws, 'audit' => $audit, 'info' => $info]);
     }
 
     public function lang(): Response

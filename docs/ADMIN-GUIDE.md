@@ -67,6 +67,7 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 | Logs: every site's access / error / PHP log in one list, live viewer (filter, highlighting, line limit), download, clear one/selected/all sites incl. rotated copies, latest errors across all sites, server logs for admins (Nginx, panel, MariaDB, slow log, WAF) | ✅ implemented |
 | SSL: automatic Let's Encrypt for new domains (background job, HTTP pre-check of every name incl. www and aliases, retry with back-off while DNS is not pointed yet, optional auto HTTPS), manual issue/renew, custom, Cloudflare Origin, force HTTPS, HSTS | ✅ implemented (Nginx) |
 | Server monitor, service control | ✅ implemented |
+| Dashboard server overview, process list (end account processes) | ✅ implemented |
 | REST API + OpenAPI | ✅ domains, me, stats |
 | Resellers, customers, packages (limits pushed to FPM cgroups), white-label (name, colour, logo, panel domain) | ✅ implemented |
 | File manager: CodeMirror editor (syntax highlighting, Ctrl+S), drag-and-drop multi upload in chunks (up to 2 GB), streaming download of any size, search, sort, copy/move, rename, bulk and recursive permissions, zip and tar.gz create/extract (unsafe archives refused), image preview; isolated to the docroot, runs as the tenant's Linux user | ✅ implemented |

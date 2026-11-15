@@ -9,7 +9,7 @@ final class Actions
     public const ALLOWED = [
         'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'php.list', 'php.extensions', 'service.list', 'service.control',
         'account.ensure', 'account.delete', 'domain.apply', 'domain.delete',
-        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply',
+        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply', 'proc.list', 'proc.signal',
         'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
         'fw.status', 'fw.enable', 'fw.disable', 'fw.allow', 'fw.ban', 'fw.whitelist', 'fw.preset', 'fw.delete', 'dns.apply', 'dns.delete', 'ftp.create', 'ftp.update', 'ftp.password', 'ftp.delete', 'backup.create', 'backup.restore', 'backup.delete', 'backup.test', 'fs.exec', 'db.create', 'db.drop', 'db.password', 'db.remote', 'db.bind', 'db.info',
     ];
@@ -420,6 +420,52 @@ final class Actions
     public function app_wordpress(array $a): array
     {
         return AppInstaller::wordpress($a);
+    }
+
+    /** Running processes (ps), newest data first by CPU; kernel threads are marked so the panel can hide them. */
+    public function proc_list(array $a): array
+    {
+        [$c, $o] = Sys::run(['ps', '-eo', 'pid=,ppid=,uid=,user:32=,pcpu=,pmem=,rss=,etimes=,stat=,args=', '--sort=-pcpu'], null, 20, ['LC_ALL' => 'C']);
+        if ($c !== 0) {
+            throw new \RuntimeException('ps failed');
+        }
+        $out = [];
+        foreach (explode("\n", trim($o)) as $line) {
+            $f = preg_split('/\s+/', trim($line), 10);
+            if (count($f) < 10 || !ctype_digit($f[0])) {
+                continue;
+            }
+            [$pid, $ppid, $uid, $user, $cpu, $mem, $rss, $et, $st, $args] = $f;
+            if ((int)$pid === getmypid()) {
+                continue;
+            }
+            $out[] = ['pid' => (int)$pid, 'ppid' => (int)$ppid, 'uid' => (int)$uid, 'user' => $user, 'cpu' => (float)$cpu, 'mem' => (float)$mem,
+                'rss' => (int)$rss * 1024, 'time' => (int)$et, 'state' => $st, 'cmd' => mb_substr($args, 0, 400),
+                'kernel' => (int)$pid === 2 || (int)$ppid === 2];
+            if (count($out) >= 2000) {
+                break;
+            }
+        }
+        return ['processes' => $out, 'at' => time()];
+    }
+
+    /** TERM or KILL for a process of a hosting account (hvN) only: system services cannot be stopped from the panel. */
+    public function proc_signal(array $a): array
+    {
+        $pid = (int)($a['pid'] ?? 0);
+        $sig = ($a['signal'] ?? 'TERM') === 'KILL' ? 9 : 15;
+        if ($pid < 2 || !is_dir("/proc/$pid")) {
+            throw new \RuntimeException('Process not found (it may have ended already)');
+        }
+        $uid = preg_match('/^Uid:\s+(\d+)/m', (string)@file_get_contents("/proc/$pid/status"), $m) ? (int)$m[1] : 0;
+        $name = (string)(posix_getpwuid($uid)['name'] ?? '');
+        if (!preg_match('/^hv\d+$/D', $name)) {
+            throw new \RuntimeException('Only processes of hosting accounts can be ended here (this one belongs to ' . ($name ?: "uid $uid") . ')');
+        }
+        if (!posix_kill($pid, $sig)) {
+            throw new \RuntimeException('Could not signal the process');
+        }
+        return ['pid' => $pid, 'user' => $name, 'signal' => $sig === 9 ? 'KILL' : 'TERM'];
     }
 
     private const PANEL_CRT = '/etc/havoc/ssl/panel.crt';

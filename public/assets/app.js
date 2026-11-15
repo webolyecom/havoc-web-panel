@@ -14,6 +14,9 @@
     applyTheme(order[(order.indexOf(cur) + 1) % 3]);
   });
   $('#theme-select')?.addEventListener('change', (e) => applyTheme(e.target.value));
+  // percentage bars rendered by the server (inline style attributes are blocked by the CSP; CSSOM is allowed)
+  document.querySelectorAll('[data-pct]').forEach((e) => { e.style.width = Math.min(100, Math.max(0, +e.dataset.pct)) + '%'; });
+
   // mobile drawer
   const drawer = (open) => { root.classList.toggle('sidebar-open', open); $('#sidebar-backdrop')?.classList.toggle('hidden', !open); };
   $('#menu-btn')?.addEventListener('click', () => drawer(true));
