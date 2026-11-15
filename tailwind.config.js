@@ -1,7 +1,7 @@
 /** Tailwind build:  npm install && npm run build   (the compiled public/assets/app.css ships in releases) */
 module.exports = {
   darkMode: 'class',
-  content: ['./views/**/*.php', './public/assets/app.js', './public/assets/files.js', './public/assets/cron.js', './public/assets/logs.js'],
+  content: ['./views/**/*.php', './public/assets/app.js', './public/assets/files.js', './public/assets/cron.js', './public/assets/logs.js', './public/assets/upload.js'],
   theme: {
     extend: {
       colors: {

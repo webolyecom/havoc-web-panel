@@ -62,7 +62,8 @@ final class Request
     /** Endpoints used by programs (Claude connector, OAuth): no session, no CSRF token, JSON errors. */
     public function isMachine(): bool
     {
-        return in_array($this->path, ['/mcp', '/oauth/token', '/oauth/register'], true) || str_starts_with($this->path, '/.well-known/');
+        return in_array($this->path, ['/mcp', '/oauth/token', '/oauth/register'], true) || str_starts_with($this->path, '/.well-known/')
+            || str_starts_with($this->path, '/upload/');               // one-time upload links: the token is the permission
     }
 
     public function wantsJson(): bool

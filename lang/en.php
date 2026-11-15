@@ -249,4 +249,11 @@ return [
     'claude.need_host' => 'needs a host name with a trusted certificate (Panel address and certificate)',
     'claude.step1' => 'In Claude: Settings → Connectors → Add custom connector.', 'claude.step2' => 'Enter the connector address above and add it.',
     'claude.step3' => 'Click Connect, log in to the panel and allow access.', 'claude.enable' => 'Allow the Claude connector (turning it off ends all connections)',
+    'upload.title' => 'Upload an archive', 'upload.to' => 'Into the website :domain', 'upload.invalid' => 'This upload link is not valid any more (it was used, it expired, or it does not exist). Ask for a new one.',
+    'upload.drop' => 'Drop the file here or click to choose it', 'upload.limits' => '.zip, .tar.gz, .tgz or .tar, up to 2 GB, one file',
+    'upload.bad_type' => 'Choose one .zip, .tar.gz, .tgz or .tar file.', 'upload.too_big' => 'The file is larger than 2 GB.',
+    'upload.done' => 'Uploaded to :path. You can close this page and tell Claude it is uploaded.', 'upload.failed' => 'Upload failed: :msg',
+    'upload.note' => 'The file goes straight to the server and is stored in a hidden folder of the site that cannot be opened from the web; it is extracted on request and removed afterwards (or after 7 days).',
+    'upload.make_link' => 'Upload link', 'upload.link_ready' => 'One-time upload link (valid until :t):',
+    'upload.link_hint' => 'Open it in any browser and drop a .zip / .tar.gz. The archive lands in the site\'s hidden .havoc-incoming folder; extract it in the file manager or ask Claude.',
 ];

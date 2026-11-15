@@ -2,6 +2,13 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.6.1] – 2026-11-15
+### Added
+- **One-time upload links**: the single, cheapest and fastest way to bring code into a site. Claude (`create_upload_link`) or the domain page creates a link valid for one hour and one file; anyone with the link uploads a .zip / .tar.gz / .tgz / .tar (up to 2 GB, 8 MB chunks with retries) in the browser, straight to the server, no login and nothing through Claude. The archive is stored in the site's hidden `.havoc-incoming` folder, `extract_archive` unpacks it and removes it; leftovers are deleted after 7 days. New connector tools: `create_upload_link`, `list_uploads`.
+- Pages without a session (upload page) follow the browser language.
+### Security
+- LiteSpeed sites now refuse hidden files and folders (`.git`, `.env`, `.havoc-incoming` …), as Nginx sites already did.
+
 ## [0.6.0] – 2026-11-15
 ### Added (Claude connector)
 - **edit_file**: changes only the given text of a file (exact match, all-or-nothing). Updating a few lines no longer means re-sending the whole file: far fewer tokens and much faster.

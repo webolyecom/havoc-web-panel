@@ -13,10 +13,22 @@ final class I18n
     public static function boot(?array $user): void
     {
         $default = Config::get('app.locale', 'en');
-        $cand = $user['locale'] ?? $_COOKIE['havoc_lang'] ?? $default;
+        $cand = $user['locale'] ?? $_COOKIE['havoc_lang'] ?? self::browser() ?? $default;
         self::$locale = isset(self::SUPPORTED[$cand]) ? $cand : 'en';
         self::$fallback = require HAVOC_ROOT . '/lang/en.php';
         self::$msgs = self::$locale === 'en' ? self::$fallback : require HAVOC_ROOT . '/lang/' . self::$locale . '.php';
+    }
+
+    /** First supported language of the browser (Accept-Language), for visitors without an account or cookie. */
+    private static function browser(): ?string
+    {
+        foreach (explode(',', strtolower((string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''))) as $part) {
+            $code = substr(trim(explode(';', $part)[0]), 0, 2);
+            if (isset(self::SUPPORTED[$code])) {
+                return $code;
+            }
+        }
+        return null;
     }
 
     public static function locale(): string

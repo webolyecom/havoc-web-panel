@@ -43,6 +43,11 @@ switch ($cmd) {
             fwrite(STDERR, 'update check: ' . $e->getMessage() . "\n");
         }
         \Havoc\Services\SslService::retryDue();
+        try {
+            \Havoc\Services\UploadService::cleanup();
+        } catch (\Throwable $e) {
+            fwrite(STDERR, 'upload cleanup: ' . $e->getMessage() . "\n");
+        }
         \Havoc\Services\UsageService::scan();
         break;
     case 'ssl:auto':

@@ -44,6 +44,7 @@ final class McpTools
                 'file_pattern' => ['type' => 'string', 'description' => 'Only file names matching this pattern, e.g. *.php'],
                 'regex' => ['type' => 'boolean', 'default' => false], 'case_insensitive' => ['type' => 'boolean', 'default' => false],
                 'max_results' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 300, 'default' => 100]], ['domain', 'query'], false),
+            $t('list_uploads', 'Recent uploads', 'Archives that arrived in a website through upload links (newest first), with the path to give to extract_archive.', ['domain' => $domain], ['domain'], false),
             $t('list_file_history', 'File history', 'Earlier versions Claude\'s changes kept of a file (or, without path, which files have versions). Use restore_file to go back.', ['domain' => $domain,
                 'path' => ['type' => 'string', 'description' => 'File path. Empty: list the files that have versions.']], ['domain'], false),
             $t('read_log', 'Read website log', 'Last lines of a website log.', ['domain' => $domain,
@@ -83,12 +84,14 @@ final class McpTools
                     'path' => ['type' => 'string'], 'content' => ['type' => 'string'], 'encoding' => ['type' => 'string', 'enum' => ['text', 'base64'], 'default' => 'text']],
                     'required' => ['path', 'content'], 'additionalProperties' => false]],
             ], ['domain', 'files'], true),
+            $t('create_upload_link', 'Create upload link', 'The cheapest and fastest way to bring code into a website: returns a one-time link (valid 1 hour) where the USER uploads a .zip / .tar.gz / .tgz / .tar (up to 2 GB) in the browser; the file goes straight to the server, not through Claude. Give the link to the user, wait until they say it is uploaded, then call list_uploads and extract_archive.', ['domain' => $domain], ['domain'], true, false),
             $t('extract_archive', 'Extract archive', 'Extracts a .zip, .tar.gz, .tgz or .tar that is already in the website (e.g. uploaded by the user in the panel\'s file manager). Files are not sent through Claude, so this costs almost no tokens. Existing files are only replaced with overwrite=true (their previous versions are kept). Archives with links or unsafe paths are refused.', [
                 'domain' => $domain,
                 'path' => ['type' => 'string', 'description' => 'Archive path relative to the website root, e.g. "site.zip"'],
                 'destination' => ['type' => 'string', 'description' => 'Folder to extract into, relative to the website root. Default: the website root.'],
                 'strip_top_folder' => ['type' => 'boolean', 'default' => true, 'description' => 'If everything is inside one top folder (e.g. "mysite/"), extract its contents directly'],
                 'overwrite' => ['type' => 'boolean', 'default' => false],
+                'remove_archive' => ['type' => 'boolean', 'default' => true, 'description' => 'Remove the archive after extracting (only for archives that came through an upload link)'],
             ], ['domain', 'path'], true, false),
             $t('download_file', 'Download file into website', 'Downloads an https:// URL (for example a private, time-limited link to an archive) straight into the website, without passing the content through Claude. Follow with extract_archive for archives. Max 1 GB; private and internal addresses are refused.', [
                 'domain' => $domain,
@@ -267,7 +270,22 @@ final class McpTools
     {
         $d = $this->d($a);
         return $this->fs($d, 'extract', ['path' => self::rel($a['path'] ?? '', false), 'dest' => self::rel($a['destination'] ?? ''),
-            'overwrite' => !empty($a['overwrite']), 'strip' => ($a['strip_top_folder'] ?? true) !== false]);
+            'overwrite' => !empty($a['overwrite']), 'strip' => ($a['strip_top_folder'] ?? true) !== false, 'cleanup' => ($a['remove_archive'] ?? true) !== false]);
+    }
+
+    private function t_create_upload_link(array $a): array
+    {
+        $d = $this->d($a);
+        $r = UploadService::create($this->user, $d, 'claude');
+        return ['domain' => $d['name'], 'upload_link' => $r['url'], 'valid_until' => $r['expires'],
+            'accepts' => '.zip, .tar.gz, .tgz, .tar up to 2 GB, one file, one time',
+            'next' => 'Send the link to the user. When they confirm, call list_uploads, then extract_archive with that path (destination as wanted).'];
+    }
+
+    private function t_list_uploads(array $a): array
+    {
+        $d = $this->d($a);
+        return ['domain' => $d['name'], 'uploads' => UploadService::recent((int)$d['id'])];
     }
 
     private function t_download_file(array $a): array
