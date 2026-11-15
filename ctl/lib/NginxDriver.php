@@ -7,6 +7,7 @@ final class NginxDriver implements WebServer
 {
     private const DIR = '/etc/nginx/conf.d';
     private const CUSTOM = '/etc/nginx/havoc-custom';
+    private const DEFAULT = '/etc/nginx/conf.d/havoc-000-default.conf';
 
     public function type(): string { return 'nginx'; }
     public function service(): string { return 'nginx'; }
@@ -26,6 +27,54 @@ final class NginxDriver implements WebServer
     {
         @unlink('/etc/nginx/sites-enabled/default');               // the Debian welcome site would take port 80 for unknown hosts
         is_dir(self::CUSTOM) || mkdir(self::CUSTOM, 0755, true);
+        $this->ensureDefault();
+    }
+
+    /**
+     * Catch-all server for host names that no site claims (the server's IP, a domain whose DNS points here but is not added,
+     * HTTPS for a site that has no certificate yet, Cloudflare connecting with an unknown SNI). Without it Nginx answers such
+     * requests with the first site in alphabetical order, so every unknown name showed that site's files.
+     */
+    private function ensureDefault(): void
+    {
+        $page = '/var/www/havoc-default';
+        is_dir($page) || mkdir($page, 0755, true);
+        if (!is_file("$page/index.html")) {
+            Sys::write("$page/index.html", "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\"><title>No website here</title>"
+                . "<body style=\"font:16px/1.5 system-ui,sans-serif;display:grid;place-items:center;min-height:90vh;color:#334155\">"
+                . "<div style=\"text-align:center\"><h1 style=\"font-size:22px\">No website is configured for this address</h1>"
+                . "<p>If this is your domain, add it in the hosting panel.</p></div>\n", 0644);
+        }
+        $conf = <<<NGX
+# Managed by Havoc WEB Panel - catch-all for host names no site claims
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    access_log off;
+    location ^~ /.well-known/acme-challenge/ { root /var/www/havoc-acme; default_type text/plain; try_files \$uri =404; }
+    location = /index.html { root $page; internal; }
+    error_page 404 /index.html;
+    location / { return 404; }
+}
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+    access_log off;
+    ssl_reject_handshake on;
+}
+
+NGX;
+        if (is_file(self::DEFAULT) && file_get_contents(self::DEFAULT) === $conf) {
+            return;
+        }
+        $old = is_file(self::DEFAULT) ? file_get_contents(self::DEFAULT) : null;
+        Sys::write(self::DEFAULT, $conf, 0644);
+        if (Sys::run(['/usr/sbin/nginx', '-t'])[0] !== 0) {
+            // e.g. another default_server defined by hand: keep the server working, sites still get their own blocks
+            $old === null ? @unlink(self::DEFAULT) : Sys::write(self::DEFAULT, $old, 0644);
+        }
     }
 
     public function start(): void
@@ -43,6 +92,7 @@ final class NginxDriver implements WebServer
     {
         $file = self::DIR . '/havoc-' . $vh['domain'] . '.conf';
         $cust = self::CUSTOM . '/' . $vh['domain'] . '.conf';
+        $this->ensureDefault();
         $old  = is_file($file) ? file_get_contents($file) : null;
         $oldC = is_file($cust) ? file_get_contents($cust) : null;
         $custom = trim((string)($vh['nginx_custom'] ?? ''));
@@ -117,6 +167,8 @@ final class NginxDriver implements WebServer
 
         $body = <<<NGX
     root $root;
+    # the web server (www-data) is in every account's group: never follow a symlink whose target has another owner
+    disable_symlinks if_not_owner from=\$document_root;
     index index.php index.html index.htm;
     $access
     error_log $logDir/$d.error.log warn;

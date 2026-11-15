@@ -12,7 +12,7 @@ final class Ctl
 {
     public static function call(string $action, array $args = [], int $timeout = 120): array
     {
-        if (!preg_match('/^[a-z]+\.[a-z_]+$/', $action)) {
+        if (!preg_match('/^[a-z]+\.[a-z_]+$/D', $action)) {
             throw new \InvalidArgumentException('Bad action');
         }
         $cmd  = [Config::get('ctl.sudo'), '-n', Config::get('ctl.bin'), $action];
@@ -58,7 +58,7 @@ final class Ctl
         fclose($pipes[0]);
         $head = (string)fgets($pipes[1], 4096);
         try {
-            if (!preg_match('/^OK (\d+) (\S+)$/', rtrim($head), $m)) {
+            if (!preg_match('/^OK (\d+) (\S+)$/D', rtrim($head), $m)) {
                 throw new \RuntimeException(str_starts_with($head, 'ERR ') ? trim(substr($head, 4)) : 'Download failed');
             }
             $sink((int)$m[1], rawurldecode($m[2]), $pipes[1]);

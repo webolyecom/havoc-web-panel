@@ -35,7 +35,7 @@ final class Firewall
     {
         $v = (string)$v;
         $proto = (string)$proto;
-        if (!preg_match('/^([0-9]{1,5})(?::([0-9]{1,5}))?$/', $v, $m)) {
+        if (!preg_match('/^([0-9]{1,5})(?::([0-9]{1,5}))?$/D', $v, $m)) {
             throw new \InvalidArgumentException('Invalid port');
         }
         $a = (int)$m[1];
@@ -96,7 +96,7 @@ final class Firewall
     {
         $rules = [];
         foreach (explode("\n", $o) as $l) {
-            if (!preg_match('/^\[\s*(\d+)\]\s+(.+?)\s{2,}(ALLOW|DENY|REJECT|LIMIT)(?:\s+(?:IN|OUT|FWD))?\s+(.+?)(?:\s+#\s*(.*))?\s*$/', $l, $m)) {
+            if (!preg_match('/^\[\s*(\d+)\]\s+(.+?)\s{2,}(ALLOW|DENY|REJECT|LIMIT)(?:\s+(?:IN|OUT|FWD))?\s+(.+?)(?:\s+#\s*(.*))?\s*$/D', $l, $m)) {
                 continue;
             }
             $rules[] = ['n' => (int)$m[1], 'to' => trim($m[2]), 'action' => $m[3], 'from' => trim($m[4]), 'comment' => trim($m[5] ?? ''), 'raw' => preg_replace('/\s+/', ' ', trim($l))];
@@ -185,11 +185,11 @@ final class Firewall
         if (!$rule || $rule['raw'] !== $raw) {
             throw new \RuntimeException('The firewall changed in the meantime. Reload the page.');
         }
-        if ($rule['action'] === 'ALLOW' && preg_match('/^(\d+)(?:\/\w+)?(?:\s+\(v6\))?$/', $rule['to'], $m) && in_array((int)$m[1], self::protectedPorts(), true)) {
+        if ($rule['action'] === 'ALLOW' && preg_match('/^(\d+)(?:\/\w+)?(?:\s+\(v6\))?$/D', $rule['to'], $m) && in_array((int)$m[1], self::protectedPorts(), true)) {
             throw new \InvalidArgumentException('This rule keeps SSH, the panel or the web server reachable and cannot be removed here');
         }
         $me = (string)($a['actor_ip'] ?? '');
-        if ($rule['action'] === 'ALLOW' && $me !== '' && preg_match('#^[0-9a-f.:/]+$#i', $rule['from']) && self::covers($rule['from'], $me)) {
+        if ($rule['action'] === 'ALLOW' && $me !== '' && preg_match('#^[0-9a-f.:/]+$#iD', $rule['from']) && self::covers($rule['from'], $me)) {
             throw new \InvalidArgumentException('This rule allows your own address and cannot be removed here');
         }
         self::ufw('--force', 'delete', (string)$n);

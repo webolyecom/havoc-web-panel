@@ -129,6 +129,11 @@ final class LswsDriver implements WebServer
         $cfg = $doc->documentElement;
         self::setText($doc, $cfg, 'user', 'www-data');
         self::setText($doc, $cfg, 'group', 'www-data');
+        // www-data is in every account's group: follow symlinks only when link and target have the same owner
+        $sec = self::child($doc, $cfg, 'security');
+        $fac = self::child($doc, $sec, 'fileAccessControl');
+        self::setText($doc, $fac, 'followSymbolLink', '2');
+        self::setText($doc, $fac, 'checkSymbolLink', '1');
         [$crt, $key] = self::defaultCert();
         $vhosts = self::managed();
 
@@ -142,7 +147,7 @@ final class LswsDriver implements WebServer
         foreach ($vhosts as $name => $names) {
             $v = $doc->createElement('virtualHost');
             self::build($doc, $v, ['name' => $name, 'vhRoot' => self::$root . "/conf/vhosts/$name", 'configFile' => self::$root . "/conf/vhosts/$name/vhconf.xml",
-                'allowSymbolLink' => 1, 'enableScript' => 1, 'restrained' => 0, 'setUIDMode' => 0]);
+                'allowSymbolLink' => 2, 'enableScript' => 1, 'restrained' => 0, 'setUIDMode' => 0]);
             $vl->appendChild($v);
         }
 

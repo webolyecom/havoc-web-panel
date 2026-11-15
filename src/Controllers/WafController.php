@@ -109,7 +109,7 @@ final class WafController extends Controller
         $target = '';
         $op = '';
         if ($type === 'exclude') {
-            if (!preg_match('/^[0-9]{3,7}$/', $value)) {
+            if (!preg_match('/^[0-9]{3,7}$/D', $value)) {
                 $this->flash('error', t('waf.bad_id'));
                 return $this->to('/waf');
             }
@@ -118,7 +118,7 @@ final class WafController extends Controller
             $op = $this->req->str('op');
             $value = strtolower($value);
             if (!in_array($target, ['uri', 'ua', 'args'], true) || !in_array($op, ['contains', 'beginswith'], true)
-                || !preg_match('#^[a-z0-9._~\-/%?=&:+@]{1,100}$#', $value)) {
+                || !preg_match('#^[a-z0-9._~\-/%?=&:+@]{1,100}$#D', $value)) {
                 $this->flash('error', t('waf.bad_value'));
                 return $this->to('/waf');
             }

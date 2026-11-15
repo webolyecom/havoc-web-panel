@@ -204,4 +204,5 @@ return [
     'nginx.inactive' => 'Aktif web sunucusu :name; bu kurallar şu anda kullanılmıyor. Nginx’e geri dönerseniz yeniden uygulanır. LiteSpeed ile yönlendirme kurallarını document root’taki bir .htaccess dosyasına yazın.',
     'nav.search' => 'Menüde ara', 'nav.no_match' => 'Sonuç yok', 'nav.collapse' => 'Menüyü daralt', 'nav.expand' => 'Menüyü genişlet',
     'common.close' => 'Kapat', 'role.admin' => 'Yönetici', 'role.reseller' => 'Bayi', 'role.user' => 'Kullanıcı',
+    'ssl.why_cloudflare' => 'alan adı Cloudflare proxy üzerinden geçiyor (turuncu bulut) ve kontrol bu sunucuya ulaşamadı. Sertifika alınana kadar DNS kayıtlarını "DNS only" (gri bulut) yapın ya da bir Cloudflare Origin sertifikası yükleyip SSL modunu "Full (strict)" seçin',
 ];

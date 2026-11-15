@@ -16,7 +16,7 @@ final class Validator
     public static function domain(mixed $d): string
     {
         $d = strtolower(trim((string)$d));
-        if (!preg_match('/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/', $d)) {
+        if (!preg_match('/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/D', $d)) {
             throw new \InvalidArgumentException('Invalid domain name');
         }
         return $d;
@@ -24,7 +24,7 @@ final class Validator
 
     public static function account(mixed $a): string
     {
-        if (!is_string($a) || !preg_match('/^hv[0-9]{1,9}$/', $a)) {
+        if (!is_string($a) || !preg_match('/^hv[0-9]{1,9}$/D', $a)) {
             throw new \InvalidArgumentException('Invalid account');
         }
         return $a;
@@ -48,7 +48,7 @@ final class Validator
 
     public static function ext(mixed $e): string
     {
-        if (!is_string($e) || !preg_match('/^[a-z0-9_]{2,32}$/', $e)) {
+        if (!is_string($e) || !preg_match('/^[a-z0-9_]{2,32}$/D', $e)) {
             throw new \InvalidArgumentException('Invalid extension');
         }
         return $e;
@@ -65,7 +65,7 @@ final class Validator
     public static function relPath(mixed $p): string
     {
         $p = trim((string)$p, '/');
-        if ($p === '' || !preg_match('#^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$#', $p) || str_contains($p, '..')) {
+        if ($p === '' || !preg_match('#^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$#D', $p) || str_contains($p, '..')) {
             throw new \InvalidArgumentException('Invalid path');
         }
         return $p;
@@ -88,7 +88,7 @@ final class Validator
     public static function redirectSource(mixed $v): string
     {
         $v = (string)$v;
-        if (!preg_match('#^/([A-Za-z0-9._~\-/%]*\*?)$#', $v) || str_starts_with($v, '/.well-known') || strlen($v) > 200
+        if (!preg_match('#^/([A-Za-z0-9._~\-/%]*\*?)$#D', $v) || str_starts_with($v, '/.well-known') || strlen($v) > 200
             || ($v !== '/' && str_contains($v, '*') && !str_ends_with($v, '/*'))) {
             throw new \InvalidArgumentException('Invalid source path (use /path, /dir/* or /)');
         }
@@ -98,7 +98,8 @@ final class Validator
     public static function redirectTarget(mixed $v): string
     {
         $v = (string)$v;
-        if (!preg_match('#^(https?://[A-Za-z0-9._~:/?\#\[\]@!&\'()*+,;=%\-]+|/[A-Za-z0-9._~:/?\#@!&()*+,;=%\-]*)$#', $v) || strlen($v) > 500) {
+        // no quotes, ";", spaces or braces: the value is written into web server configuration files
+        if (!preg_match('#^(https?://[A-Za-z0-9._~:/?\#\[\]@!&()*+,=%\-]+|/[A-Za-z0-9._~:/?\#@!&()*+,=%\-]*)$#D', $v) || strlen($v) > 500) {
             throw new \InvalidArgumentException('Invalid target URL');
         }
         return $v;

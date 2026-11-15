@@ -11,7 +11,7 @@ final class Dns
 {
     private const DIR = '/etc/bind/havoc';
     private const TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'CAA'];
-    private const HOST = '/^[a-z0-9_][a-z0-9_-]{0,62}(\.[a-z0-9_][a-z0-9_-]{0,62})*\.?$/';
+    private const HOST = '/^[a-z0-9_][a-z0-9_-]{0,62}(\.[a-z0-9_][a-z0-9_-]{0,62})*\.?$/D';
 
     private static function name(string $n, string $dom): string
     {
@@ -22,7 +22,7 @@ final class Dns
         if (str_ends_with($n, '.' . $dom)) {
             $n = substr($n, 0, -strlen($dom) - 1);
         }
-        if (strlen($n) > 200 || !preg_match('/^(\*|[a-z0-9_][a-z0-9_-]{0,62})(\.[a-z0-9_][a-z0-9_-]{0,62})*$/', $n)) {
+        if (strlen($n) > 200 || !preg_match('/^(\*|[a-z0-9_][a-z0-9_-]{0,62})(\.[a-z0-9_][a-z0-9_-]{0,62})*$/D', $n)) {
             throw new \InvalidArgumentException("Invalid record name: $n");
         }
         return $n;
@@ -52,7 +52,7 @@ final class Dns
 
     private static function txt(string $t): string
     {
-        if ($t === '' || strlen($t) > 2048 || !preg_match('/^[\x20-\x7e]+$/', $t)) {
+        if ($t === '' || strlen($t) > 2048 || !preg_match('/^[\x20-\x7e]+$/D', $t)) {
             throw new \InvalidArgumentException('TXT value must be printable ASCII (max 2048 chars)');
         }
         return implode(' ', array_map(static fn($c) => '"' . addcslashes($c, '"\\') . '"', str_split($t, 250)));
@@ -97,13 +97,13 @@ final class Dns
                 $d = self::txt($c);
                 break;
             case 'SRV':
-                if (!preg_match('/^([0-9]{1,5}) ([0-9]{1,5}) (\S+)$/', preg_replace('/\s+/', ' ', $c), $m)) {
+                if (!preg_match('/^([0-9]{1,5}) ([0-9]{1,5}) (\S+)$/D', preg_replace('/\s+/', ' ', $c), $m)) {
                     throw new \InvalidArgumentException('SRV content: "weight port target"');
                 }
                 $d = "$prio {$m[1]} {$m[2]} " . self::target($m[3]);
                 break;
             case 'CAA':
-                if (!preg_match('/^([0-9]{1,3}) (issue|issuewild|iodef) (\S{1,255})$/', preg_replace('/\s+/', ' ', $c), $m) || !preg_match('#^[A-Za-z0-9.\-;:@/_=]+$#', $m[3])) {
+                if (!preg_match('/^([0-9]{1,3}) (issue|issuewild|iodef) (\S{1,255})$/D', preg_replace('/\s+/', ' ', $c), $m) || !preg_match('#^[A-Za-z0-9.\-;:@/_=]+$#D', $m[3])) {
                     throw new \InvalidArgumentException('CAA content: "flags tag value", e.g. 0 issue letsencrypt.org');
                 }
                 $d = "{$m[1]} {$m[2]} \"{$m[3]}\"";

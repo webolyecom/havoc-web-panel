@@ -29,7 +29,7 @@ final class DnsController extends Controller
         $ns = [];
         foreach (['ns1', 'ns2'] as $k) {
             $v = strtolower($this->req->str($k));
-            if ($v !== '' && !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/', $v)) {
+            if ($v !== '' && !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/D', $v)) {
                 $this->flash('error', t('domains.invalid'));
                 return $this->to('/dns');
             }

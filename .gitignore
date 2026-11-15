@@ -1,0 +1,21 @@
+# dependencies (only needed to rebuild CSS / editor bundle; compiled assets are committed)
+node_modules/
+
+# local config and runtime data
+config/config.php
+*.sqlite
+*.sqlite-*
+storage/
+*.log
+
+# editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# release builds
+/dist/
+*.tar.gz
+*.tar.gz.sha256

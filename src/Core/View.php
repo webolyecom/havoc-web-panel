@@ -16,7 +16,7 @@ final class View
 
     private static function capture(string $tpl, array $data): string
     {
-        if (!preg_match('#^[a-z0-9_/]+$#i', $tpl)) {
+        if (!preg_match('#^[a-z0-9_/]+$#iD', $tpl)) {
             throw new \InvalidArgumentException('Bad template name');
         }
         extract($data, EXTR_SKIP);

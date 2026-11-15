@@ -39,6 +39,8 @@ final class NginxCustom
                 $out[] = $c;
                 $i++;
             } elseif ($c === '"' || $c === "'") {
+                // nginx only treats a quote as the start of a string at the beginning of a token, and needs a separator
+                // after the closing quote; anything else is rejected so this parser and nginx always see the same tokens
                 $j = $i + 1;
                 while ($j < $n && $s[$j] !== $c) {
                     $j += $s[$j] === '\\' ? 2 : 1;
@@ -46,11 +48,17 @@ final class NginxCustom
                 if ($j >= $n) {
                     throw new \InvalidArgumentException('Unterminated quoted string');
                 }
+                if ($j + 1 < $n && !ctype_space($s[$j + 1]) && !in_array($s[$j + 1], [';', '{', '}'], true)) {
+                    throw new \InvalidArgumentException('A quoted value must be followed by a space, ";" or "{"');
+                }
                 $out[] = ['q', substr($s, $i + 1, $j - $i - 1)];
                 $i = $j + 1;
             } else {
                 $j = $i;
-                while ($j < $n && !ctype_space($s[$j]) && !in_array($s[$j], [';', '{', '}', '"', "'"], true)) {
+                while ($j < $n && !ctype_space($s[$j]) && !in_array($s[$j], [';', '{', '}'], true)) {
+                    if ($s[$j] === '"' || $s[$j] === "'") {
+                        throw new \InvalidArgumentException('Quotes are only allowed around a whole value, e.g. "text with spaces"');
+                    }
                     $j += $s[$j] === '\\' ? 2 : 1;
                 }
                 $out[] = ['w', substr($s, $i, $j - $i)];
@@ -70,6 +78,12 @@ final class NginxCustom
             throw new \InvalidArgumentException('Invalid control characters');
         }
         $t = self::tokens($s);
+        foreach ($t as $tok) {
+            // "..": paths in try_files / index / error_page are not normalised by nginx and could leave the document root
+            if (is_array($tok) && str_contains($tok[1], '..')) {
+                throw new \InvalidArgumentException('".." is not allowed in rules');
+            }
+        }
         $depth = 0;
         $stmt = [];
         foreach ($t as $tok) {

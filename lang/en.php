@@ -204,4 +204,5 @@ return [
     'nginx.inactive' => 'The active web server is :name, so these rules are not in use right now. They are applied again if you switch back to Nginx. With LiteSpeed, put rewrite rules into a .htaccess file in the document root.',
     'nav.search' => 'Search menu', 'nav.no_match' => 'Nothing found', 'nav.collapse' => 'Collapse menu', 'nav.expand' => 'Expand menu',
     'common.close' => 'Close', 'role.admin' => 'Administrator', 'role.reseller' => 'Reseller', 'role.user' => 'User',
+    'ssl.why_cloudflare' => 'the domain goes through the Cloudflare proxy (orange cloud) and the check could not reach this server. Set its DNS records to "DNS only" (grey cloud) until the certificate is issued, or install a Cloudflare Origin Certificate and use SSL mode "Full (strict)"',
 ];

@@ -201,7 +201,7 @@ final class Fs
 
     private function chmod(string $rel, string $mode): array
     {
-        if (!preg_match('/^[0-7]{3,4}$/', $mode)) {
+        if (!preg_match('/^[0-7]{3,4}$/D', $mode)) {
             throw new \InvalidArgumentException('Invalid mode');
         }
         chmod($this->path($rel), octdec($mode) & 0777);       // no setuid/setgid/sticky
@@ -418,7 +418,7 @@ final class Fs
         if ($m === '') {
             return null;
         }
-        if (!preg_match('/^0?[0-7]{3}$/', $m)) {
+        if (!preg_match('/^0?[0-7]{3}$/D', $m)) {
             throw new \InvalidArgumentException('Invalid mode');
         }
         return octdec($m) & 0777;                              // never setuid/setgid/sticky
@@ -501,7 +501,7 @@ final class Fs
             if (!in_array($type, ['-', 'd'], true)) {
                 throw new \RuntimeException('Archive contains links or special files; refused');
             }
-            if (!preg_match('/^\S+\s+\S+\s+(\d+)\s+\S+\s+\S+\s+(.*)$/', rtrim($line, "\n"), $m)) {
+            if (!preg_match('/^\S+\s+\S+\s+(\d+)\s+\S+\s+\S+\s+(.*)$/D', rtrim($line, "\n"), $m)) {
                 throw new \RuntimeException('Cannot read archive listing');
             }
             $total += (int)$m[1];

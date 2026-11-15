@@ -49,7 +49,7 @@ final class PhpIni
         $v = trim((string)$value);
         switch ($type) {
             case 'size':
-                if (!preg_match('/^(\d{1,5})\s*([MG]?)$/i', $v, $m)) {
+                if (!preg_match('/^(\d{1,5})\s*([MG]?)$/iD', $v, $m)) {
                     throw new \InvalidArgumentException("$key: use a size like 256M or 1G");
                 }
                 if ($m[2] === '') {
@@ -61,7 +61,7 @@ final class PhpIni
                 }
                 return $mb % 1024 === 0 && $mb >= 1024 ? ($mb / 1024) . 'G' : $mb . 'M';
             case 'int':
-                if (!preg_match('/^-?\d{1,10}$/', $v) || (int)$v < $x[0] || (int)$v > $x[1]) {
+                if (!preg_match('/^-?\d{1,10}$/D', $v) || (int)$v < $x[0] || (int)$v > $x[1]) {
                     throw new \InvalidArgumentException("$key: whole number {$x[0]} - {$x[1]}");
                 }
                 return (string)(int)$v;
@@ -82,7 +82,7 @@ final class PhpIni
                 }
                 return $v;
             case 'charset':
-                if (!preg_match('/^[A-Za-z0-9_-]{2,20}$/', $v)) {
+                if (!preg_match('/^[A-Za-z0-9_-]{2,20}$/D', $v)) {
                     throw new \InvalidArgumentException("$key: invalid charset");
                 }
                 return $v;
@@ -112,7 +112,7 @@ final class PhpIni
             if ($line === '' || $line[0] === ';' || $line[0] === '#') {
                 continue;
             }
-            if (!preg_match('/^([a-z][a-z0-9_.]{1,60})\s*=\s*(.{0,200})$/i', $line, $m)) {
+            if (!preg_match('/^([a-z][a-z0-9_.]{1,60})\s*=\s*(.{0,200})$/iD', $line, $m)) {
                 throw new \InvalidArgumentException('Line ' . ($n + 1) . ': expected "directive = value"');
             }
             $k = strtolower($m[1]);

@@ -23,7 +23,7 @@ final class UserController extends Controller
         $email = filter_var($this->req->str('email'), FILTER_VALIDATE_EMAIL);
         $pass  = (string)$this->req->post('password', '');
         $role  = $actor['role'] === 'admin' && $this->req->str('role') === 'reseller' ? 'reseller' : 'user';
-        if (!preg_match('/^[a-z][a-z0-9_]{2,31}$/', $name) || !$email || strlen($pass) < 10) {
+        if (!preg_match('/^[a-z][a-z0-9_]{2,31}$/D', $name) || !$email || strlen($pass) < 10) {
             $this->flash('error', t('users.invalid'));
             return $this->to('/users');
         }
