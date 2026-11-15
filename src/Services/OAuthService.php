@@ -23,14 +23,23 @@ final class OAuthService
         return Settings::get('mcp.enabled', '1') === '1';
     }
 
-    /** Public base URL of this panel as the client reached it (scheme + host + port). */
+    /**
+     * Public base URL of the panel: host from the Host header, port from the port Nginx actually accepted the
+     * connection on (SERVER_PORT). The Host header alone is not enough: with HTTP/2 it can arrive without the port,
+     * and the metadata would then send Claude to port 443, where the sites' web server answers instead of the panel.
+     */
     public static function base(): string
     {
-        $h = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
-        if (!preg_match('/^[a-z0-9.-]{1,253}(:\d{1,5})?$|^\[[0-9a-f:]+\](:\d{1,5})?$/D', $h)) {
-            $h = 'localhost';
+        $h = strtolower((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
+        if (preg_match('/^\[([0-9a-f:]+)\](?::\d{1,5})?$/D', $h, $m)) {
+            $host = '[' . $m[1] . ']';
+        } elseif (preg_match('/^([a-z0-9.-]{1,253})(?::\d{1,5})?$/D', $h, $m)) {
+            $host = $m[1];
+        } else {
+            $host = 'localhost';
         }
-        return 'https://' . $h;
+        $port = (int)($_SERVER['SERVER_PORT'] ?? 443);
+        return 'https://' . $host . ($port > 0 && $port !== 443 ? ':' . $port : '');
     }
 
     public static function resource(): string
