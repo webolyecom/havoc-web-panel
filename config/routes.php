@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+use Havoc\Controllers\AppController;
+use Havoc\Controllers\McpController;
+use Havoc\Controllers\OAuthController;
 use Havoc\Controllers\{ApiController, AuthController, BackupController, BrandingController, CronController, DashboardController, DatabaseController, DnsController, DomainController, FileController, FirewallController, FtpController, LimitsController, LogController, PackageController, ServerController, SettingsController, StackController, TrafficController, UserController, WafController, WebServerController};
 use Havoc\Core\Router;
 
@@ -138,6 +141,7 @@ return static function (Router $r): void {
     $r->get('/server', [ServerController::class, 'monitor'], ['admin']);
     $r->get('/server/stats', [ServerController::class, 'stats'], ['admin']);
     $r->post('/server/update', [ServerController::class, 'update'], ['admin']);
+    $r->post('/server/hostname', [ServerController::class, 'hostname'], ['admin']);
     $r->post('/server/update/check', [ServerController::class, 'updateCheck'], ['admin']);
     $r->post('/server/update/auto', [ServerController::class, 'updateAuto'], ['admin']);
     $r->get('/server/settings', [ServerController::class, 'settings'], ['admin']);
@@ -164,8 +168,23 @@ return static function (Router $r): void {
     $r->post('/settings/2fa/disable', [SettingsController::class, 'disable2fa'], ['auth']);
     $r->post('/settings/tokens', [SettingsController::class, 'tokenCreate'], ['auth']);
     $r->post('/settings/tokens/{id}/delete', [SettingsController::class, 'tokenDelete'], ['auth']);
+    $r->post('/settings/claude/revoke', [SettingsController::class, 'claudeRevoke'], ['auth']);
+    $r->post('/server/claude', [ServerController::class, 'claude'], ['admin']);
 
     // REST API v1 (Bearer token, no cookies, no CSRF)
+    $r->post('/domains/{id}/apps/wordpress', [AppController::class, 'wordpress'], ['auth']);
+    $r->post('/domains/{id}/apps/clear', [AppController::class, 'clear'], ['auth']);
+    // Claude connector: OAuth 2.1 + MCP
+    $r->get('/.well-known/oauth-protected-resource', [OAuthController::class, 'protectedResource']);
+    $r->get('/.well-known/oauth-protected-resource/mcp', [OAuthController::class, 'protectedResource']);
+    $r->get('/.well-known/oauth-authorization-server', [OAuthController::class, 'metadata']);
+    $r->post('/oauth/register', [OAuthController::class, 'register']);
+    $r->get('/oauth/authorize', [OAuthController::class, 'authorize']);
+    $r->post('/oauth/authorize', [OAuthController::class, 'decide'], ['auth']);
+    $r->post('/oauth/token', [OAuthController::class, 'token']);
+    $r->post('/mcp', [McpController::class, 'handle']);
+    $r->get('/mcp', [McpController::class, 'handle']);
+    $r->delete('/mcp', [McpController::class, 'handle']);
     $r->get('/api/v1/openapi.json', [ApiController::class, 'openapi']);
     $r->get('/api/v1/me', [ApiController::class, 'me'], ['api']);
     $r->get('/api/v1/domains', [ApiController::class, 'domains'], ['api']);

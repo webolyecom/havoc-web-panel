@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Havoc\Controllers;
 
+use Havoc\Services\DatabaseService;
 use Havoc\Core\{Audit, Ctl, DB, Response, Scope};
 
 final class DatabaseController extends Controller
@@ -55,29 +56,11 @@ final class DatabaseController extends Controller
         if (!$owner || !\Havoc\Core\Scope::canManageUser($u, $owner)) {
             $this->abort(404);
         }
-        $short = strtolower($this->req->str('name'));
-        if (!preg_match('/^[a-z0-9_]{1,16}$/D', $short)) {
-            $this->flash('error', t('db.invalid'));
-            return $this->to('/databases');
-        }
-        if ($owner['package_id']) {
-            $max = (int)DB::q('SELECT max_databases FROM packages WHERE id = ?', [$owner['package_id']])->fetchColumn();
-            if ((int)DB::q('SELECT COUNT(*) FROM db_instances WHERE user_id = ?', [$ownerId])->fetchColumn() >= $max) {
-                $this->flash('error', t('db.quota'));
-                return $this->to('/databases');
-            }
-        }
-        $name = 'hv' . $ownerId . '_' . $short;
-        if (DB::one('SELECT id FROM db_instances WHERE name = ?', [$name])) {
-            $this->flash('error', t('db.exists'));
-            return $this->to('/databases');
-        }
-        $pass = $this->req->str('password') ?: $this->generate();
         try {
-            Ctl::call('db.create', ['name' => $name, 'password' => $pass]);
-            DB::insert('db_instances', ['user_id' => $ownerId, 'name' => $name, 'db_user' => $name]);
-            Audit::log('db.create', $name);
-            $_SESSION['new_db'] = ['name' => $name, 'password' => $pass];      // shown once
+            $db = DatabaseService::create($u, $ownerId, $this->req->str('name'), $this->req->str('password') ?: null);
+            $_SESSION['new_db'] = ['name' => $db['name'], 'password' => $db['password']];      // shown once
+        } catch (\DomainException $e) {
+            $this->flash('error', str_starts_with($e->getMessage(), 'db.') ? t($e->getMessage()) : $e->getMessage());
         } catch (\Throwable $e) {
             $this->flash('error', $e->getMessage());
         }

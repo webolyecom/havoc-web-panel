@@ -14,7 +14,15 @@ final class App
         }
         try {
             Config::load();
-            Session::start($req);
+            if ($req->path === '/oauth/authorize' && $req->method === 'GET' && empty($_COOKIE['havoc_sid']) && !isset($_GET['hop'])) {
+                // arriving from claude.ai: the SameSite=Strict session cookie is not sent on a cross-site navigation, so
+                // hop once through a same-site reload instead of starting (and overwriting) a new session
+                self::hop()->send();
+                return;
+            }
+            if (!$req->isMachine()) {
+                Session::start($req);
+            }
             Security::headers($req);
             I18n::boot(Auth::user());
             $router = new Router();
@@ -28,6 +36,17 @@ final class App
             $res = self::error($req, 500, $debug ? $e->getMessage() : 'Internal error');
         }
         $res->send();
+    }
+
+    private static function hop(): Response
+    {
+        $q = $_GET + ['hop' => '1'];
+        $url = '/oauth/authorize?' . http_build_query($q);
+        $u = htmlspecialchars($url, ENT_QUOTES);
+        header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+        header('Referrer-Policy: no-referrer');
+        header('Cache-Control: no-store');
+        return new Response("<!doctype html><meta charset=utf-8><meta http-equiv=\"refresh\" content=\"0;url=$u\"><title>Havoc WEB Panel</title><p><a href=\"$u\">Continue</a></p>\n");
     }
 
     private static function error(Request $req, int $code, string $msg): Response
@@ -49,7 +68,15 @@ final class App
     {
         try {
             Config::load();
-            Session::start($req);
+            if ($req->path === '/oauth/authorize' && $req->method === 'GET' && empty($_COOKIE['havoc_sid']) && !isset($_GET['hop'])) {
+                // arriving from claude.ai: the SameSite=Strict session cookie is not sent on a cross-site navigation, so
+                // hop once through a same-site reload instead of starting (and overwriting) a new session
+                self::hop()->send();
+                return;
+            }
+            if (!$req->isMachine()) {
+                Session::start($req);
+            }
             http_response_code(Auth::user() ? 204 : 401);
         } catch (\Throwable $e) {
             error_log('[havoc] auth check: ' . $e->getMessage());

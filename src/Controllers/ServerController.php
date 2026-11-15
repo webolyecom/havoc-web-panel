@@ -56,6 +56,32 @@ final class ServerController extends Controller
         return $this->to('/server/settings#update');
     }
 
+    public function hostname(): Response
+    {
+        $host = strtolower($this->req->str('hostname'));
+        try {
+            $r = Ctl::call('panel.hostname_ssl', ['host' => $host, 'email' => $this->req->str('email') ?: (string)$this->user()['email']], 360);
+            Audit::log('panel.hostname', $host);
+            $this->flash('success', t('ph.issued', ['url' => 'https://' . $r['host'] . ':' . $r['port']]));
+        } catch (\Throwable $e) {
+            $this->flash('error', $e->getMessage());
+        }
+        return $this->to('/server/settings#hostname');
+    }
+
+    /** Turns the Claude connector on or off for the whole panel; turning it off also ends every connection. */
+    public function claude(): Response
+    {
+        $on = $this->req->post('enabled', '') === '1';
+        \Havoc\Core\Settings::set('mcp.enabled', $on ? '1' : '0');
+        if (!$on) {
+            \Havoc\Services\OAuthService::revokeAll();
+        }
+        Audit::log('claude.connector', $on ? 'on' : 'off');
+        $this->flash('success', t('common.saved'));
+        return $this->to('/server/settings#claude');
+    }
+
     public function updateCheck(): Response
     {
         $c = UpdateService::check();
@@ -92,7 +118,12 @@ final class ServerController extends Controller
         if ($check['checked'] === 0) {
             $check = UpdateService::check();                         // first visit: ask GitHub once
         }
-        return view('server/settings', ['st' => $st, 'via' => $via, 'host' => $this->req->host(), 'check' => $check,
+        $ph = ['host' => '', 'port' => 0, 'issuer' => '', 'subject' => '', 'expires' => '', 'trusted' => false, 'webserver' => ''];
+        try {
+            $ph = Ctl::call('panel.hostname_status');
+        } catch (\Throwable) {
+        }
+        return view('server/settings', ['st' => $st, 'via' => $via, 'host' => $this->req->host(), 'check' => $check, 'ph' => $ph,
             'avail' => UpdateService::available($check), 'auto' => UpdateService::autoEnabled(), 'upd' => UpdateService::status()]);
     }
 

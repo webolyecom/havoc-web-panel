@@ -74,7 +74,18 @@ final class DomainController extends Controller
             'ini' => $formIni ?? (json_decode((string)($d['php_ini'] ?? ''), true) ?: []), 'rules' => $formRules ?? (string)($d['nginx_custom'] ?? ''),
             'redirects' => DB::all('SELECT * FROM redirects WHERE domain_id = ? ORDER BY id', [$d['id']]),
             'aliases' => DB::all("SELECT id, name FROM domains WHERE parent_id = ? AND type = 'alias' ORDER BY name", [$d['id']]),
-            'enabled' => $d['php_extensions'] ? json_decode($d['php_extensions'], true) : $ext['default']]);
+            'enabled' => $d['php_extensions'] ? json_decode($d['php_extensions'], true) : $ext['default'],
+            'app' => \Havoc\Services\AppService::forDomain((int)$d['id']), 'newApp' => $this->pullNewApp((int)$d['id'])]);
+    }
+
+    private function pullNewApp(int $id): ?array
+    {
+        $n = $_SESSION['new_app'] ?? null;
+        if ($n && (int)$n['domain'] === $id) {
+            unset($_SESSION['new_app']);
+            return $n;
+        }
+        return null;
     }
 
     public function php(): Response

@@ -73,6 +73,9 @@ switch ($cmd) {
             }
         }
         break;
+    case 'app:install':
+        \Havoc\Services\AppService::run((int)($argv[2] ?? 0));
+        break;
     case 'update:check':
         $c = \Havoc\Services\UpdateService::check();
         $n = \Havoc\Services\UpdateService::available($c);
