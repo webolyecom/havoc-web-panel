@@ -9,7 +9,7 @@ final class Actions
     public const ALLOWED = [
         'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'php.list', 'php.extensions', 'service.list', 'service.control',
         'account.ensure', 'account.delete', 'domain.apply', 'domain.delete',
-        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update',
+        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check',
         'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
         'fw.status', 'fw.enable', 'fw.disable', 'fw.allow', 'fw.ban', 'fw.whitelist', 'fw.preset', 'fw.delete', 'dns.apply', 'dns.delete', 'ftp.create', 'ftp.update', 'ftp.password', 'ftp.delete', 'backup.create', 'backup.restore', 'backup.delete', 'backup.test', 'fs.exec', 'db.create', 'db.drop', 'db.password', 'db.remote', 'db.bind', 'db.info',
     ];
@@ -415,10 +415,115 @@ final class Actions
     public function log_tail_many(array $a): array { return Logs::tailMany($a); }
     public function log_cat(array $a): array { throw new \LogicException('log.cat is a streaming action'); }
 
+    private const UPDATE_UNIT = 'havoc-update';
+
+    private static function updateRepo(): string
+    {
+        $repo = 'webolyecom/havoc-web-panel';
+        foreach (@file('/etc/havoc/update.conf', FILE_IGNORE_NEW_LINES) ?: [] as $l) {
+            if (preg_match('/^\s*HAVOC_UPDATE_REPO=["\']?([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)["\']?\s*$/D', $l, $m)) {
+                $repo = $m[1];
+            }
+        }
+        return $repo;
+    }
+
+    /** Starts bin/havoc-update in its own systemd unit (it restarts the panel). */
     public function panel_update(array $a): array
     {
-        Sys::ok(['systemd-run', '--no-block', '--unit=havoc-update', '/opt/havoc/bin/havoc-update']);
+        $args = [];
+        if (($a['tag'] ?? '') !== '') {
+            $tag = (string)$a['tag'];
+            if (!preg_match('/^v?\d{1,4}\.\d{1,4}\.\d{1,4}$/D', $tag)) {
+                throw new \InvalidArgumentException('Invalid version');
+            }
+            $args[] = $tag;
+        }
+        if (!empty($a['force'])) {
+            $args[] = '--force';
+        }
+        $state = trim(Sys::run(['systemctl', 'show', self::UPDATE_UNIT, '-p', 'ActiveState', '--value'])[1]);
+        if (in_array($state, ['active', 'activating'], true)) {
+            throw new \RuntimeException('An update is already running');
+        }
+        Sys::run(['systemctl', 'reset-failed', self::UPDATE_UNIT]);      // a failed transient unit would block the name
+        Sys::ok(['systemd-run', '--no-block', '--unit=' . self::UPDATE_UNIT, '--description=Havoc WEB Panel update',
+            '--property=TimeoutStartSec=1800', '/opt/havoc/bin/havoc-update', ...$args]);
         return [];
+    }
+
+    /** State and log of the last update run (bin/havoc-update keeps its own log, the transient unit is gone afterwards). */
+    public function panel_update_status(array $a): array
+    {
+        $unit = trim(Sys::run(['systemctl', 'show', self::UPDATE_UNIT, '-p', 'ActiveState', '--value'])[1]);
+        $st = preg_split('/\s+/', trim((string)@file_get_contents('/var/log/havoc/update.status'))) ?: [];
+        $state = in_array($unit, ['active', 'activating', 'deactivating'], true) ? 'running' : ($st[0] ?? '');
+        if ($state === 'running' && !in_array($unit, ['active', 'activating', 'deactivating'], true)) {
+            $state = 'failed';                                          // killed (reboot, OOM) before it could finish
+        }
+        $log = (string)@file_get_contents('/var/log/havoc/update.log', false, null, 0, 200000);
+        return ['state' => in_array($state, ['running', 'done', 'failed', 'uptodate'], true) ? $state : '', 'time' => $st[1] ?? '',
+            'log' => mb_substr(trim(preg_replace('/\e\[[0-9;]*m/', '', $log)), -20000),
+            'repo' => self::updateRepo(), 'version' => trim((string)@file_get_contents('/opt/havoc/VERSION'))];
+    }
+
+    /** Tag of the latest release from the redirect of github.com/<repo>/releases/latest; null = no release, false = failed. */
+    private static function latestTagByRedirect(string $repo): string|null|false
+    {
+        $ctx = stream_context_create(['http' => ['method' => 'HEAD', 'timeout' => 15, 'follow_location' => 0, 'ignore_errors' => true,
+            'header' => "User-Agent: Havoc-WEB-Panel\r\n"]]);
+        if (@file_get_contents("https://github.com/$repo/releases/latest", false, $ctx) === false && empty($http_response_header)) {
+            return false;
+        }
+        foreach ($http_response_header ?? [] as $h) {
+            if (preg_match('#^Location:\s*\S*/releases/tag/(v?\d{1,4}\.\d{1,4}\.\d{1,4})\s*$#iD', $h, $m)) {
+                return $m[1];
+            }
+            if (preg_match('#^Location:\s*\S*/releases/?\s*$#iD', $h)) {
+                return null;
+            }
+        }
+        return false;
+    }
+
+    /** Latest published release of the configured repository (GitHub API, no token). */
+    public function panel_update_check(array $a): array
+    {
+        $repo = self::updateRepo();
+        $ctx = stream_context_create(['http' => ['timeout' => 15, 'ignore_errors' => true,
+            'header' => "Accept: application/vnd.github+json\r\nUser-Agent: Havoc-WEB-Panel\r\n"]]);
+        $body = @file_get_contents("https://api.github.com/repos/$repo/releases/latest", false, $ctx, 0, 2000000);
+        $code = 0;
+        foreach ($http_response_header ?? [] as $h) {
+            if (preg_match('#^HTTP/\S+ (\d{3})#', $h, $m)) {
+                $code = (int)$m[1];
+            }
+        }
+        if ($body === false || $code === 0 || $code === 403 || $code === 429) {
+            // API unreachable or rate limited (60 requests/hour per IP): the release page redirect still names the latest tag
+            $tag = self::latestTagByRedirect($repo);
+            if ($tag === false) {
+                throw new \RuntimeException($code ? 'GitHub answered ' . $code : 'GitHub could not be reached');
+            }
+            return ['repo' => $repo, 'latest' => $tag === null ? null : ['tag' => $tag, 'version' => ltrim($tag, 'v'), 'name' => $tag, 'notes' => '',
+                'published' => '', 'url' => "https://github.com/$repo/releases/tag/" . rawurlencode($tag)]];
+        }
+        if ($code === 404) {
+            return ['repo' => $repo, 'latest' => null];                  // no release published yet
+        }
+        $j = json_decode($body, true);
+        if ($code !== 200 || !is_array($j)) {
+            throw new \RuntimeException('GitHub answered ' . $code . (is_array($j) && isset($j['message']) ? ': ' . mb_substr((string)$j['message'], 0, 200) : ''));
+        }
+        $tag = (string)($j['tag_name'] ?? '');
+        if (!preg_match('/^v?\d{1,4}\.\d{1,4}\.\d{1,4}$/D', $tag)) {
+            return ['repo' => $repo, 'latest' => null];
+        }
+        return ['repo' => $repo, 'latest' => [
+            'tag' => $tag, 'version' => ltrim($tag, 'v'), 'name' => mb_substr((string)($j['name'] ?? $tag), 0, 200),
+            'notes' => mb_substr((string)($j['body'] ?? ''), 0, 20000), 'published' => (string)($j['published_at'] ?? ''),
+            'url' => "https://github.com/$repo/releases/tag/" . rawurlencode($tag),
+        ]];
     }
 
     /** @return array{0:array,1:string} [command, JSON payload] for the file worker of a domain */

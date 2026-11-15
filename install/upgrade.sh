@@ -51,6 +51,13 @@ if [ ! -f /etc/havoc/webserver ]; then
 fi
 echo "Sites are served by: $(cat /etc/havoc/webserver)"
 
+log "Self-update source"
+if ! grep -q '^HAVOC_UPDATE_REPO=' /etc/havoc/update.conf 2>/dev/null; then
+  echo "HAVOC_UPDATE_REPO=webolyecom/havoc-web-panel" > /etc/havoc/update.conf   # replaces the old HAVOC_UPDATE_URL setting
+fi
+chmod 600 /etc/havoc/update.conf
+echo "Updates come from: https://github.com/$(sed -n 's/^HAVOC_UPDATE_REPO=//p' /etc/havoc/update.conf)/releases"
+
 log "Database migrations"
 runuser -u havoc -- php /opt/havoc/bin/havoc migrate
 

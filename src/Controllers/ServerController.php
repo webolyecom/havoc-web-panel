@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Havoc\Controllers;
 
+use Havoc\Services\UpdateService;
 use Havoc\Core\{Audit, Ctl, Response};
 use Havoc\Services\SystemStats;
 
@@ -41,16 +42,40 @@ final class ServerController extends Controller
         return $this->to('/services');
     }
 
+    /** Starts the update to the latest release (or the one given as "tag"). */
     public function update(): Response
     {
+        $tag = (string)$this->req->post('tag', '');
         try {
-            Ctl::call('panel.update');
-            Audit::log('panel.update');
-            $this->flash('success', t('server.updating'));
+            UpdateService::start($tag !== '' ? $tag : null, $this->req->post('force', '') === '1');
+            Audit::log('panel.update', $tag);
+            $this->flash('success', t('update.started'));
         } catch (\Throwable $e) {
             $this->flash('error', $e->getMessage());
         }
-        return $this->to('/');
+        return $this->to('/server/settings#update');
+    }
+
+    public function updateCheck(): Response
+    {
+        $c = UpdateService::check();
+        if ($c['error'] !== '') {
+            $this->flash('error', t('update.check_failed', ['msg' => $c['error']]));
+        } elseif (UpdateService::available($c)) {
+            $this->flash('success', t('update.found', ['v' => $c['latest']['version']]));
+        } else {
+            $this->flash('success', t('update.none'));
+        }
+        return $this->to('/server/settings#update');
+    }
+
+    public function updateAuto(): Response
+    {
+        $on = $this->req->post('auto', '') === '1';
+        UpdateService::setAuto($on);
+        Audit::log('panel.update.auto', $on ? 'on' : 'off');
+        $this->flash('success', t('common.saved'));
+        return $this->to('/server/settings#update');
     }
 
     /** Panel settings: HTTPS port (two-step change with automatic revert) and panel update. */
@@ -63,7 +88,12 @@ final class ServerController extends Controller
             $this->flash('error', $e->getMessage());
         }
         $via = (int)($_SERVER['SERVER_PORT'] ?? 0);
-        return view('server/settings', ['st' => $st, 'via' => $via, 'host' => $this->req->host()]);
+        $check = UpdateService::cached();
+        if ($check['checked'] === 0) {
+            $check = UpdateService::check();                         // first visit: ask GitHub once
+        }
+        return view('server/settings', ['st' => $st, 'via' => $via, 'host' => $this->req->host(), 'check' => $check,
+            'avail' => UpdateService::available($check), 'auto' => UpdateService::autoEnabled(), 'upd' => UpdateService::status()]);
     }
 
     public function portChange(): Response

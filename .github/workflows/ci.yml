@@ -1,0 +1,23 @@
+# Basic checks for pull requests.
+name: Checks
+
+on:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax
+        run: |
+          find . -name '*.php' -not -path './node_modules/*' -print0 | xargs -0 -n1 php -l > /dev/null
+      - name: Shell syntax
+        run: |
+          for f in install/*.sh bin/havoc-*; do head -1 "$f" | grep -q bash && bash -n "$f"; done
+      - name: Translations complete (en / tr)
+        run: |
+          php -r '$e = require "lang/en.php"; $t = require "lang/tr.php"; $d = array_keys(array_diff_key($e, $t) + array_diff_key($t, $e)); if ($d) { echo implode("\n", $d), "\n"; exit(1); }'
+      - name: VERSION and package.json agree
+        run: |
+          grep -q "\"version\": \"$(tr -d '[:space:]' < VERSION)\"" package.json

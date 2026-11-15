@@ -1,18 +1,101 @@
 #!/bin/bash
-# Self-update. Started by `havocctl panel.update` through systemd-run (so restarting the panel does not kill it).
-# The update URL is read from a root-owned file; the panel user cannot influence it.
+# Havoc WEB Panel self-update from GitHub Releases.
+#   havoc-update            install the latest release (if it is newer than the installed version)
+#   havoc-update v0.4.0     install that release (must be a published release of the configured repository)
+#   havoc-update --force    also reinstall the same version or go back to an older one
+# Started by `havocctl panel.update` through systemd-run (unit havoc-update), so restarting the panel does not stop it;
+# its output is the update log shown in the panel. The repository comes from the root-owned /etc/havoc/update.conf
+# (HAVOC_UPDATE_REPO=owner/name); the panel can only choose among the releases published there.
 set -euo pipefail
+export LC_ALL=C
+LOG=/var/log/havoc/update.log
+STATUS=/var/log/havoc/update.status
+install -d -m 750 /var/log/havoc
+: > "$LOG"; chmod 640 "$LOG"
+exec > >(tee -a "$LOG") 2>&1
+echo "running $(date -u +%FT%TZ)" > "$STATUS"
+RESULT=failed
+tmp=""
+finish() { rc=$?; [ -n "$tmp" ] && rm -rf "$tmp"; [ $rc -eq 0 ] || RESULT=failed; echo "$RESULT $(date -u +%FT%TZ)" > "$STATUS"; }
+trap finish EXIT
+echo "Havoc WEB Panel update started $(date -u '+%F %T') UTC"
+REPO="webolyecom/havoc-web-panel"
 [ -r /etc/havoc/update.conf ] && . /etc/havoc/update.conf
-: "${HAVOC_UPDATE_URL:?HAVOC_UPDATE_URL not set in /etc/havoc/update.conf}"
-tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
-curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/pkg.tar.gz" "$HAVOC_UPDATE_URL"
-curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/pkg.sha256" "$HAVOC_UPDATE_URL.sha256"
-( cd "$tmp" && echo "$(cut -d' ' -f1 pkg.sha256)  pkg.tar.gz" | sha256sum -c - )
-mkdir "$tmp/new" && tar -xzf "$tmp/pkg.tar.gz" -C "$tmp/new" --strip-components=1
-[ -f "$tmp/new/public/index.php" ] || { echo "bad package"; exit 1; }
-rm -rf /opt/havoc.old && cp -a /opt/havoc /opt/havoc.old
-rsync -a --delete "$tmp/new/" /opt/havoc/
-chown -R root:root /opt/havoc && chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install && chmod 755 /opt/havoc/bin/havoc-cronwrap /opt/havoc/ctl/fsworker
-runuser -u havoc -- php /opt/havoc/bin/havoc migrate
-systemctl restart havoc-panel-fpm havoc-panel-nginx
-echo "Havoc updated to $(runuser -u havoc -- php /opt/havoc/bin/havoc version)"
+REPO="${HAVOC_UPDATE_REPO:-$REPO}"
+[[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "Invalid HAVOC_UPDATE_REPO: $REPO"; exit 1; }
+
+FORCE=0; TAG=""
+for a in "$@"; do
+  case "$a" in
+    --force) FORCE=1 ;;
+    *) [[ "$a" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid version: $a"; exit 64; }; TAG="$a" ;;
+  esac
+done
+
+api() { curl -fsSL --proto '=https' --tlsv1.2 --max-time 30 -H 'Accept: application/vnd.github+json' -H 'User-Agent: Havoc-WEB-Panel-Updater' "https://api.github.com/repos/$REPO/$1"; }
+json() { php -r '$j = json_decode(stream_get_contents(STDIN), true); echo is_array($j) ? (string)($j[$argv[1]] ?? "") : "";' "$1"; }
+
+CUR=$(cat /opt/havoc/VERSION 2>/dev/null || echo 0.0.0)
+echo "Installed version: $CUR"
+echo "Update source:     https://github.com/$REPO/releases"
+
+# tag of the latest release from the redirect of the release page (works when the API is rate limited)
+latest_by_redirect() {
+  curl -sSI --proto '=https' --tlsv1.2 --max-time 30 -H 'User-Agent: Havoc-WEB-Panel-Updater' "https://github.com/$REPO/releases/latest" \
+    | tr -d '\r' | sed -n 's#^[Ll]ocation: .*/releases/tag/\(v\{0,1\}[0-9]\{1,4\}\.[0-9]\{1,4\}\.[0-9]\{1,4\}\)$#\1#p' | head -1
+}
+if [ -z "$TAG" ]; then
+  if REL=$(api releases/latest 2>/dev/null); then
+    TAG=$(printf '%s' "$REL" | json tag_name)
+  else
+    TAG=$(latest_by_redirect || true)
+    [ -n "$TAG" ] || { echo "Could not find a published release on GitHub."; exit 1; }
+  fi
+else
+  # an explicit version must be a published release (not just any tag or branch)
+  if REL=$(api "releases/tags/$TAG" 2>/dev/null); then
+    [ "$(printf '%s' "$REL" | json draft)" = "1" ] && { echo "$TAG is a draft."; exit 1; }
+  else
+    curl -fsSI --proto '=https' --tlsv1.2 --max-time 30 -o /dev/null "https://github.com/$REPO/releases/tag/$TAG" \
+      || { echo "Release $TAG was not found on GitHub."; exit 1; }
+  fi
+fi
+[[ "$TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "The release has no valid version tag ($TAG)."; exit 1; }
+VER="${TAG#v}"
+echo "Release:           $VER"
+
+if [ "$FORCE" != 1 ] && ! php -r 'exit(version_compare($argv[1], $argv[2], ">") ? 0 : 1);' "$VER" "$CUR"; then
+  echo "Havoc WEB Panel is up to date ($CUR)."
+  RESULT=uptodate
+  exit 0
+fi
+
+tmp=$(mktemp -d /var/tmp/havoc-update.XXXXXX)
+echo "Downloading $TAG..."
+curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 300 -o "$tmp/src.tar.gz" "https://github.com/$REPO/archive/refs/tags/$TAG.tar.gz"
+mkdir "$tmp/new"
+tar -xzf "$tmp/src.tar.gz" -C "$tmp/new" --strip-components=1 --no-same-owner
+for f in public/index.php install/upgrade.sh ctl/havocctl VERSION; do
+  [ -f "$tmp/new/$f" ] || { echo "The release archive is incomplete ($f missing)."; exit 1; }
+done
+[ "$(tr -d '[:space:]' < "$tmp/new/VERSION")" = "$VER" ] || { echo "VERSION in the archive does not match $TAG."; exit 1; }
+# the release must be complete before anything is replaced
+fail=0
+while IFS= read -r -d '' f; do php -l "$f" >/dev/null 2>&1 || { echo "PHP syntax error in ${f#$tmp/new/}"; fail=1; }; done \
+  < <(find "$tmp/new/src" "$tmp/new/ctl" "$tmp/new/config" "$tmp/new/public" -name '*.php' -print0)
+bash -n "$tmp/new/install/upgrade.sh" || fail=1
+[ $fail = 0 ] || { echo "The release did not pass the checks; nothing was changed."; exit 1; }
+
+echo "Installing $VER (the previous version is kept in /opt/havoc.old)..."
+if ! bash "$tmp/new/install/upgrade.sh"; then
+  echo "The update failed; restoring $CUR."
+  if [ -d /opt/havoc.old ] && [ "$(cat /opt/havoc.old/VERSION 2>/dev/null)" = "$CUR" ]; then
+    rm -rf /opt/havoc.failed && mv /opt/havoc /opt/havoc.failed && cp -a /opt/havoc.old /opt/havoc
+    systemctl restart havoc-panel-fpm || true
+    systemctl reload havoc-panel-nginx || systemctl restart havoc-panel-nginx || true
+    echo "Version $CUR was restored."
+  fi
+  exit 1
+fi
+RESULT=done
+echo "Havoc WEB Panel is now at $(cat /opt/havoc/VERSION)."

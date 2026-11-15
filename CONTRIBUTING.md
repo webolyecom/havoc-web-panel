@@ -51,6 +51,16 @@ npm run build
 
 Then describe **what** changed, **why**, and **how you tested it** (which Debian version, which pages/actions). Screenshots help for UI changes.
 
+## Publishing a release (maintainers)
+
+Installed panels update themselves from this repository's **GitHub Releases**. Releases are created automatically:
+
+1. In your pull request, raise the version in `VERSION` **and** `package.json` and add a `## [X.Y.Z]` section to `CHANGELOG.md`.
+2. Merge it into `main`.
+3. The *Release* workflow (`.github/workflows/release.yml`) checks the code and publishes the release `vX.Y.Z` with the changelog section as release notes.
+
+Panels see the new release within 6 hours (or at once with *Check now*). Never move or delete a published tag.
+
 ## License of contributions
 
 By contributing you agree that your contribution is released under the project's [MIT License](LICENSE).

@@ -10,7 +10,7 @@ Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, fi
 from one clean interface, with no license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.3.3-0b7fa0.svg)
+![Version](https://img.shields.io/badge/version-0.4.0-0b7fa0.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg)
 ![Debian](https://img.shields.io/badge/Debian-12%20%7C%2013-a81d33.svg)
 ![Status](https://img.shields.io/badge/status-beta-f59e0b.svg)
@@ -96,6 +96,7 @@ Contributions back to the project are very welcome, but never required.
 - **Resellers**, hosting packages with CPU / RAM / disk / bandwidth limits
 - **White-label**: your own name, logo, colour and panel domain
 - **REST API** with OpenAPI description
+- **One-click self-update** from GitHub Releases, optionally automatic
 - English & Turkish interface, light & dark theme, mobile friendly
 
 </td>
@@ -180,13 +181,27 @@ sudo HAVOC_WEBSERVER=ols HAVOC_PORT=8443 HAVOC_PHP_VERSIONS="8.3 8.4" bash insta
 
 ### Updating
 
+**From the panel (recommended):** open **Panel settings → Panel updates**. The panel checks this repository's
+[GitHub Releases](../../releases) every 6 hours, shows what is new and installs a new release with one click, or on its own
+if you turn on *Install new releases automatically*. The release is downloaded and checked first, the previous version is
+kept, and it is restored automatically if anything goes wrong. Websites keep running during the update.
+
+From the command line, the same update:
+
+```bash
+sudo /opt/havoc/bin/havoc-update            # latest release
+sudo /opt/havoc/bin/havoc-update v0.4.0     # a specific release
+```
+
+Or manually from a checkout:
+
 ```bash
 cd havoc-web-panel
 git pull
 sudo bash install/upgrade.sh
 ```
 
-`upgrade.sh` keeps your configuration, encryption key, certificates, database and websites, and runs the database migrations.
+Every update keeps your configuration, encryption key, certificates, database and websites, and runs the database migrations.
 
 > ❗ Never run `install.sh` again on a server that is already in use: it creates a new encryption key, and stored backup credentials could no longer be decrypted. Always update with `upgrade.sh`.
 
@@ -223,7 +238,6 @@ Havoc WEB Panel is **beta software (0.x)**. The panel has been installed and use
 
 Known limitations:
 - OpenLiteSpeed and LiteSpeed Enterprise support is new and has not yet been tested widely on real servers.
-- Self-update from the panel needs a published release URL (`HAVOC_UPDATE_URL`); until then, update with `git pull` + `upgrade.sh`.
 - No email server (SMTP/IMAP) module yet.
 
 See the [changelog](CHANGELOG.md) for what changed in each version.

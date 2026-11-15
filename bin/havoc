@@ -37,6 +37,11 @@ switch ($cmd) {
         \Havoc\Services\BackupService::runDue();
         break;
     case 'usage:scan':
+        try {
+            \Havoc\Services\UpdateService::checkDue();
+        } catch (\Throwable $e) {
+            fwrite(STDERR, 'update check: ' . $e->getMessage() . "\n");
+        }
         \Havoc\Services\SslService::retryDue();
         \Havoc\Services\UsageService::scan();
         break;
@@ -67,6 +72,11 @@ switch ($cmd) {
                 echo "FAIL  {$d['name']}: " . $e->getMessage() . "\n";
             }
         }
+        break;
+    case 'update:check':
+        $c = \Havoc\Services\UpdateService::check();
+        $n = \Havoc\Services\UpdateService::available($c);
+        echo $c['error'] !== '' ? "Check failed: {$c['error']}\n" : ($n ? "Update available: {$n['version']} ({$n['url']})\n" : "Up to date.\n");
         break;
     case 'version':
         echo Config::get('app.version'), "\n";

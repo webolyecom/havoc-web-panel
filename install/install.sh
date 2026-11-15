@@ -2,7 +2,7 @@
 # Havoc WEB Panel installer - Debian 12 (bookworm) / Debian 13 (trixie)
 #   git clone <repository URL> havoc-web-panel && cd havoc-web-panel && sudo bash install/install.sh
 # Options (env): HAVOC_WEBSERVER=nginx|ols|lsws (lsws: HAVOC_LSWS_LICENSE=<serial>, default TRIAL)  HAVOC_PHP_VERSIONS="8.1 8.2 8.3 8.4"  HAVOC_PORT=2087
-#                HAVOC_TARBALL=<https URL of havoc-panel.tar.gz>  HAVOC_UPDATE_URL=<same, used by self-update>
+#                HAVOC_TARBALL=<https URL of havoc-panel.tar.gz>  HAVOC_UPDATE_REPO=<owner/repo on GitHub for self-update>
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
@@ -69,8 +69,9 @@ log "Configuration"
 KEY=$(openssl rand -hex 32)
 sed "s/CHANGE_ME/$KEY/" /opt/havoc/config/config.php.dist > /etc/havoc/config.php
 chown root:havoc /etc/havoc/config.php; chmod 640 /etc/havoc/config.php
-[ -n "${HAVOC_UPDATE_URL:-${HAVOC_TARBALL:-}}" ] && echo "HAVOC_UPDATE_URL=${HAVOC_UPDATE_URL:-$HAVOC_TARBALL}" > /etc/havoc/update.conf
-chmod 600 /etc/havoc/update.conf 2>/dev/null || true
+# self-update source (GitHub Releases); root-owned so the panel user cannot change where updates come from
+echo "HAVOC_UPDATE_REPO=${HAVOC_UPDATE_REPO:-webolyecom/havoc-web-panel}" > /etc/havoc/update.conf
+chmod 600 /etc/havoc/update.conf
 
 # only the helper may run as root, nothing else
 echo 'havoc ALL=(root) NOPASSWD: /opt/havoc/ctl/havocctl *' > /etc/sudoers.d/havoc
