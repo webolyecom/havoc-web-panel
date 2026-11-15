@@ -24,9 +24,73 @@
       <p class="text-xs text-slate-500"><?= e(t('panel.port_hint')) ?></p>
     <?php endif; ?>
   </div>
-  <div class="card space-y-3">
-    <h2 class="h2"><?= e(t('panel.update_title')) ?></h2>
-    <p class="text-sm text-slate-500"><?= e(t('panel.update_hint')) ?></p>
-    <form method="post" action="/server/update" data-confirm="<?= e(t('server.update_confirm')) ?>"><?= csrf_field() ?><button class="btn-ghost border border-slate-300 dark:border-slate-700"><?= e(t('server.update')) ?></button></form>
+<?php
+  $lat = $check['latest'] ?? null;
+  $state = (string)($upd['state'] ?? '');
+  $running = $state === 'running';
+  $stBadge = ['running' => 'badge-warn', 'done' => 'badge-ok', 'failed' => 'badge-err', 'uptodate' => 'badge-ok'];
+?>
+  <div class="card space-y-5 lg:col-span-2" id="update">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 class="h2"><?= e(t('update.title')) ?></h2>
+        <?php if (!empty($check['repo'])): ?><p class="text-sm text-slate-500"><?= e(t('update.source')) ?> <a class="link" href="https://github.com/<?= e($check['repo']) ?>/releases" target="_blank" rel="noopener">github.com/<?= e($check['repo']) ?></a></p><?php endif; ?>
+      </div>
+      <?php if (!$running): ?>
+      <form method="post" action="/server/update/check"><?= csrf_field() ?><button class="btn-ghost border border-slate-300 dark:border-slate-700"><?= e(t('update.check')) ?></button></form>
+      <?php endif; ?>
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-3">
+      <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700"><p class="text-xs text-slate-500"><?= e(t('update.installed')) ?></p><p class="mt-1 text-lg font-semibold">v<?= e(Havoc\Services\UpdateService::current()) ?></p></div>
+      <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700"><p class="text-xs text-slate-500"><?= e(t('update.latest')) ?></p>
+        <p class="mt-1 text-lg font-semibold"><?= $lat ? 'v' . e($lat['version']) : '–' ?></p>
+        <?php if ($lat && $lat['published'] !== ''): ?><p class="text-xs text-slate-500"><?= e(substr($lat['published'], 0, 10)) ?></p><?php endif; ?></div>
+      <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700"><p class="text-xs text-slate-500"><?= e(t('common.status')) ?></p>
+        <p class="mt-1.5"><?php if ($running): ?><span class="badge badge-warn"><?= e(t('update.st_running')) ?></span>
+        <?php elseif ($avail): ?><span class="badge badge-warn"><?= e(t('update.available')) ?></span>
+        <?php elseif ($lat): ?><span class="badge badge-ok"><?= e(t('update.uptodate')) ?></span>
+        <?php else: ?><span class="badge"><?= e(t('update.none_published')) ?></span><?php endif; ?></p></div>
+    </div>
+    <p class="text-xs text-slate-500"><?= e(t('update.checked', ['t' => $check['checked'] ? date('Y-m-d H:i', (int)$check['checked']) : '–'])) ?><?php if ($check['error'] !== ''): ?> · <span class="text-rose-600"><?= e(t('update.check_failed', ['msg' => $check['error']])) ?></span><?php endif; ?></p>
+
+    <?php if ($avail && !$running): ?>
+    <div class="space-y-3 rounded-lg border border-brand/30 bg-brand/5 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <p class="font-semibold"><?= e($avail['name'] !== '' ? $avail['name'] : 'v' . $avail['version']) ?></p>
+        <div class="flex items-center gap-2">
+          <a class="btn-ghost text-sm" href="<?= e($avail['url']) ?>" target="_blank" rel="noopener"><?= e(t('update.github')) ?></a>
+          <form method="post" action="/server/update" data-confirm="<?= e(t('update.confirm', ['v' => $avail['version']])) ?>"><?= csrf_field() ?>
+            <input type="hidden" name="tag" value="<?= e($avail['tag']) ?>"><button class="btn"><?= e(t('update.install', ['v' => $avail['version']])) ?></button></form>
+        </div>
+      </div>
+      <?php if (trim($avail['notes']) !== ''): ?>
+      <details class="group"><summary class="cursor-pointer text-sm text-slate-600 dark:text-slate-300"><?= e(t('update.notes')) ?></summary>
+        <div class="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-md bg-white p-3 text-sm dark:bg-slate-900"><?= e($avail['notes']) ?></div></details>
+      <?php endif; ?>
+      <p class="text-xs text-slate-500"><?= e(t('update.restart_note')) ?></p>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($state !== ''): ?>
+    <div class="space-y-2">
+      <p class="text-sm font-medium"><?= e(t('update.log')) ?> <span class="badge <?= $stBadge[$state] ?? '' ?>"><?= e(t('update.st_' . $state)) ?></span>
+        <?php if (!empty($upd['time'])): ?><span class="text-xs text-slate-500"><?= e(str_replace(['T', 'Z'], [' ', ' UTC'], (string)$upd['time'])) ?></span><?php endif; ?></p>
+      <?php if ($running || $state === 'failed'): ?>
+        <pre class="max-h-80 overflow-auto rounded-lg bg-ink-950 p-3 text-xs leading-relaxed text-slate-200"><?= e((string)$upd['log']) ?></pre>
+      <?php else: ?>
+        <details><summary class="cursor-pointer text-sm text-slate-500"><?= e(t('update.show_log')) ?></summary>
+        <pre class="mt-2 max-h-80 overflow-auto rounded-lg bg-ink-950 p-3 text-xs leading-relaxed text-slate-200"><?= e((string)$upd['log']) ?></pre></details>
+      <?php endif; ?>
+      <?php if ($running): ?><div data-autorefresh></div><?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <form method="post" action="/server/update/auto" class="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4 dark:border-slate-700"><?= csrf_field() ?>
+      <input type="hidden" name="auto" value="0">
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="auto" value="1" <?= $auto ? 'checked' : '' ?>> <?= e(t('update.auto')) ?></label>
+      <button class="btn-ghost border border-slate-300 text-sm dark:border-slate-700"><?= e(t('common.save')) ?></button>
+      <p class="w-full text-xs text-slate-500"><?= e(t('update.auto_hint')) ?></p>
+    </form>
   </div>
 </div>

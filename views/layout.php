@@ -32,7 +32,8 @@ $rank = ['user' => 0, 'reseller' => 1, 'admin' => 2];
       <?php if ($brand['logo']): ?><img src="/brand/<?= (int)$brand['rid'] ?>/logo" alt="" class="h-9 w-9 shrink-0 rounded-xl bg-white/5 object-contain p-0.5"><?php else: ?><span class="brand-mark">H</span><?php endif; ?>
       <div class="nav-label min-w-0 leading-tight">
         <div class="truncate text-[15px] font-semibold text-white"><?= e($brand['name']) ?></div>
-        <div class="text-[11px] text-ink-400">v<?= e((string)Havoc\Core\Config::get('app.version')) ?></div>
+        <div class="text-[11px] text-ink-400">v<?= e((string)Havoc\Core\Config::get('app.version')) ?><?php if ($u && $u['role'] === 'admin' && ($nv = Havoc\Services\UpdateService::available())): ?>
+          <a href="/server/settings#update" class="ml-1 rounded-full bg-amber-400/15 px-1.5 py-px text-[10px] font-medium text-amber-300 hover:bg-amber-400/25" title="<?= e(t('update.banner', ['v' => $nv['version']])) ?>">&uarr; v<?= e($nv['version']) ?></a><?php endif; ?></div>
       </div>
       <button class="nav-label ml-auto rounded-md p-1.5 text-ink-400 hover:bg-white/5 hover:text-white md:hidden" id="menu-close" aria-label="<?= e(t('common.close')) ?>"><svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
     </div>

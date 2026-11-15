@@ -138,6 +138,8 @@ return static function (Router $r): void {
     $r->get('/server', [ServerController::class, 'monitor'], ['admin']);
     $r->get('/server/stats', [ServerController::class, 'stats'], ['admin']);
     $r->post('/server/update', [ServerController::class, 'update'], ['admin']);
+    $r->post('/server/update/check', [ServerController::class, 'updateCheck'], ['admin']);
+    $r->post('/server/update/auto', [ServerController::class, 'updateAuto'], ['admin']);
     $r->get('/server/settings', [ServerController::class, 'settings'], ['admin']);
     $r->get('/server/webserver', [WebServerController::class, 'index'], ['admin']);
     $r->post('/server/webserver/{type}/install', [WebServerController::class, 'install'], ['admin']);

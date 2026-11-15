@@ -15,6 +15,12 @@ curl -fsSL https://YOUR-HOST/install.sh | sudo HAVOC_TARBALL=https://YOUR-HOST/h
 Options: `HAVOC_WEBSERVER=nginx|ols|lsws` (with `HAVOC_LSWS_LICENSE=<serial>`, default trial), `HAVOC_PHP_VERSIONS="8.1 8.2 8.3 8.4"`, `HAVOC_PORT=2087`.
 The installer prints the panel URL and a random admin password. Panel: `https://SERVER_IP:2087`.
 
+### Self-update
+* Source: the GitHub repository in `/etc/havoc/update.conf` (`HAVOC_UPDATE_REPO=webolyecom/havoc-web-panel`, root-owned, so the panel user cannot point updates elsewhere). Only **published releases** (tags `vX.Y.Z`) are installed, never branches.
+* The panel checks every 6 hours (`havoc-usage.timer` → `UpdateService::checkDue`) through the GitHub API, falling back to the `releases/latest` redirect when the API rate limit (60 requests/hour per IP) is reached. `php /opt/havoc/bin/havoc update:check` checks from the shell.
+* `bin/havoc-update` (root, started as the transient unit `havoc-update`) downloads `archive/refs/tags/<tag>.tar.gz` over HTTPS, checks that the archive is complete, that `VERSION` matches the tag and that every PHP file passes `php -l`, then runs the release's own `install/upgrade.sh`. If that fails, `/opt/havoc.old` is moved back. Log: `/var/log/havoc/update.log`, result: `/var/log/havoc/update.status`.
+* Automatic updates (off by default) try each release once; a failed one stays on the previous version until it is installed by hand.
+
 ### Updating an existing server
 ```bash
 tar xzf havoc-panel.tar.gz && cd havoc
@@ -57,7 +63,7 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 | MariaDB: create/drop DB + user, password reset, remote access per DB, global bind toggle; one-click phpMyAdmin (latest release, SHA-256 checked, behind the panel login, own system user and PHP-FPM); server-wide performance tuning with RAM-based profiles and automatic rollback | ✅ implemented |
 | Web server choice: Nginx, OpenLiteSpeed or LiteSpeed Enterprise for the sites; one-click install (LiteSpeed repo / official Enterprise tarball with trial or serial license) and activation; all sites re-written for the target, automatic return to the previous server if the new one does not answer on port 80 | 🟡 implemented; LiteSpeed paths not yet run on a real server |
 | Per-site configuration: php.ini directives (whitelist for users, extra lines for admins, php-fpm -t before restart), Nginx include (directive whitelist for users, free for admins, nginx -t before reload, can replace "location /") | ✅ implemented (Nginx) |
-| Self-update | 🟡 script ready; needs `HAVOC_UPDATE_URL` + published `.sha256` |
+| Self-update from GitHub Releases (manual or automatic, checked and rolled back on failure) | ✅ |
 | Cron jobs: presets (1/2/5/10/15/30 min, hourly, every N hours, daily, weekly, monthly), schedule builder, range-checked parser, plain-language description and next run times, names, output logging (~/logs/cron, 1 MB per job), run now (as the tenant, 40 s), view log; subdomain / alias (parked) / addon domains, redirects | ✅ implemented |
 | Backups: files + databases (tar.gz), manual and scheduled (daily/weekly, retention), local + S3/FTP/SFTP via rclone (credentials encrypted with libsodium), one-click restore (files / databases / both) | ✅ implemented |
 | FTP (Pure-FTPd virtual users, TLS) and SFTP (OpenSSH chroot) accounts: per-domain/sub-folder jail, FTP quota, IP allow-list, password reset | ✅ implemented |

@@ -1,0 +1,40 @@
+# Publishes a GitHub Release when a new VERSION reaches main. Installed panels update themselves from these releases.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the code
+        run: |
+          find . -name '*.php' -not -path './node_modules/*' -print0 | xargs -0 -n1 php -l > /dev/null
+          for f in install/*.sh bin/havoc-*; do head -1 "$f" | grep -q bash && bash -n "$f"; done
+          php -r '$e = require "lang/en.php"; $t = require "lang/tr.php"; exit(array_diff_key($e, $t) || array_diff_key($t, $e) ? 1 : 0);'
+
+      - name: Create the release for a new version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(tr -d '[:space:]' < VERSION)
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "VERSION must look like 1.2.3"; exit 1; }
+          grep -q "\"version\": \"$v\"" package.json || { echo "package.json version differs from VERSION"; exit 1; }
+          if gh release view "v$v" > /dev/null 2>&1; then
+            echo "v$v is already released."
+            exit 0
+          fi
+          # release notes: the CHANGELOG section of this version
+          awk -v v="$v" 'index($0, "## [" v "]") == 1 {f = 1; next} f && /^## \[/ {exit} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Havoc WEB Panel $v" > notes.md
+          printf '\n---\nUpdate from the panel (**Panel settings → Panel updates**) or with `sudo /opt/havoc/bin/havoc-update`.\n' >> notes.md
+          gh release create "v$v" --target "$GITHUB_SHA" --title "Havoc WEB Panel $v" --notes-file notes.md --latest
