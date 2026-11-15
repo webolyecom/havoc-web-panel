@@ -35,7 +35,17 @@ final class McpTools
             $t('get_domain', 'Website details', 'Details of one website: PHP version, SSL/HTTPS, aliases, redirects, installed application.', ['domain' => $domain], ['domain'], false),
             $t('list_php_versions', 'PHP versions', 'PHP versions available on this server.', [], [], false),
             $t('list_files', 'List files', 'Files and folders in a website folder.', ['domain' => $domain, 'path' => $path], ['domain'], false),
-            $t('read_file', 'Read file', 'Text content of a file of a website (max 256 KB).', ['domain' => $domain, 'path' => $path], ['domain', 'path'], false),
+            $t('read_file', 'Read file', 'Text of a file, at most 800 lines per call; the answer says total_lines. To save tokens find the place with search_files first and read only those lines (start_line/end_line).', ['domain' => $domain, 'path' => $path,
+                'start_line' => ['type' => 'integer', 'minimum' => 1, 'description' => 'First line (1-based). Default 1.'],
+                'end_line' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Last line (inclusive).']], ['domain', 'path'], false),
+            $t('search_files', 'Search in files', 'Finds text in the website\'s files and returns "path:line: text" matches. Skips binary files, files over 2 MB, .git and node_modules.', ['domain' => $domain,
+                'query' => ['type' => 'string', 'description' => 'Text to find (or a regular expression when regex is true)'],
+                'path' => ['type' => 'string', 'description' => 'Folder to search in, relative to the website root. Default: whole site.'],
+                'file_pattern' => ['type' => 'string', 'description' => 'Only file names matching this pattern, e.g. *.php'],
+                'regex' => ['type' => 'boolean', 'default' => false], 'case_insensitive' => ['type' => 'boolean', 'default' => false],
+                'max_results' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 300, 'default' => 100]], ['domain', 'query'], false),
+            $t('list_file_history', 'File history', 'Earlier versions Claude\'s changes kept of a file (or, without path, which files have versions). Use restore_file to go back.', ['domain' => $domain,
+                'path' => ['type' => 'string', 'description' => 'File path. Empty: list the files that have versions.']], ['domain'], false),
             $t('read_log', 'Read website log', 'Last lines of a website log.', ['domain' => $domain,
                 'type' => ['type' => 'string', 'enum' => ['access', 'error', 'php'], 'description' => 'access, error (web server) or php (PHP errors)'],
                 'lines' => ['type' => 'integer', 'minimum' => 10, 'maximum' => 500, 'default' => 100]], ['domain', 'type'], false),
@@ -55,11 +65,40 @@ final class McpTools
                 'admin_email' => ['type' => 'string', 'description' => 'Administrator e-mail. Default: the account e-mail.'],
                 'language' => ['type' => 'string', 'enum' => array_keys(AppService::LOCALES), 'description' => 'WordPress language. Default: en_US'],
             ], ['domain'], true, false),
-            $t('write_file', 'Write file', 'Creates or replaces a file in a website (missing folders are created). Use encoding "base64" for images and other binary files. Existing files are overwritten without backup.', [
+            $t('edit_file', 'Edit file', 'Changes part of a text file by exact text replacement: the cheapest way to update code. Each "old" must match the file exactly (spaces, line breaks) and occur once, unless replace_all is true. All edits are applied or none. The previous version is kept (restore_file).', [
+                'domain' => $domain, 'path' => $path,
+                'edits' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 50, 'items' => ['type' => 'object', 'properties' => (object)[
+                    'old' => ['type' => 'string', 'description' => 'Exact current text, with enough surrounding lines to be unique'],
+                    'new' => ['type' => 'string', 'description' => 'Replacement text'],
+                    'replace_all' => ['type' => 'boolean', 'default' => false]], 'required' => ['old', 'new'], 'additionalProperties' => false]],
+            ], ['domain', 'path', 'edits'], true, false),
+            $t('write_file', 'Write file', 'Creates or replaces one whole file (folders are created). For changes to an existing file use edit_file instead. Use encoding "base64" for binary files; for large files or images prefer download_file or extract_archive. The previous version is kept.', [
                 'domain' => $domain, 'path' => $path,
                 'content' => ['type' => 'string', 'description' => 'File content (text, or base64 when encoding is base64). Max 8 MB.'],
                 'encoding' => ['type' => 'string', 'enum' => ['text', 'base64'], 'default' => 'text'],
             ], ['domain', 'path', 'content'], true),
+            $t('write_files', 'Write several files', 'Creates or replaces up to 200 files in one call (16 MB in total); all paths are checked before anything is written. Previous versions are kept.', [
+                'domain' => $domain,
+                'files' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 200, 'items' => ['type' => 'object', 'properties' => (object)[
+                    'path' => ['type' => 'string'], 'content' => ['type' => 'string'], 'encoding' => ['type' => 'string', 'enum' => ['text', 'base64'], 'default' => 'text']],
+                    'required' => ['path', 'content'], 'additionalProperties' => false]],
+            ], ['domain', 'files'], true),
+            $t('extract_archive', 'Extract archive', 'Extracts a .zip, .tar.gz, .tgz or .tar that is already in the website (e.g. uploaded by the user in the panel\'s file manager). Files are not sent through Claude, so this costs almost no tokens. Existing files are only replaced with overwrite=true (their previous versions are kept). Archives with links or unsafe paths are refused.', [
+                'domain' => $domain,
+                'path' => ['type' => 'string', 'description' => 'Archive path relative to the website root, e.g. "site.zip"'],
+                'destination' => ['type' => 'string', 'description' => 'Folder to extract into, relative to the website root. Default: the website root.'],
+                'strip_top_folder' => ['type' => 'boolean', 'default' => true, 'description' => 'If everything is inside one top folder (e.g. "mysite/"), extract its contents directly'],
+                'overwrite' => ['type' => 'boolean', 'default' => false],
+            ], ['domain', 'path'], true, false),
+            $t('download_file', 'Download file into website', 'Downloads an https:// URL (for example a private, time-limited link to an archive) straight into the website, without passing the content through Claude. Follow with extract_archive for archives. Max 1 GB; private and internal addresses are refused.', [
+                'domain' => $domain,
+                'url' => ['type' => 'string', 'description' => 'https:// address'],
+                'path' => ['type' => 'string', 'description' => 'Target file path relative to the website root, e.g. "release.zip"'],
+                'overwrite' => ['type' => 'boolean', 'default' => false],
+            ], ['domain', 'url', 'path'], true, false),
+            $t('restore_file', 'Restore file version', 'Puts back an earlier version of a file (see list_file_history). The current content is kept as a version too, so this can be undone.', [
+                'domain' => $domain, 'path' => $path, 'version' => ['type' => 'string', 'description' => 'Version id from list_file_history'],
+            ], ['domain', 'path', 'version'], true, false),
             $t('create_directory', 'Create folder', 'Creates a folder (and missing parent folders) in a website.', ['domain' => $domain, 'path' => $path], ['domain', 'path'], true),
             $t('update_domain', 'Change website settings', 'Changes the PHP version and/or HTTPS redirection of a website.', ['domain' => $domain,
                 'php_version' => ['type' => 'string', 'description' => 'New PHP version'],
@@ -94,7 +133,10 @@ final class McpTools
         $res = $this->{'t_' . $tool}($a);
         if (self::isWrite($tool)) {
             $target = (string)($a['domain'] ?? $a['name'] ?? '');
-            $meta = array_intersect_key($a, array_flip(['path', 'php_version', 'force_https', 'language', 'parent_domain', 'owner', 'encoding']));
+            $meta = array_intersect_key($a, array_flip(['path', 'php_version', 'force_https', 'language', 'parent_domain', 'owner', 'encoding', 'destination', 'overwrite', 'url', 'version']));
+            if (isset($a['files']) && is_array($a['files'])) {
+                $meta['files'] = count($a['files']);
+            }
             Audit::log('claude.' . $tool, $target, $meta, $this->user);
         }
         return $res;
@@ -186,9 +228,58 @@ final class McpTools
     {
         $d = $this->d($a);
         $rel = self::rel($a['path'] ?? '', false);
-        $c = (string)($this->fs($d, 'read', ['path' => $rel])['content'] ?? '');
-        $cut = strlen($c) > self::MAX_READ;
-        return ['domain' => $d['name'], 'path' => $rel, 'content' => $cut ? mb_strcut($c, 0, self::MAX_READ) : $c, 'truncated' => $cut];
+        $from = max(1, (int)($a['start_line'] ?? 1));
+        $to = isset($a['end_line']) ? max($from, (int)$a['end_line']) : 0;
+        return $this->fs($d, 'readrange', ['path' => $rel, 'from' => $from, 'to' => $to]);
+    }
+
+    private function t_search_files(array $a): array
+    {
+        $d = $this->d($a);
+        return $this->fs($d, 'grep', ['path' => self::rel($a['path'] ?? ''), 'q' => (string)($a['query'] ?? ''), 'regex' => !empty($a['regex']),
+            'icase' => !empty($a['case_insensitive']), 'glob' => (string)($a['file_pattern'] ?? ''), 'max' => (int)($a['max_results'] ?? 100)]);
+    }
+
+    private function t_list_file_history(array $a): array
+    {
+        $d = $this->d($a);
+        $p = (string)($a['path'] ?? '');
+        return $this->fs($d, 'hist_list', ['path' => $p === '' ? '' : self::rel($p, false)]);
+    }
+
+    private function t_edit_file(array $a): array
+    {
+        $d = $this->d($a);
+        return $this->fs($d, 'edit', ['path' => self::rel($a['path'] ?? '', false), 'edits' => array_values((array)($a['edits'] ?? []))]);
+    }
+
+    private function t_write_files(array $a): array
+    {
+        $d = $this->d($a);
+        $files = [];
+        foreach ((array)($a['files'] ?? []) as $f) {
+            $files[] = ['path' => self::rel($f['path'] ?? '', false), 'content' => (string)($f['content'] ?? ''), 'encoding' => ($f['encoding'] ?? 'text') === 'base64' ? 'base64' : 'text'];
+        }
+        return $this->fs($d, 'putmany', ['files' => $files]);
+    }
+
+    private function t_extract_archive(array $a): array
+    {
+        $d = $this->d($a);
+        return $this->fs($d, 'extract', ['path' => self::rel($a['path'] ?? '', false), 'dest' => self::rel($a['destination'] ?? ''),
+            'overwrite' => !empty($a['overwrite']), 'strip' => ($a['strip_top_folder'] ?? true) !== false]);
+    }
+
+    private function t_download_file(array $a): array
+    {
+        $d = $this->d($a);
+        return $this->fs($d, 'fetch', ['url' => (string)($a['url'] ?? ''), 'path' => self::rel($a['path'] ?? '', false), 'overwrite' => !empty($a['overwrite'])]);
+    }
+
+    private function t_restore_file(array $a): array
+    {
+        $d = $this->d($a);
+        return $this->fs($d, 'hist_restore', ['path' => self::rel($a['path'] ?? '', false), 'version' => (string)($a['version'] ?? '')]);
     }
 
     private function t_read_log(array $a): array
@@ -277,50 +368,18 @@ final class McpTools
     {
         $d = $this->d($a);
         $rel = self::rel($a['path'] ?? '', false);
-        $content = (string)($a['content'] ?? '');
         $b64 = ($a['encoding'] ?? 'text') === 'base64';
-        $bytes = $b64 ? base64_decode($content, true) : $content;
-        if ($bytes === false) {
-            throw new \InvalidArgumentException('content is not valid base64');
+        $content = (string)($a['content'] ?? '');
+        if (strlen($content) > ($b64 ? 11500000 : self::MAX_WRITE)) {
+            throw new \InvalidArgumentException('File too large (max 8 MB); use download_file or extract_archive');
         }
-        if (strlen($bytes) > self::MAX_WRITE) {
-            throw new \InvalidArgumentException('File too large (max 8 MB)');
-        }
-        $this->mkdirs($d, dirname($rel) === '.' ? '' : dirname($rel));
-        // text up to 2 MB through the editor path, everything else through the upload path (binary safe)
-        if (!$b64 && strlen($bytes) <= 2 * 1024 * 1024) {
-            $this->fs($d, 'write', ['path' => $rel, 'content' => $bytes]);
-        } else {
-            $this->fs($d, 'upload', ['path' => $rel, 'b64' => base64_encode($bytes)]);
-        }
-        $https = in_array($d['ssl_mode'], ['letsencrypt', 'custom', 'cloudflare'], true) || $d['ssl_auto'] === 'issued';
-        return ['domain' => $d['name'], 'path' => $rel, 'bytes' => strlen($bytes), 'url' => ($https ? 'https://' : 'http://') . $d['name'] . '/' . implode('/', array_map('rawurlencode', explode('/', $rel)))];
-    }
-
-    private function mkdirs(array $d, string $rel): void
-    {
-        if ($rel === '') {
-            return;
-        }
-        $cur = '';
-        foreach (explode('/', $rel) as $part) {
-            $cur = $cur === '' ? $part : "$cur/$part";
-            try {
-                $this->fs($d, 'mkdir', ['path' => $cur]);
-            } catch (\RuntimeException $e) {
-                if (!str_contains($e->getMessage(), 'exists')) {
-                    throw $e;
-                }
-            }
-        }
+        return $this->fs($d, 'put', ['path' => $rel, 'content' => $content, 'encoding' => $b64 ? 'base64' : 'text']);
     }
 
     private function t_create_directory(array $a): array
     {
         $d = $this->d($a);
-        $rel = self::rel($a['path'] ?? '', false);
-        $this->mkdirs($d, $rel);
-        return ['domain' => $d['name'], 'path' => $rel, 'created' => true];
+        return $this->fs($d, 'mkdirp', ['path' => self::rel($a['path'] ?? '', false)]);
     }
 
     private function t_update_domain(array $a): array

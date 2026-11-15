@@ -2,6 +2,18 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.6.0] – 2026-11-15
+### Added (Claude connector)
+- **edit_file**: changes only the given text of a file (exact match, all-or-nothing). Updating a few lines no longer means re-sending the whole file: far fewer tokens and much faster.
+- **search_files** (`path:line: text` results) and **read_file with start_line / end_line** (max 800 lines per call), so Claude reads only what it needs.
+- **write_files**: up to 200 files in one call, checked before anything is written.
+- **extract_archive**: extracts a zip / tar.gz already in the site (e.g. uploaded in the file manager) without passing the files through Claude; refuses to overwrite unless asked, refuses links and unsafe paths.
+- **download_file**: fetches an https:// link (e.g. a private, time-limited link) straight into the site; private and internal addresses are refused.
+- **File history**: every file Claude changes keeps its previous version outside the public folder (20 per file); **list_file_history** and **restore_file** undo a change.
+### Changed
+- Tool answers are compact JSON sent once (about 65% shorter), and the connector tells Claude to prefer the cheap path (search → read lines → edit).
+- write_file and create_directory create missing folders in one step.
+
 ## [0.5.2] – 2026-11-15
 ### Changed
 - **The panel is also served on `https://<panel host>/` (port 443)** once it has a host name with a certificate, so the Claude connector address is `https://<panel host>/mcp`. Claude's connector service could not reach panels on port 2087 ("No server responded at this URL"). The sites' Nginx forwards to the panel port; the client address and port are trusted only from the loopback address with a secret that hosting accounts cannot read. Kept in sync when the panel port or the web server changes.
