@@ -24,6 +24,42 @@
       <p class="text-xs text-slate-500"><?= e(t('panel.port_hint')) ?></p>
     <?php endif; ?>
   </div>
+  <div class="card space-y-4" id="hostname">
+    <h2 class="h2"><?= e(t('ph.title')) ?></h2>
+    <div class="space-y-1 text-sm">
+      <?php if ($ph['host'] !== '' && $ph['trusted']): ?>
+        <p><?= e(t('ph.current')) ?> <a class="link font-medium" href="https://<?= e($ph['host']) ?>:<?= (int)$ph['port'] ?>/">https://<?= e($ph['host']) ?>:<?= (int)$ph['port'] ?></a></p>
+        <p class="text-slate-500"><span class="badge badge-ok"><?= e($ph['issuer']) ?></span> <?= e(t('ph.expires', ['d' => $ph['expires']])) ?> · <?= e(t('ph.renews')) ?></p>
+      <?php else: ?>
+        <p><span class="badge badge-warn"><?= e(t('ph.selfsigned')) ?></span></p>
+        <p class="text-slate-500"><?= e(t('ph.hint')) ?></p>
+      <?php endif; ?>
+    </div>
+    <form method="post" action="/server/hostname" class="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" data-confirm="<?= e(t('common.confirm')) ?>"><?= csrf_field() ?>
+      <div><label class="label" for="ph-host"><?= e(t('ph.hostname')) ?></label><input class="input" id="ph-host" name="hostname" required placeholder="panel.example.com" value="<?= e($ph['host']) ?>"></div>
+      <div><label class="label" for="ph-mail"><?= e(t('ph.email')) ?></label><input class="input" id="ph-mail" type="email" name="email" placeholder="<?= e((string)Havoc\Core\Auth::user()['email']) ?>"></div>
+      <button class="btn"><?= e(t('ph.issue')) ?></button>
+    </form>
+    <p class="text-xs text-slate-500"><?= e(t('ph.dns_hint')) ?><?php if ($ph['webserver'] !== '' && $ph['webserver'] !== 'nginx'): ?> <span class="text-amber-600"><?= e(t('ph.needs_nginx')) ?></span><?php endif; ?></p>
+  </div>
+  <div class="card space-y-3" id="claude">
+    <h2 class="h2"><?= e(t('claude.title')) ?></h2>
+    <p class="text-sm text-slate-500"><?= e(t('claude.admin_hint')) ?></p>
+    <?php $mcpOn = Havoc\Services\OAuthService::enabled(); $mcpHost = $ph['trusted'] && $ph['host'] !== '' ? $ph['host'] . ':' . (int)$ph['port'] : ''; ?>
+    <?php if ($mcpOn): ?>
+      <div class="text-sm"><?= e(t('claude.url')) ?>
+        <?php if ($mcpHost !== ''): ?><code class="select-all ml-1 rounded bg-slate-100 px-2 py-1 font-mono dark:bg-slate-800">https://<?= e($mcpHost) ?>/mcp</code>
+        <?php else: ?><span class="text-amber-700 dark:text-amber-300"><?= e(t('claude.need_host')) ?></span><?php endif; ?></div>
+      <ol class="list-decimal space-y-1 pl-5 text-xs text-slate-500">
+        <li><?= e(t('claude.step1')) ?></li><li><?= e(t('claude.step2')) ?></li><li><?= e(t('claude.step3')) ?></li>
+      </ol>
+    <?php endif; ?>
+    <form method="post" action="/server/claude" class="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-3 dark:border-slate-700"><?= csrf_field() ?>
+      <input type="hidden" name="enabled" value="0">
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="enabled" value="1" <?= $mcpOn ? 'checked' : '' ?>> <?= e(t('claude.enable')) ?></label>
+      <button class="btn-ghost border border-slate-300 text-sm dark:border-slate-700"><?= e(t('common.save')) ?></button>
+    </form>
+  </div>
 <?php
   $lat = $check['latest'] ?? null;
   $state = (string)($upd['state'] ?? '');

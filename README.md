@@ -10,7 +10,7 @@ Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, fi
 from one clean interface, with no license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.4.0-0b7fa0.svg)
+![Version](https://img.shields.io/badge/version-0.5.0-0b7fa0.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg)
 ![Debian](https://img.shields.io/badge/Debian-12%20%7C%2013-a81d33.svg)
 ![Status](https://img.shields.io/badge/status-beta-f59e0b.svg)
@@ -51,8 +51,14 @@ Contributions back to the project are very welcome, but never required.
 <tr>
 <td width="50%" valign="top">
 
+### 🤖 Manage your sites by talking to Claude
+- Built-in **Claude connector** (MCP): add it in Claude and say *"add example.com and install WordPress"* or *"publish this page on my site"*
+- Claude adds sites, installs WordPress, writes files, requests SSL, creates databases, reads logs, all with your panel login and rights, never deleting anything
+- Every action in the audit log; end the connection any time
+
 ### 🌐 Websites
 - Domains, subdomains, addon domains, aliases (parked) and redirects
+- **One-click WordPress** (own database, admin account, language of your choice)
 - **Per-site PHP version** (8.1 – 8.4), extensions, OPcache and `php.ini` settings
 - Every site runs in its **own PHP-FPM process** under its own Linux user
 - **Automatic Let's Encrypt SSL** when a domain is added, plus renewals, custom certificates and Cloudflare Origin certificates
@@ -129,6 +135,27 @@ Contributions back to the project are very welcome, but never required.
 <td><img src="docs/screenshots/login.png" alt="Login"><br><sub><b>Login</b>: with optional two-factor authentication.</sub></td>
 </tr>
 </table>
+
+---
+
+## 🤖 Claude connector
+
+Havoc WEB Panel is also an [MCP](https://modelcontextprotocol.io) server, so Claude can manage your websites for you:
+
+> *"Add shop.example.com, install WordPress in Turkish and send me the admin login."*
+> *"Publish this landing page at example.com/kampanya."*
+> *"Why does example.com show an error? Check the logs."*
+
+**Setup (once):**
+
+1. In the panel: **Panel settings → Panel address and certificate**: give the panel a host name (e.g. `panel.example.com`, A record pointing to the server) and click *Get certificate*. Claude only connects to a trusted certificate.
+2. In Claude: **Settings → Connectors → Add custom connector**, enter `https://panel.example.com:2087/mcp` (shown in the panel) and click *Connect*.
+3. Log in to the panel (with 2FA) and approve. You choose whether Claude may make changes or only read.
+
+**What Claude can do:** list and inspect sites, read and write files (text and images), read logs, add domains and subdomains, install WordPress, request SSL, change PHP version / HTTPS redirect, create databases.
+**What Claude cannot do:** delete websites, databases or files. It acts with the rights of the panel user who approved it, so a customer's connection only reaches that customer's sites. Every action is written to the audit log; connections are listed and can be ended under **Settings → Claude connector**, and the administrator can switch the connector off for the whole panel.
+
+Technically: Streamable HTTP MCP endpoint at `/mcp`, OAuth 2.1 with dynamic client registration and PKCE (S256), rotating refresh tokens, tokens stored as hashes.
 
 ---
 

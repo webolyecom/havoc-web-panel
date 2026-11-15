@@ -56,7 +56,13 @@ final class Request
 
     public function isApi(): bool
     {
-        return str_starts_with($this->path, '/api/');
+        return str_starts_with($this->path, '/api/') || $this->isMachine();
+    }
+
+    /** Endpoints used by programs (Claude connector, OAuth): no session, no CSRF token, JSON errors. */
+    public function isMachine(): bool
+    {
+        return in_array($this->path, ['/mcp', '/oauth/token', '/oauth/register'], true) || str_starts_with($this->path, '/.well-known/');
     }
 
     public function wantsJson(): bool

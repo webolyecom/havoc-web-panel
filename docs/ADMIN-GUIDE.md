@@ -15,6 +15,13 @@ curl -fsSL https://YOUR-HOST/install.sh | sudo HAVOC_TARBALL=https://YOUR-HOST/h
 Options: `HAVOC_WEBSERVER=nginx|ols|lsws` (with `HAVOC_LSWS_LICENSE=<serial>`, default trial), `HAVOC_PHP_VERSIONS="8.1 8.2 8.3 8.4"`, `HAVOC_PORT=2087`.
 The installer prints the panel URL and a random admin password. Panel: `https://SERVER_IP:2087`.
 
+### Claude connector (MCP) and one-click WordPress
+* `/mcp` (Streamable HTTP, JSON responses) with OAuth 2.1: metadata at `/.well-known/oauth-protected-resource[/mcp]` and `/.well-known/oauth-authorization-server`, dynamic client registration at `/oauth/register` (redirect URIs limited to `https://claude.ai|claude.com/api/mcp/auth_callback` and loopback), consent at `/oauth/authorize` (panel login + 2FA), tokens at `/oauth/token` (PKCE S256 only, access 1 h, refresh 30 days, rotated). Codes and tokens are stored as SHA-256 hashes. These endpoints never start a session.
+* A token acts as the approving user through `Scope`, exactly like the web interface; the "write" scope is optional at consent. Tools: `src/Services/McpTools.php`. No delete tools. Every write is logged as `claude.<tool>` in the audit log.
+* Users see and end their connections under Settings → Claude connector; *Panel settings → Claude connector* switches the connector off (ending all connections).
+* Claude's servers connect from `160.79.104.0/21`; the panel port must be reachable from there, with a trusted certificate (*Panel address and certificate*: Let's Encrypt over the Nginx catch-all server on port 80, copied to `/etc/havoc/ssl/panel.{crt,key}`, deploy hook `/etc/letsencrypt/renewal-hooks/deploy/havoc-panel`).
+* WordPress: `AppInstaller` (root) downloads WP-CLI (SHA-512 checked, `/usr/local/lib/havoc/wp-cli.phar`) and runs every step as the hosting account inside the site folder; passwords go through stdin. The site folder must be empty except the panel's welcome page. The panel creates the database (`hvN_wp`), keeps the install secrets encrypted only until the background job (`bin/havoc app:install <id>`) ends, and shows the admin password once.
+
 ### Self-update
 * Source: the GitHub repository in `/etc/havoc/update.conf` (`HAVOC_UPDATE_REPO=webolyecom/havoc-web-panel`, root-owned, so the panel user cannot point updates elsewhere). Only **published releases** (tags `vX.Y.Z`) are installed, never branches.
 * The panel checks every 6 hours (`havoc-usage.timer` → `UpdateService::checkDue`) through the GitHub API, falling back to the `releases/latest` redirect when the API rate limit (60 requests/hour per IP) is reached. `php /opt/havoc/bin/havoc update:check` checks from the shell.
@@ -64,6 +71,9 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 | Web server choice: Nginx, OpenLiteSpeed or LiteSpeed Enterprise for the sites; one-click install (LiteSpeed repo / official Enterprise tarball with trial or serial license) and activation; all sites re-written for the target, automatic return to the previous server if the new one does not answer on port 80 | 🟡 implemented; LiteSpeed paths not yet run on a real server |
 | Per-site configuration: php.ini directives (whitelist for users, extra lines for admins, php-fpm -t before restart), Nginx include (directive whitelist for users, free for admins, nginx -t before reload, can replace "location /") | ✅ implemented (Nginx) |
 | Self-update from GitHub Releases (manual or automatic, checked and rolled back on failure) | ✅ |
+| One-click WordPress | ✅ |
+| Claude connector (MCP + OAuth 2.1) | ✅ |
+| Panel host name with Let's Encrypt | ✅ (needs Nginx as the site web server) |
 | Cron jobs: presets (1/2/5/10/15/30 min, hourly, every N hours, daily, weekly, monthly), schedule builder, range-checked parser, plain-language description and next run times, names, output logging (~/logs/cron, 1 MB per job), run now (as the tenant, 40 s), view log; subdomain / alias (parked) / addon domains, redirects | ✅ implemented |
 | Backups: files + databases (tar.gz), manual and scheduled (daily/weekly, retention), local + S3/FTP/SFTP via rclone (credentials encrypted with libsodium), one-click restore (files / databases / both) | ✅ implemented |
 | FTP (Pure-FTPd virtual users, TLS) and SFTP (OpenSSH chroot) accounts: per-domain/sub-folder jail, FTP quota, IP allow-list, password reset | ✅ implemented |

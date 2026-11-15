@@ -41,4 +41,21 @@
     <?php endforeach; ?>
     <a class="text-sm text-brand hover:underline" href="/api/v1/openapi.json">OpenAPI spec</a>
   </div>
+  <div class="card space-y-3 lg:col-span-2" id="claude">
+    <h2 class="h2"><?= e(t('claude.title')) ?></h2>
+    <p class="text-sm text-slate-500"><?= e(t('claude.hint')) ?></p>
+    <?php if ($mcpUrl !== ''): ?>
+      <div class="flex flex-wrap items-center gap-2 text-sm"><span><?= e(t('claude.url')) ?></span><code class="select-all rounded bg-slate-100 px-2 py-1 font-mono dark:bg-slate-800"><?= e($mcpUrl) ?></code></div>
+    <?php else: ?>
+      <p class="text-sm text-amber-700"><?= e(t('claude.disabled')) ?></p>
+    <?php endif; ?>
+    <?php if (!$claude): ?><p class="text-sm text-slate-400"><?= e(t('claude.none')) ?></p><?php endif; ?>
+    <?php foreach ($claude as $c): ?>
+      <form method="post" action="/settings/claude/revoke" class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700" data-confirm="<?= e(t('claude.revoke_confirm')) ?>"><?= csrf_field() ?>
+        <input type="hidden" name="client" value="<?= e($c['client_id']) ?>">
+        <span><span class="font-medium"><?= e($c['client_name']) ?></span> <span class="badge <?= str_contains($c['scope'], 'write') ? 'badge-warn' : 'badge-ok' ?>"><?= e(str_contains($c['scope'], 'write') ? t('claude.can_change') : t('claude.read_only')) ?></span>
+          <span class="block text-xs text-slate-500"><?= e(t('claude.last_used', ['t' => (string)$c['last_used'], 'ip' => (string)$c['last_ip']])) ?></span></span>
+        <button class="btn-ghost text-red-600"><?= e(t('claude.revoke')) ?></button></form>
+    <?php endforeach; ?>
+  </div>
 </div>

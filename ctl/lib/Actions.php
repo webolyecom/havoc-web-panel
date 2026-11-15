@@ -9,7 +9,7 @@ final class Actions
     public const ALLOWED = [
         'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'php.list', 'php.extensions', 'service.list', 'service.control',
         'account.ensure', 'account.delete', 'domain.apply', 'domain.delete',
-        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check',
+        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status',
         'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
         'fw.status', 'fw.enable', 'fw.disable', 'fw.allow', 'fw.ban', 'fw.whitelist', 'fw.preset', 'fw.delete', 'dns.apply', 'dns.delete', 'ftp.create', 'ftp.update', 'ftp.password', 'ftp.delete', 'backup.create', 'backup.restore', 'backup.delete', 'backup.test', 'fs.exec', 'db.create', 'db.drop', 'db.password', 'db.remote', 'db.bind', 'db.info',
     ];
@@ -414,6 +414,74 @@ final class Actions
     public function log_clear(array $a): array { return Logs::clear($a); }
     public function log_tail_many(array $a): array { return Logs::tailMany($a); }
     public function log_cat(array $a): array { throw new \LogicException('log.cat is a streaming action'); }
+
+    /** WordPress into an empty site, installed as the hosting account (see AppInstaller). */
+    public function app_wordpress(array $a): array
+    {
+        return AppInstaller::wordpress($a);
+    }
+
+    private const PANEL_CRT = '/etc/havoc/ssl/panel.crt';
+    private const PANEL_KEY = '/etc/havoc/ssl/panel.key';
+    private const PANEL_HOOK = '/etc/letsencrypt/renewal-hooks/deploy/havoc-panel';
+
+    /**
+     * Let's Encrypt certificate for the panel's own host name (HTTP-01 through the ACME webroot that the catch-all
+     * Nginx server answers on port 80). The certificate is copied over the panel's certificate files, so the panel
+     * Nginx configuration does not change; a deploy hook repeats the copy on every renewal.
+     */
+    public function panel_hostname_ssl(array $a): array
+    {
+        $host = Validator::domain($a['host'] ?? '');
+        $email = filter_var($a['email'] ?? '', FILTER_VALIDATE_EMAIL);
+        if (!$email) {
+            throw new \InvalidArgumentException('Valid email required');
+        }
+        if (WebServerFactory::active() !== 'nginx') {
+            throw new \RuntimeException('The panel certificate is issued through Nginx on port 80; activate Nginx as the web server first.');
+        }
+        (new NginxDriver())->prepare();                                  // makes sure the catch-all (ACME) server exists
+        Sys::run(['systemctl', 'reload', 'nginx']);
+        $pre = $this->ssl_precheck(['names' => [$host]])['results'][$host] ?? ['ok' => false, 'reason' => 'http_fail'];
+        if (empty($pre['ok'])) {
+            $why = ['no_dns' => 'has no A/AAAA record', 'private_ip' => 'points to a private address', 'cloudflare' => 'goes through the Cloudflare proxy (use "DNS only")',
+                'ipv6_fail' => 'has an AAAA record that does not reach this server', 'http_fail' => 'does not point to this server'][$pre['reason']] ?? 'is not reachable';
+            throw new \RuntimeException("$host $why.");
+        }
+        [$c, $o, $e] = Sys::run(['certbot', 'certonly', '--webroot', '-w', '/var/www/havoc-acme', '--non-interactive', '--agree-tos', '-m', $email,
+            '--cert-name', 'havoc-panel', '-d', $host, '--keep-until-expiring'], null, 300);
+        if ($c !== 0) {
+            $msg = preg_match('/(Detail|Error): (.+)/', $e . $o, $m) ? $m[2] : trim($e ?: $o);
+            throw new \RuntimeException('Let\'s Encrypt: ' . mb_substr($msg, 0, 300));
+        }
+        Sys::write(self::PANEL_HOOK, "#!/bin/sh\n# Havoc WEB Panel: copy the renewed panel certificate and reload the panel web server\n"
+            . "[ \"\$RENEWED_LINEAGE\" = /etc/letsencrypt/live/havoc-panel ] || exit 0\n"
+            . "install -m 644 /etc/letsencrypt/live/havoc-panel/fullchain.pem " . self::PANEL_CRT . "\n"
+            . "install -m 600 /etc/letsencrypt/live/havoc-panel/privkey.pem " . self::PANEL_KEY . "\n"
+            . "systemctl reload havoc-panel-nginx\n", 0755);
+        $cur = is_file(self::PANEL_CRT) ? @openssl_x509_parse((string)file_get_contents(self::PANEL_CRT)) : false;
+        if (!is_file(self::PANEL_CRT . '.selfsigned') && $cur && !str_contains((string)($cur['issuer']['O'] ?? ''), "Let's Encrypt")) {
+            copy(self::PANEL_CRT, self::PANEL_CRT . '.selfsigned');
+            copy(self::PANEL_KEY, self::PANEL_KEY . '.selfsigned');
+        }
+        Sys::ok(['/bin/sh', self::PANEL_HOOK], null, 60, ['RENEWED_LINEAGE' => '/etc/letsencrypt/live/havoc-panel']);
+        Sys::write('/etc/havoc/panel-host', $host . "\n", 0644);
+        return $this->panel_hostname_status([]);
+    }
+
+    public function panel_hostname_status(array $a): array
+    {
+        $host = trim((string)@file_get_contents('/etc/havoc/panel-host'));
+        $x = @openssl_x509_parse((string)@file_get_contents(self::PANEL_CRT));
+        $port = 0;
+        if (preg_match('/listen\s+(\d+)\s+ssl/', (string)@file_get_contents('/etc/havoc/nginx/nginx.conf'), $m)) {
+            $port = (int)$m[1];
+        }
+        return ['host' => $host, 'port' => $port, 'issuer' => (string)($x['issuer']['O'] ?? $x['issuer']['CN'] ?? ''),
+            'subject' => (string)($x['subject']['CN'] ?? ''), 'expires' => isset($x['validTo_time_t']) ? gmdate('Y-m-d', (int)$x['validTo_time_t']) : '',
+            'trusted' => isset($x['issuer']['O']) && str_contains((string)$x['issuer']['O'], "Let's Encrypt"),
+            'webserver' => WebServerFactory::active()];
+    }
 
     private const UPDATE_UNIT = 'havoc-update';
 

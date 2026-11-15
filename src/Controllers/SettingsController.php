@@ -21,6 +21,8 @@ final class SettingsController extends Controller
             'otpuri' => $secret ? Totp::uri('Havoc', $u['username'], $secret) : '',
             'tokens' => DB::all('SELECT id, name, last_used, created_at FROM api_tokens WHERE user_id = ?', [$u['id']]),
             'newToken' => $new,
+            'claude' => \Havoc\Services\OAuthService::connections((int)$u['id']),
+            'mcpUrl' => \Havoc\Services\OAuthService::enabled() ? \Havoc\Services\OAuthService::resource() : '',
         ]);
     }
 
@@ -92,5 +94,14 @@ final class SettingsController extends Controller
         DB::q('DELETE FROM api_tokens WHERE id = ? AND user_id = ?', [(int)$this->param('id'), $this->user()['id']]);
         Audit::log('token.delete');
         return $this->to('/settings');
+    }
+
+    public function claudeRevoke(): Response
+    {
+        $client = $this->req->str('client');
+        \Havoc\Services\OAuthService::revoke((int)$this->user()['id'], $client);
+        Audit::log('claude.revoke', $client);
+        $this->flash('success', t('claude.revoked'));
+        return $this->to('/settings#claude');
     }
 }

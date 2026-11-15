@@ -14,8 +14,7 @@ final class Security
 
     public static function headers(Request $req): void
     {
-        $n = self::nonce();
-        header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-$n'; style-src 'self' 'nonce-$n'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+        self::csp();
         header('X-Frame-Options: DENY');
         header('X-Content-Type-Options: nosniff');
         header('Referrer-Policy: same-origin');
@@ -25,5 +24,13 @@ final class Security
         if ($req->isHttps()) {
             header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
         }
+    }
+
+    /** @param string $formTarget extra origin a form on this page may lead to (OAuth consent redirecting back to Claude) */
+    public static function csp(string $formTarget = ''): void
+    {
+        $n = self::nonce();
+        $fa = "'self'" . ($formTarget !== '' ? ' ' . $formTarget : '');
+        header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-$n'; style-src 'self' 'nonce-$n'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action $fa");
     }
 }
