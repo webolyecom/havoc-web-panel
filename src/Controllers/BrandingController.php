@@ -20,7 +20,7 @@ final class BrandingController extends Controller
     public function save(): Response
     {
         $u = $this->user();
-        $color = preg_match('/^#[0-9a-fA-F]{6}$/', $this->req->str('color')) ? $this->req->str('color') : '#0b7fa0';
+        $color = preg_match('/^#[0-9a-fA-F]{6}$/D', $this->req->str('color')) ? $this->req->str('color') : '#0b7fa0';
         $domain = $this->req->str('panel_domain');
         try {
             $domain = $domain === '' ? null : Validator::domain($domain);

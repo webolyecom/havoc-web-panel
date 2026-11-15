@@ -58,7 +58,7 @@ final class FtpController extends Controller
         $short = strtolower($this->req->str('login'));
         $sub = trim($this->req->str('subdir'), '/');
         try {
-            if (!preg_match('/^[a-z0-9]{1,16}$/', $short)) {
+            if (!preg_match('/^[a-z0-9]{1,16}$/D', $short)) {
                 throw new \InvalidArgumentException(t('ftp.invalid_login'));
             }
             if ($sub !== '') {

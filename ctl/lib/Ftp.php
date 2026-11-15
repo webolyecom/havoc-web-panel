@@ -17,7 +17,7 @@ final class Ftp
 
     private static function login(mixed $l): string
     {
-        if (!is_string($l) || !preg_match('/^hv[0-9]{1,9}_[a-z0-9]{1,16}$/', $l)) {
+        if (!is_string($l) || !preg_match('/^hv[0-9]{1,9}_[a-z0-9]{1,16}$/D', $l)) {
             throw new \InvalidArgumentException('Invalid login');
         }
         return $l;
@@ -33,7 +33,7 @@ final class Ftp
 
     private static function pass(mixed $p): string
     {
-        if (!is_string($p) || !preg_match('/^[\x21-\x7e]{12,64}$/', $p)) {
+        if (!is_string($p) || !preg_match('/^[\x21-\x7e]{12,64}$/D', $p)) {
             throw new \InvalidArgumentException('Password must be 12-64 printable characters without spaces');
         }
         return $p;

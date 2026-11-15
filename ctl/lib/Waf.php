@@ -65,7 +65,7 @@ final class Waf
             $dom = !empty($r['domain']) ? Validator::domain($r['domain']) : null;
             if (($r['type'] ?? '') === 'exclude') {
                 $x = (string)($r['value'] ?? '');
-                if (!preg_match('/^[0-9]{3,7}$/', $x)) {
+                if (!preg_match('/^[0-9]{3,7}$/D', $x)) {
                     throw new \InvalidArgumentException('Invalid CRS rule id');
                 }
                 if ($dom === null) {
@@ -77,7 +77,7 @@ final class Waf
                 $target = ['uri' => 'REQUEST_URI', 'ua' => 'REQUEST_HEADERS:User-Agent', 'args' => 'ARGS'][(string)($r['target'] ?? '')] ?? throw new \InvalidArgumentException('Invalid target');
                 $op = ['contains' => '@contains', 'beginswith' => '@beginsWith'][(string)($r['op'] ?? '')] ?? throw new \InvalidArgumentException('Invalid operator');
                 $v = strtolower((string)($r['value'] ?? ''));
-                if (!preg_match('#^[a-z0-9._~\-/%?=&:+@]{1,100}$#', $v)) {
+                if (!preg_match('#^[a-z0-9._~\-/%?=&:+@]{1,100}$#D', $v)) {
                     throw new \InvalidArgumentException('Invalid match value');
                 }
                 $act = "id:$rid,phase:2,deny,status:403,log,msg:'Havoc custom rule $id'";

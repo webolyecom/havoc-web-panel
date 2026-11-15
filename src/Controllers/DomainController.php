@@ -84,7 +84,7 @@ final class DomainController extends Controller
             'opcache_enabled' => (int)(bool)$this->req->post('opcache'),
             'opcache_memory' => max(32, min(1024, (int)$this->req->post('opcache_memory', 128)))];
         if ($this->req->post('ext_form')) {
-            $sel = array_values(array_filter((array)$this->req->post('ext', []), fn($e) => is_string($e) && preg_match('/^[a-z0-9_]{2,32}$/', $e)));
+            $sel = array_values(array_filter((array)$this->req->post('ext', []), fn($e) => is_string($e) && preg_match('/^[a-z0-9_]{2,32}$/D', $e)));
             $fields['php_extensions'] = json_encode($sel);
         }
         return $this->apply($d, $fields, '/domains/' . $d['id']);

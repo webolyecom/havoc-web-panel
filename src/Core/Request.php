@@ -51,7 +51,7 @@ final class Request
     public function bearer(): ?string
     {
         $h = $this->header('Authorization');
-        return ($h && preg_match('/^Bearer\s+(\S+)$/i', $h, $m)) ? $m[1] : null;
+        return ($h && preg_match('/^Bearer\s+(\S+)$/iD', $h, $m)) ? $m[1] : null;
     }
 
     public function isApi(): bool

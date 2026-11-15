@@ -56,7 +56,7 @@ final class DatabaseController extends Controller
             $this->abort(404);
         }
         $short = strtolower($this->req->str('name'));
-        if (!preg_match('/^[a-z0-9_]{1,16}$/', $short)) {
+        if (!preg_match('/^[a-z0-9_]{1,16}$/D', $short)) {
             $this->flash('error', t('db.invalid'));
             return $this->to('/databases');
         }

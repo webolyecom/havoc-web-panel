@@ -17,7 +17,7 @@ final class Branding
         if (!$row) {
             return $default + ['rgb' => self::rgb($default['color'])];
         }
-        $color = preg_match('/^#[0-9a-f]{6}$/i', (string)$row['primary_color']) ? $row['primary_color'] : $default['color'];
+        $color = preg_match('/^#[0-9a-f]{6}$/iD', (string)$row['primary_color']) ? $row['primary_color'] : $default['color'];
         return ['name' => $row['brand_name'] ?: $default['name'], 'logo' => $row['logo_path'], 'rid' => (int)$row['reseller_id'], 'color' => $color, 'rgb' => self::rgb($color)];
     }
 

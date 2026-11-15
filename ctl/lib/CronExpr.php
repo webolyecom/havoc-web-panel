@@ -54,7 +54,7 @@ final class CronExpr
         [$min, $max] = self::RANGES[$i];
         $out = [];
         foreach (explode(',', $f) as $part) {
-            if (!preg_match('/^(\*|(\d{1,2})(?:-(\d{1,2}))?)(?:\/(\d{1,2}))?$/', $part, $m)) {
+            if (!preg_match('/^(\*|(\d{1,2})(?:-(\d{1,2}))?)(?:\/(\d{1,2}))?$/D', $part, $m)) {
                 throw new \InvalidArgumentException('Invalid ' . self::NAMES[$i] . ' field: ' . $part);
             }
             if ($m[1] === '*') {
@@ -135,19 +135,19 @@ final class CronExpr
         if ($mi === '*' && $h === '*' && $dom === '*' && $dow === '*') {
             return ['every_minute', []];
         }
-        if (preg_match('/^\*\/(\d+)$/', $mi, $m) && $h === '*' && $dom === '*' && $dow === '*') {
+        if (preg_match('/^\*\/(\d+)$/D', $mi, $m) && $h === '*' && $dom === '*' && $dow === '*') {
             return ['every_n_minutes', ['n' => (int)$m[1]]];
         }
         if ($num($mi) && $h === '*' && $dom === '*' && $dow === '*') {
             return ['hourly', ['m' => sprintf('%02d', (int)$mi)]];
         }
-        if ($num($mi) && preg_match('/^\*\/(\d+)$/', $h, $m) && $dom === '*' && $dow === '*') {
+        if ($num($mi) && preg_match('/^\*\/(\d+)$/D', $h, $m) && $dom === '*' && $dow === '*') {
             return ['every_n_hours', ['n' => (int)$m[1], 'm' => sprintf('%02d', (int)$mi)]];
         }
         if ($num($mi) && $num($h) && $dom === '*' && $dow === '*') {
             return ['daily', ['time' => $time()]];
         }
-        if ($num($mi) && $num($h) && $dom === '*' && preg_match('/^[0-7](,[0-7])*$/', $dow)) {
+        if ($num($mi) && $num($h) && $dom === '*' && preg_match('/^[0-7](,[0-7])*$/D', $dow)) {
             $days = array_values(array_unique(array_map(static fn($x) => (int)$x % 7, explode(',', $dow))));
             return ['weekly', ['days' => $days, 'time' => $time()]];
         }

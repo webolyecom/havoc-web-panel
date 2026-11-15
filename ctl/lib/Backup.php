@@ -34,7 +34,7 @@ final class Backup
 
     private static function file(string $acct, mixed $f): string
     {
-        if (!is_string($f) || !preg_match('/^' . $acct . '-[0-9]{8}-[0-9]{6}\.tar\.gz$/', $f)) {
+        if (!is_string($f) || !preg_match('/^' . $acct . '-[0-9]{8}-[0-9]{6}\.tar\.gz$/D', $f)) {
             throw new \InvalidArgumentException('Invalid backup file name');
         }
         return $f;
@@ -75,7 +75,7 @@ final class Backup
     {
         $type = $t['type'] ?? '';
         $path = (string)($t['path'] ?? '');
-        if (!preg_match('#^[A-Za-z0-9._\-/]{0,200}$#', $path) || str_contains($path, '..')) {
+        if (!preg_match('#^[A-Za-z0-9._\-/]{0,200}$#D', $path) || str_contains($path, '..')) {
             throw new \InvalidArgumentException('Invalid remote path');
         }
         $env = [];
@@ -85,7 +85,7 @@ final class Backup
             $port = (int)(($t['port'] ?? 0) ?: ($type === 'sftp' ? 22 : 21));
             $user = (string)($t['user'] ?? '');
             $pass = (string)($t['password'] ?? '');
-            if ($port < 1 || $port > 65535 || !preg_match('/^[A-Za-z0-9._@\-]{1,64}$/', $user) || $pass === '' || strlen($pass) > 200 || str_contains($pass, "\0")) {
+            if ($port < 1 || $port > 65535 || !preg_match('/^[A-Za-z0-9._@\-]{1,64}$/D', $user) || $pass === '' || strlen($pass) > 200 || str_contains($pass, "\0")) {
                 throw new \InvalidArgumentException('Invalid connection settings');
             }
             $obscured = trim(Sys::ok(['rclone', 'obscure', '-'], $pass));      // secret via stdin, never argv
@@ -102,14 +102,14 @@ final class Backup
             $sk = (string)($t['secret_key'] ?? '');
             $region = (string)($t['region'] ?? '') ?: 'us-east-1';
             $endpoint = (string)($t['endpoint'] ?? '');
-            if (!preg_match('/^[a-z0-9][a-z0-9.\-]{2,62}$/', $bucket) || !preg_match('/^[A-Za-z0-9+\/=_\-]{8,128}$/', $ak) || !preg_match('/^[A-Za-z0-9+\/=_\-]{16,128}$/', $sk)
-                || !preg_match('/^[a-z0-9\-]{2,30}$/', $region)) {
+            if (!preg_match('/^[a-z0-9][a-z0-9.\-]{2,62}$/D', $bucket) || !preg_match('/^[A-Za-z0-9+\/=_\-]{8,128}$/D', $ak) || !preg_match('/^[A-Za-z0-9+\/=_\-]{16,128}$/D', $sk)
+                || !preg_match('/^[a-z0-9\-]{2,30}$/D', $region)) {
                 throw new \InvalidArgumentException('Invalid S3 settings');
             }
             $env = ['RCLONE_CONFIG_HV_TYPE' => 's3', 'RCLONE_CONFIG_HV_PROVIDER' => $endpoint ? 'Other' : 'AWS', 'RCLONE_CONFIG_HV_ACCESS_KEY_ID' => $ak,
                     'RCLONE_CONFIG_HV_SECRET_ACCESS_KEY' => $sk, 'RCLONE_CONFIG_HV_REGION' => $region];
             if ($endpoint !== '') {
-                if (!preg_match('#^https://([A-Za-z0-9.\-]+)(:[0-9]{2,5})?$#', $endpoint, $m)) {
+                if (!preg_match('#^https://([A-Za-z0-9.\-]+)(:[0-9]{2,5})?$#D', $endpoint, $m)) {
                     throw new \InvalidArgumentException('Endpoint must be https://host[:port]');
                 }
                 self::checkHost($m[1]);
@@ -123,7 +123,7 @@ final class Backup
     /** SSRF guard: no loopback / link-local / reserved addresses, no IPv6 literals. */
     private static function checkHost(string $h): void
     {
-        if (!preg_match('/^[A-Za-z0-9]([A-Za-z0-9.\-]{0,251}[A-Za-z0-9])?$/', $h)) {
+        if (!preg_match('/^[A-Za-z0-9]([A-Za-z0-9.\-]{0,251}[A-Za-z0-9])?$/D', $h)) {
             throw new \InvalidArgumentException('Invalid host');
         }
         $ips = filter_var($h, FILTER_VALIDATE_IP) ? [$h] : (gethostbynamel($h) ?: []);
@@ -177,7 +177,7 @@ final class Backup
             if ($db) {
                 $dump = self::bin('/usr/bin/mariadb-dump', '/usr/bin/mysqldump');
                 foreach ($names as $n) {
-                    if (!is_string($n) || !preg_match('/^' . $acct . '_[a-z0-9_]{1,16}$/', $n)) {
+                    if (!is_string($n) || !preg_match('/^' . $acct . '_[a-z0-9_]{1,16}$/D', $n)) {
                         throw new \InvalidArgumentException('Invalid database name');
                     }
                     [$c, $e] = Sys::runIO([$dump, '--single-transaction', '--quick', '--routines', '--events', '--triggers', '--default-character-set=utf8mb4', $n], null, "$w/db/$n.sql");
@@ -187,17 +187,29 @@ final class Backup
                     $hasDb = true;
                 }
             }
-            $cmd = [self::bin('/usr/bin/tar', '/bin/tar'), '-czf', $out];
+            // the archive is built by tar running as the tenant (it only reads what the tenant itself can read, so symlinks
+            // or races inside the home directory gain nothing); root only opens the output file in the backup directory
+            if ($hasDb) {
+                chgrp($w, (int)$pw['gid']);
+                chmod($w, 0750);
+                chgrp("$w/db", (int)$pw['gid']);
+                chmod("$w/db", 0750);
+                foreach (glob("$w/db/*.sql") ?: [] as $f) {
+                    chgrp($f, (int)$pw['gid']);
+                    chmod($f, 0640);
+                }
+            }
+            $cmd = [...self::asUser($pw), self::bin('/usr/bin/tar', '/bin/tar'), '-czf', '-'];
             if ($hasDb) {
                 array_push($cmd, '-C', $w, 'db');                          // db first: restore can stop reading early
             }
             if ($files && is_dir("/home/$acct/domains")) {
                 array_push($cmd, '-C', "/home/$acct", 'domains');
             }
-            if (count($cmd) === 3) {
+            if (count($cmd) === 10) {
                 throw new \RuntimeException('Nothing to back up');
             }
-            [$c, $e] = Sys::runIO($cmd, null, null);
+            [$c, $e] = Sys::runIO($cmd, null, $out);
             if ($c > 1) {                                                   // 1 = "file changed while reading": acceptable
                 @unlink($out);
                 throw new \RuntimeException('Archive creation failed: ' . $e);
@@ -239,7 +251,7 @@ final class Backup
         if (!empty($a['db'])) {
             $client = self::bin('/usr/bin/mariadb', '/usr/bin/mysql');
             foreach (array_slice((array)($a['db_names'] ?? []), 0, 100) as $n) {
-                if (!is_string($n) || !preg_match('/^' . $acct . '_[a-z0-9_]{1,16}$/', $n)) {
+                if (!is_string($n) || !preg_match('/^' . $acct . '_[a-z0-9_]{1,16}$/D', $n)) {
                     throw new \InvalidArgumentException('Invalid database name');
                 }
                 $w = self::tmp($pw);

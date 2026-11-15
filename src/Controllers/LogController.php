@@ -124,7 +124,7 @@ final class LogController extends Controller
             }
         }
         foreach ((array)$this->req->post('sel', []) as $v) {
-            if (!is_string($v) || !preg_match('/^(\d+|system):([a-z-]+)$/', $v, $m)) {
+            if (!is_string($v) || !preg_match('/^(\d+|system):([a-z-]+)$/D', $v, $m)) {
                 continue;
             }
             if ($m[1] === 'system') {
@@ -152,7 +152,7 @@ final class LogController extends Controller
     private function back(): string
     {
         $b = $this->req->str('back');
-        return preg_match('#^/logs(/view\?[A-Za-z0-9_=&%.-]*)?$#', $b) ? $b : '/logs';
+        return preg_match('#^/logs(/view\?[A-Za-z0-9_=&%.-]*)?$#D', $b) ? $b : '/logs';
     }
 
     /** The latest lines of one log type across all sites in scope, newest site first. */

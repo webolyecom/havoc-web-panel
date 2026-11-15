@@ -92,7 +92,7 @@ final class MariaTune
     {
         $out = [];
         foreach (is_file(self::FILE) ? (file(self::FILE, FILE_IGNORE_NEW_LINES) ?: []) : [] as $l) {
-            if (preg_match('/^([a-z_]+)\s*=\s*(\S+)$/', $l, $m) && isset(self::KEYS[$m[1]])) {
+            if (preg_match('/^([a-z_]+)\s*=\s*(\S+)$/D', $l, $m) && isset(self::KEYS[$m[1]])) {
                 $out[$m[1]] = $m[2];
             }
         }
@@ -110,13 +110,13 @@ final class MariaTune
             $v = $a[$k];
             switch ($def[0]) {
                 case 'mb':
-                    if (!preg_match('/^\d{1,6}$/', (string)$v) || (int)$v < $def[1] || (int)$v > $def[2]) {
+                    if (!preg_match('/^\d{1,6}$/D', (string)$v) || (int)$v < $def[1] || (int)$v > $def[2]) {
                         throw new \InvalidArgumentException("$k: {$def[1]} - {$def[2]} MB");
                     }
                     $lines[] = "$k = " . (int)$v . 'M';
                     break;
                 case 'int':
-                    if (!preg_match('/^\d{1,7}$/', (string)$v) || (int)$v < $def[1] || (int)$v > $def[2]) {
+                    if (!preg_match('/^\d{1,7}$/D', (string)$v) || (int)$v < $def[1] || (int)$v > $def[2]) {
                         throw new \InvalidArgumentException("$k: {$def[1]} - {$def[2]}");
                     }
                     $lines[] = "$k = " . (int)$v;

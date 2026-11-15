@@ -29,7 +29,7 @@ final class Actions
     {
         $t = WebServerFactory::type($a['type'] ?? '');
         $lic = (string)($a['license'] ?? 'TRIAL');
-        if ($t === 'lsws' && $lic !== 'TRIAL' && !preg_match('/^[A-Za-z0-9\/+=-]{8,64}$/', $lic)) {
+        if ($t === 'lsws' && $lic !== 'TRIAL' && !preg_match('/^[A-Za-z0-9\/+=-]{8,64}$/D', $lic)) {
             throw new \InvalidArgumentException('Invalid LiteSpeed serial number');
         }
         if ($t !== 'nginx' && WebServerFactory::active() !== 'nginx' && WebServerFactory::active() !== $t) {
@@ -260,7 +260,8 @@ final class Actions
         Fpm::remove($id);
         if (!empty($a['purge'])) {
             $acct = Validator::account($a['account'] ?? '');
-            Sys::run(['rm', '-rf', "/home/$acct/domains/$dom"]);
+            // as the account user: the tenant controls this path (a symlinked "domains" must not make root delete elsewhere)
+            Sys::run([...Sys::asUser($acct), 'rm', '-rf', '--', "/home/$acct/domains/$dom"]);
         }
         return [];
     }
@@ -330,7 +331,7 @@ final class Actions
                         'header' => "Host: $n\r\nUser-Agent: Havoc-SSL-Precheck\r\nConnection: close\r\n"]]);
                     $body = @file_get_contents("http://$host/.well-known/acme-challenge/$tok", false, $ctx, 0, 256);
                     if (trim((string)$body) !== $tok) {
-                        $res = ['ok' => false, 'reason' => str_contains($ip, ':') ? 'ipv6_fail' : 'http_fail', 'ip' => $ip];
+                        $res = ['ok' => false, 'reason' => self::cloudflare($ip) ? 'cloudflare' : (str_contains($ip, ':') ? 'ipv6_fail' : 'http_fail'), 'ip' => $ip];
                         break;
                     }
                 }
@@ -340,6 +341,31 @@ final class Actions
             @unlink("$dir/$tok");
         }
         return ['results' => $out];
+    }
+
+    /** Cloudflare's published proxy ranges (https://www.cloudflare.com/ips/). */
+    private const CLOUDFLARE = ['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18',
+        '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14',
+        '172.64.0.0/13', '131.0.72.0/22', '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32',
+        '2a06:98c0::/29', '2c0f:f248::/32'];
+
+    private static function cloudflare(string $ip): bool
+    {
+        $bin = @inet_pton($ip);
+        foreach (self::CLOUDFLARE as $cidr) {
+            [$net, $len] = explode('/', $cidr);
+            $nb = inet_pton($net);
+            if ($bin === false || strlen($nb) !== strlen($bin)) {
+                continue;
+            }
+            $bytes = intdiv((int)$len, 8);
+            $bits = (int)$len % 8;
+            if (substr($bin, 0, $bytes) === substr($nb, 0, $bytes)
+                && ($bits === 0 || ((ord($bin[$bytes]) ^ ord($nb[$bytes])) & (0xFF << (8 - $bits)) & 0xFF) === 0)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Custom certificate or Cloudflare Origin Certificate (both are plain PEM pairs). */
@@ -457,7 +483,7 @@ final class Actions
 
     private function dbName(mixed $n): string
     {
-        if (!is_string($n) || !preg_match('/^hv[0-9]{1,9}_[a-z0-9_]{1,16}$/', $n)) {
+        if (!is_string($n) || !preg_match('/^hv[0-9]{1,9}_[a-z0-9_]{1,16}$/D', $n)) {
             throw new \InvalidArgumentException('Invalid database name');
         }
         return $n;
@@ -465,7 +491,7 @@ final class Actions
 
     private function dbPass(mixed $p): string
     {
-        if (!is_string($p) || !preg_match('/^[A-Za-z0-9!@#%^*_+=.\-]{12,64}$/', $p)) {
+        if (!is_string($p) || !preg_match('/^[A-Za-z0-9!@#%^*_+=.\-]{12,64}$/D', $p)) {
             throw new \InvalidArgumentException('Password must be 12-64 characters: letters, digits and ! @ # % ^ * _ + = . -');
         }
         return $p;

@@ -91,7 +91,7 @@ final class OlsDriver implements WebServer
         $maps = '';
         foreach ($vhosts as $name => $names) {
             $blocks .= "virtualhost $name {\n  vhRoot                  " . self::$root . "/conf/vhosts/$name\n  configFile              \$VH_ROOT/vhconf.conf\n"
-                . "  allowSymbolLink         1\n  enableScript            1\n  restrained              0\n  setUIDMode              0\n}\n\n";
+                . "  allowSymbolLink         2\n  enableScript            1\n  restrained              0\n  setUIDMode              0\n}\n\n";
             $maps .= "  map                     $name " . implode(', ', $names) . "\n";
         }
         $conf = <<<CONF
@@ -145,8 +145,8 @@ tuning  {
 }
 
 fileAccessControl  {
-  followSymbolLink        1
-  checkSymbolLink         0
+  followSymbolLink        2
+  checkSymbolLink         1
   requiredPermissionMask  000
   restrictedPermissionMask 000
 }

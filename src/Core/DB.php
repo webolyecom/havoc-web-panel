@@ -66,7 +66,7 @@ final class DB
 
     private static function ident(string $s): void
     {
-        if (!preg_match('/^[a-z_]+$/', $s)) {
+        if (!preg_match('/^[a-z_]+$/D', $s)) {
             throw new \InvalidArgumentException('Invalid identifier');
         }
     }

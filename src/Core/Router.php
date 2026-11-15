@@ -11,7 +11,7 @@ final class Router
     {
         $re = preg_replace_callback('/\{(\w+)\}/', static fn($m) =>
             '(?P<' . $m[1] . '>' . (str_ends_with($m[1], 'id') ? '[0-9]+' : '[A-Za-z0-9_.-]+') . ')', $path);
-        $this->routes[] = [$method, '#^' . $re . '$#', $handler, $mw];
+        $this->routes[] = [$method, '#^' . $re . '$#D', $handler, $mw];
     }
 
     public function get(string $p, array $h, array $mw = []): void { $this->add('GET', $p, $h, $mw); }

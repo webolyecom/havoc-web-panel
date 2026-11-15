@@ -83,7 +83,7 @@ final class Auth
     public static function apiUser(Request $req): ?array
     {
         $tok = $req->bearer();
-        if (!$tok || !preg_match('/^hvc_[a-f0-9]{48}$/', $tok)) {
+        if (!$tok || !preg_match('/^hvc_[a-f0-9]{48}$/D', $tok)) {
             return null;
         }
         $row = DB::one('SELECT u.*, t.id AS token_id FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.status = ?', [hash('sha256', $tok), 'active']);

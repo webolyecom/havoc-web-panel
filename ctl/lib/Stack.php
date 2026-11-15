@@ -30,11 +30,11 @@ final class Stack
     {
         $cfg = ['maxmemory' => '', 'policy' => 'noeviction', 'appendonly' => 'no', 'password' => false];
         foreach (is_file(self::RINC) ? (file(self::RINC, FILE_IGNORE_NEW_LINES) ?: []) : [] as $l) {
-            if (preg_match('/^maxmemory (\S+)$/', $l, $m)) {
+            if (preg_match('/^maxmemory (\S+)$/D', $l, $m)) {
                 $cfg['maxmemory'] = $m[1];
-            } elseif (preg_match('/^maxmemory-policy (\S+)$/', $l, $m)) {
+            } elseif (preg_match('/^maxmemory-policy (\S+)$/D', $l, $m)) {
                 $cfg['policy'] = $m[1];
-            } elseif (preg_match('/^appendonly (yes|no)$/', $l, $m)) {
+            } elseif (preg_match('/^appendonly (yes|no)$/D', $l, $m)) {
                 $cfg['appendonly'] = $m[1];
             } elseif (str_starts_with($l, 'requirepass ')) {
                 $cfg['password'] = true;
@@ -46,7 +46,7 @@ final class Stack
     public static function redisSet(array $a): array
     {
         $mm = (string)($a['maxmemory'] ?? '');
-        if ($mm !== '' && !preg_match('/^[1-9][0-9]{0,5}(mb|gb)$/', $mm)) {
+        if ($mm !== '' && !preg_match('/^[1-9][0-9]{0,5}(mb|gb)$/D', $mm)) {
             throw new \InvalidArgumentException('maxmemory must look like 256mb or 2gb');
         }
         $pol = (string)($a['policy'] ?? 'noeviction');
@@ -58,7 +58,7 @@ final class Stack
         $pw = null;
         if (array_key_exists('password', $a) && $a['password'] !== null) {
             $pw = (string)$a['password'];
-            if ($pw !== '' && !preg_match('/^[A-Za-z0-9]{16,64}$/', $pw)) {
+            if ($pw !== '' && !preg_match('/^[A-Za-z0-9]{16,64}$/D', $pw)) {
                 throw new \InvalidArgumentException('Password: 16-64 letters/digits');
             }
         } elseif ($old !== null && preg_match('/^requirepass (\S+)$/m', $old, $m)) {
@@ -92,7 +92,7 @@ final class Stack
         $c = [];
         if (is_file(self::MCONF)) {
             foreach (file(self::MCONF, FILE_IGNORE_NEW_LINES) ?: [] as $l) {
-                if (preg_match('/^([a-z_]+)\s*=\s*"?([^"]*)"?\s*$/', $l, $m)) {
+                if (preg_match('/^([a-z_]+)\s*=\s*"?([^"]*)"?\s*$/D', $l, $m)) {
                     $c[$m[1]] = $m[2];
                 }
             }
@@ -104,7 +104,7 @@ final class Stack
     {
         $out = "# Managed by Havoc WEB Panel\n";
         foreach ($c as $k => $v) {
-            if (!preg_match('/^[a-z_]+$/', $k) || !preg_match('/^[A-Za-z0-9 .:\/_-]*$/', (string)$v)) {
+            if (!preg_match('/^[a-z_]+$/D', $k) || !preg_match('/^[A-Za-z0-9 .:\/_-]*$/D', (string)$v)) {
                 throw new \InvalidArgumentException('Invalid configuration value');
             }
             $out .= is_bool($v) || $v === 'true' || $v === 'false' ? "$k = " . ($v === true || $v === 'true' ? 'true' : 'false') . "\n" : "$k = \"$v\"\n";
@@ -128,7 +128,7 @@ final class Stack
             $ctx = stream_context_create(['http' => ['timeout' => 2, 'ignore_errors' => true]]);
             $health = str_contains((string)@file_get_contents('http://127.0.0.1:7700/health', false, $ctx), 'available');
             $c = self::meiliConf();
-            $mem = preg_match('/^(\d+) MiB$/', $c['max_indexing_memory'] ?? '', $m) ? (int)$m[1] : 0;
+            $mem = preg_match('/^(\d+) MiB$/D', $c['max_indexing_memory'] ?? '', $m) ? (int)$m[1] : 0;
             $size = (int)Sys::run(['du', '-sx', '--block-size=1', self::MDATA], null, 60)[1];
         }
         return ['installed' => $installed, 'version' => $version, 'health' => $health, 'job' => $job, 'log' => $log,
