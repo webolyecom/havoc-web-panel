@@ -4,6 +4,7 @@ declare(strict_types=1);
 use Havoc\Controllers\AppController;
 use Havoc\Controllers\McpController;
 use Havoc\Controllers\OAuthController;
+use Havoc\Controllers\ProcessController;
 use Havoc\Controllers\UploadController;
 use Havoc\Controllers\{ApiController, AuthController, BackupController, BrandingController, CronController, DashboardController, DatabaseController, DnsController, DomainController, FileController, FirewallController, FtpController, LimitsController, LogController, PackageController, ServerController, SettingsController, StackController, TrafficController, UserController, WafController, WebServerController};
 use Havoc\Core\Router;
@@ -140,6 +141,9 @@ return static function (Router $r): void {
 
     // server (admin only)
     $r->get('/server', [ServerController::class, 'monitor'], ['admin']);
+    $r->get('/server/processes', [ProcessController::class, 'index'], ['admin']);
+    $r->get('/server/processes.json', [ProcessController::class, 'list'], ['admin']);
+    $r->post('/server/processes/signal', [ProcessController::class, 'signal'], ['admin']);
     $r->get('/server/stats', [ServerController::class, 'stats'], ['admin']);
     $r->post('/server/update', [ServerController::class, 'update'], ['admin']);
     $r->post('/server/hostname', [ServerController::class, 'hostname'], ['admin']);

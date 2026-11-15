@@ -2,6 +2,11 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.7.0] – 2026-11-16
+### Added
+- **Server overview on the dashboard** (administrators): IP addresses, operating system and kernel, CPU model, cores and load, uptime and server time, free memory and free disk space per volume (with bars), web server, PHP and MariaDB versions, panel version.
+- **Processes page** (Server → Processes): live list of running processes refreshed every 5 seconds (pauses in a background tab) with CPU, memory, run time, state and command; summary cards, per-user totals, search, user filter, optional kernel threads, sortable columns. Hosting account processes show the panel user and site they belong to and can be ended (TERM) or forced (KILL); system services, the panel and other users' processes cannot be signalled. Every signal is written to the activity log.
+
 ## [0.6.1] – 2026-11-15
 ### Added
 - **One-time upload links**: the single, cheapest and fastest way to bring code into a site. Claude (`create_upload_link`) or the domain page creates a link valid for one hour and one file; anyone with the link uploads a .zip / .tar.gz / .tgz / .tar (up to 2 GB, 8 MB chunks with retries) in the browser, straight to the server, no login and nothing through Claude. The archive is stored in the site's hidden `.havoc-incoming` folder, `extract_archive` unpacks it and removes it; leftovers are deleted after 7 days. New connector tools: `create_upload_link`, `list_uploads`.
