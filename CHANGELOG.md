@@ -2,6 +2,11 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.5.2] – 2026-11-15
+### Changed
+- **The panel is also served on `https://<panel host>/` (port 443)** once it has a host name with a certificate, so the Claude connector address is `https://<panel host>/mcp`. Claude's connector service could not reach panels on port 2087 ("No server responded at this URL"). The sites' Nginx forwards to the panel port; the client address and port are trusted only from the loopback address with a secret that hosting accounts cannot read. Kept in sync when the panel port or the web server changes.
+- The MCP endpoint no longer refuses requests that carry an `Origin` header (Claude's check may send one).
+
 ## [0.5.1] – 2026-11-15
 ### Fixed
 - **Claude connector "Couldn't reach":** the OAuth discovery addresses left out the panel port when the browser or Claude sent the host name without it (HTTP/2), so Claude looked for the panel on port 443. The port now comes from the port the panel actually listens on.

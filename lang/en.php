@@ -232,7 +232,7 @@ return [
     'ph.title' => 'Panel address and certificate', 'ph.current' => 'The panel is reachable at', 'ph.expires' => 'valid until :d', 'ph.renews' => 'renewed automatically',
     'ph.selfsigned' => 'Self-signed certificate', 'ph.hint' => 'Browsers warn about the panel and the Claude connector cannot connect until the panel has a host name with a trusted certificate.',
     'ph.hostname' => 'Host name of the panel', 'ph.email' => 'E-mail for Let\'s Encrypt', 'ph.issue' => 'Get certificate',
-    'ph.dns_hint' => 'Point the host name (A record) to this server first. Port 80 must be reachable; the panel keeps its port.',
+    'ph.dns_hint' => 'Point the host name (A record) to this server first. Ports 80 and 443 must be reachable. The panel then answers on https://<host name>/ as well as on its own port.',
     'ph.needs_nginx' => 'Sites are currently served by LiteSpeed: activate Nginx under Web Server to issue the panel certificate.',
     'ph.issued' => 'Certificate installed. The panel is now reachable at :url',
     'oauth.title' => 'Connect Claude', 'oauth.disabled' => 'The Claude connector is turned off on this panel.', 'oauth.bad_client' => 'This connection request is not valid (unknown client or return address). Start the connection again from Claude.',

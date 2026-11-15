@@ -69,6 +69,10 @@ systemctl reload havoc-panel-nginx || systemctl restart havoc-panel-nginx
 log "Re-applying site configurations (adds www.<domain>, new PHP/Nginx options)"
 runuser -u havoc -- php /opt/havoc/bin/havoc domains:reapply || true
 
+log "Panel host name on port 443 (Claude connector)"
+/opt/havoc/ctl/havocctl panel.proxy_apply <<< '{}' >/dev/null 2>&1 && [ -f /etc/nginx/conf.d/havoc-001-panel.conf ] \
+  && echo "The panel is also served on https://$(cat /etc/havoc/panel-host)/" || echo "No panel host name with a certificate yet (Panel settings)."
+
 log "Rewriting cron tables"
 runuser -u havoc -- php /opt/havoc/bin/havoc cron:sync || true
 

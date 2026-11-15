@@ -232,7 +232,7 @@ return [
     'ph.title' => 'Panel adresi ve sertifikası', 'ph.current' => 'Panelin adresi:', 'ph.expires' => ':d tarihine kadar geçerli', 'ph.renews' => 'otomatik yenilenir',
     'ph.selfsigned' => 'Kendinden imzalı sertifika', 'ph.hint' => 'Panelin güvenilir sertifikalı bir adı olana kadar tarayıcılar uyarı verir ve Claude bağlayıcısı bağlanamaz.',
     'ph.hostname' => 'Panelin alan adı', 'ph.email' => 'Let\'s Encrypt e-postası', 'ph.issue' => 'Sertifika al',
-    'ph.dns_hint' => 'Önce alan adını (A kaydı) bu sunucuya yönlendirin. 80 portu erişilebilir olmalı; panel kendi portunda kalır.',
+    'ph.dns_hint' => 'Önce alan adını (A kaydı) bu sunucuya yönlendirin. 80 ve 443 portları erişilebilir olmalı. Panel ardından kendi portunun yanında https://<alan adı>/ adresinde de açılır.',
     'ph.needs_nginx' => 'Siteler şu an LiteSpeed ile sunuluyor: panel sertifikası için Web Sunucusu bölümünden Nginx\'i etkinleştirin.',
     'ph.issued' => 'Sertifika kuruldu. Panel artık şu adreste: :url',
     'oauth.title' => 'Claude bağlantısı', 'oauth.disabled' => 'Bu panelde Claude bağlayıcısı kapalı.', 'oauth.bad_client' => 'Bu bağlantı isteği geçerli değil (bilinmeyen istemci veya dönüş adresi). Bağlantıyı Claude\'dan yeniden başlatın.',

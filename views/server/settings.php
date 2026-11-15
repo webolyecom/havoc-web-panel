@@ -28,7 +28,8 @@
     <h2 class="h2"><?= e(t('ph.title')) ?></h2>
     <div class="space-y-1 text-sm">
       <?php if ($ph['host'] !== '' && $ph['trusted']): ?>
-        <p><?= e(t('ph.current')) ?> <a class="link font-medium" href="https://<?= e($ph['host']) ?>:<?= (int)$ph['port'] ?>/">https://<?= e($ph['host']) ?>:<?= (int)$ph['port'] ?></a></p>
+        <p><?= e(t('ph.current')) ?> <a class="link font-medium" href="https://<?= e($ph['host']) ?>:<?= (int)$ph['port'] ?>/">https://<?= e($ph['host']) ?>:<?= (int)$ph['port'] ?></a>
+          <?php if (!empty($ph['proxy'])): ?> · <a class="link font-medium" href="https://<?= e($ph['host']) ?>/">https://<?= e($ph['host']) ?></a><?php endif; ?></p>
         <p class="text-slate-500"><span class="badge badge-ok"><?= e($ph['issuer']) ?></span> <?= e(t('ph.expires', ['d' => $ph['expires']])) ?> · <?= e(t('ph.renews')) ?></p>
       <?php else: ?>
         <p><span class="badge badge-warn"><?= e(t('ph.selfsigned')) ?></span></p>
@@ -45,7 +46,7 @@
   <div class="card space-y-3" id="claude">
     <h2 class="h2"><?= e(t('claude.title')) ?></h2>
     <p class="text-sm text-slate-500"><?= e(t('claude.admin_hint')) ?></p>
-    <?php $mcpOn = Havoc\Services\OAuthService::enabled(); $mcpHost = $ph['trusted'] && $ph['host'] !== '' ? $ph['host'] . ':' . (int)$ph['port'] : ''; ?>
+    <?php $mcpOn = Havoc\Services\OAuthService::enabled(); $mcpHost = $ph['trusted'] && $ph['host'] !== '' ? $ph['host'] . (!empty($ph['proxy']) ? '' : ':' . (int)$ph['port']) : ''; ?>
     <?php if ($mcpOn): ?>
       <div class="text-sm"><?= e(t('claude.url')) ?>
         <?php if ($mcpHost !== ''): ?><code class="select-all ml-1 rounded bg-slate-100 px-2 py-1 font-mono dark:bg-slate-800">https://<?= e($mcpHost) ?>/mcp</code>
