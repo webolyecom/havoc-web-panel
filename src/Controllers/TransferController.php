@@ -99,7 +99,7 @@ final class TransferController extends Controller
             }
             $dbs = array_values(array_intersect(array_column($d['dbs'], 'name'), array_keys(array_filter((array)($opt['dbs'] ?? [])))));
             $owner = (int)($opt['owner'] ?? 0);
-            $items[] = ['domain' => $name, 'options' => ['source_id' => (int)$d['id'], 'type' => $d['type'], 'dbs' => $dbs, 'ssl' => !empty($opt['ssl']) && $d['ssl'] !== 'none',
+            $items[] = ['domain' => $name, 'options' => ['source_id' => (int)$d['id'], 'type' => $d['type'], 'dbs' => $dbs, 'ssl' => !empty($opt['ssl']) && $d['ssl'] !== 'none', 'search' => !empty($opt['search']) && !empty($d['search']),
                 'owner_id' => $owner > 0 && DB::one('SELECT id FROM users WHERE id = ?', [$owner]) ? $owner : null]];
         }
         if (!$items) {

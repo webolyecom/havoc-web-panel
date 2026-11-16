@@ -10,7 +10,7 @@ Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, fi
 from one clean interface, or simply ask Claude to do it. No license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.9.0-0b7fa0.svg)
+![Version](https://img.shields.io/badge/version-0.9.1-0b7fa0.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg)
 ![Debian](https://img.shields.io/badge/Debian-12%20%7C%2013-a81d33.svg)
 ![Status](https://img.shields.io/badge/status-beta-f59e0b.svg)
@@ -89,7 +89,7 @@ Contributions back to the project are very welcome, but never required.
 
 ### 🧩 Add-ons (one-click install / uninstall)
 - **Redis**: memory limit, eviction policy, persistence, random password, PHP extension
-- **Meilisearch**: official release with checksum check, master key, indexing memory
+- **Meilisearch**: official release with checksum check, master key, indexing memory; **per-site search**: each site gets its own index prefix and two keys that only work for its indexes, included in backups and transfers
 - **Memcached**: cache size, connections, statistics, empty cache, PHP extension
 - **Fail2ban**: protects SSH/SFTP, FTP and the panel login; rules, whitelist, ban / unban from the panel
 - **Node.js**: 22 / 24 / 26 LTS from NodeSource, version switch, pm2 / yarn / pnpm
@@ -101,7 +101,8 @@ Contributions back to the project are very welcome, but never required.
 - Server monitor, service control, resource limits, traffic statistics with CSV export
 
 ### 🗄️ Databases, DNS & FTP
-- MariaDB databases and users, remote access per database, one-click **phpMyAdmin**
+- MariaDB databases and users, remote access per database, **databases assigned to sites** (also detected automatically from config files)
+- **One-click phpMyAdmin**: opens a site's database without a password, with a temporary login for that database only
 - **MariaDB performance tuning** with RAM-based profiles and automatic rollback
 - Authoritative **DNS** (BIND9) with record validation
 - **FTP** (Pure-FTPd, TLS) and **SFTP** (chrooted) accounts

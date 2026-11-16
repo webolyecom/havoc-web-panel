@@ -1,29 +1,42 @@
-<?php $me = Havoc\Core\Auth::user(); ?>
+<?php $me = Havoc\Core\Auth::user(); $pmaOn = !empty($pma['installed']); ?>
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
   <h1 class="h1 mb-0"><?= e(t('nav.databases')) ?></h1>
-  <?php if (!empty($pma['installed'])): ?><a class="btn" href="/phpmyadmin/" target="_blank" rel="noopener"><?= e(t('pma.open')) ?> ↗</a><?php endif; ?>
+  <div class="flex flex-wrap items-center gap-2">
+    <form method="get" action="/databases"><select class="input w-auto" name="site" data-autosubmit><option value="0"><?= e(t('db.all_sites')) ?></option>
+      <?php foreach ($sites as $x): ?><option value="<?= $x['id'] ?>" <?= $site === $x['id'] ? 'selected' : '' ?>><?= e($x['name']) ?></option><?php endforeach; ?></select></form>
+    <form method="post" action="/databases/detect"><?= csrf_field() ?><button class="btn-ghost border border-slate-300 dark:border-slate-700" title="<?= e(t('db.detect_hint')) ?>"><?= e(t('db.detect')) ?></button></form>
+    <?php if ($pmaOn): ?><a class="btn" href="/phpmyadmin/" target="_blank" rel="noopener"><?= e(t('pma.open')) ?> ↗</a><?php endif; ?>
+  </div>
 </div>
 <?php if ($new): ?>
 <div class="mb-4 rounded-lg bg-amber-100 p-4 text-sm text-amber-900"><?= e(t('db.once')) ?><br>
   <b><?= e(t('db.name')) ?>:</b> <code><?= e($new['name']) ?></code> &nbsp; <b><?= e(t('auth.password')) ?>:</b> <code class="break-all"><?= e($new['password']) ?></code></div>
 <?php endif; ?>
-<form method="post" action="/databases" class="card mb-6 grid gap-3 sm:grid-cols-5"><?= csrf_field() ?>
+<form method="post" action="/databases" class="card mb-6 grid gap-3 sm:grid-cols-6"><?= csrf_field() ?>
   <div class="sm:col-span-2"><label class="label"><?= e(t('db.name')) ?></label><input class="input" name="name" required pattern="[a-z0-9_]{1,16}" placeholder="shop"></div>
+  <div><label class="label"><?= e(t('db.site')) ?></label><select class="input" name="domain_id"><option value=""><?= e(t('db.no_site')) ?></option>
+    <?php foreach ($sites as $x): ?><option value="<?= $x['id'] ?>" <?= $site === $x['id'] ? 'selected' : '' ?>><?= e($x['name']) ?></option><?php endforeach; ?></select></div>
   <div><label class="label"><?= e(t('auth.password')) ?></label><input class="input" name="password" placeholder="<?= e(t('db.auto')) ?>" autocomplete="new-password"></div>
   <?php if (count($owners) > 1): ?><div><label class="label"><?= e(t('domains.owner')) ?></label><select class="input" name="owner"><?php foreach ($owners as $o): ?><option value="<?= (int)$o['id'] ?>"><?= e($o['username']) ?></option><?php endforeach; ?></select></div><?php endif; ?>
   <div class="flex items-end"><button class="btn w-full"><?= e(t('common.add')) ?></button></div>
 </form>
 <div class="card overflow-x-auto p-0"><table class="table">
-  <thead><tr><th><?= e(t('db.name')) ?></th><th><?= e(t('domains.owner')) ?></th><th><?= e(t('db.tables')) ?></th><th><?= e(t('db.size')) ?></th><th><?= e(t('db.remote')) ?></th><th></th></tr></thead>
+  <thead><tr><th><?= e(t('db.name')) ?></th><th><?= e(t('db.site')) ?></th><th><?= e(t('domains.owner')) ?></th><th><?= e(t('db.tables')) ?></th><th><?= e(t('db.size')) ?></th><th><?= e(t('db.remote')) ?></th><th></th></tr></thead>
   <tbody>
   <?php foreach ($rows as $r): $i = $info[$r['name']] ?? ['tables' => 0, 'size' => 0]; ?>
-    <tr><td class="font-mono font-medium"><?= e($r['name']) ?></td><td><?= e($r['username']) ?></td><td><?= (int)$i['tables'] ?></td><td><?= e(bytes((int)$i['size'])) ?></td>
+    <tr><td class="font-mono font-medium"><?= e($r['name']) ?></td>
+      <td><form method="post" action="/databases/<?= (int)$r['id'] ?>/site"><?= csrf_field() ?><select class="input w-auto py-1 text-sm <?= $r['domain_id'] ? '' : 'text-slate-400' ?>" name="domain_id" data-autosubmit>
+        <option value=""><?= e(t('db.no_site')) ?></option>
+        <?php foreach ($sites as $x): if ($x['user_id'] !== (int)$r['user_id']) continue; ?><option value="<?= $x['id'] ?>" <?= (int)$r['domain_id'] === $x['id'] ? 'selected' : '' ?>><?= e($x['name']) ?></option><?php endforeach; ?>
+      </select></form></td>
+      <td><?= e($r['username']) ?></td><td><?= (int)$i['tables'] ?></td><td><?= e(bytes((int)$i['size'])) ?></td>
       <td><form method="post" action="/databases/<?= (int)$r['id'] ?>/remote" class="inline"><?= csrf_field() ?><button class="badge <?= $r['remote_access'] ? 'badge-warn' : 'badge-ok' ?>"><?= e(t($r['remote_access'] ? 'db.remote_on' : 'db.remote_off')) ?></button></form></td>
       <td class="space-x-1 whitespace-nowrap text-right">
+        <?php if ($pmaOn): ?><form method="post" action="/databases/<?= (int)$r['id'] ?>/pma" class="inline" target="_blank"><?= csrf_field() ?><button class="btn text-xs" title="<?= e(t('pma.sso_hint')) ?>">phpMyAdmin ↗</button></form><?php endif; ?>
         <form method="post" action="/databases/<?= (int)$r['id'] ?>/password" class="inline"><?= csrf_field() ?><button class="btn-ghost border border-slate-300 text-xs dark:border-slate-700"><?= e(t('db.reset')) ?></button></form>
         <form method="post" action="/databases/<?= (int)$r['id'] ?>/delete" class="inline" data-confirm="<?= e(t('common.confirm')) ?>"><?= csrf_field() ?><button class="btn-ghost text-xs text-red-600"><?= e(t('common.delete')) ?></button></form></td></tr>
   <?php endforeach; ?>
-  <?php if (!$rows): ?><tr><td colspan="6" class="py-8 text-center text-slate-400"><?= e(t('common.empty')) ?></td></tr><?php endif; ?>
+  <?php if (!$rows): ?><tr><td colspan="7" class="py-8 text-center text-slate-400"><?= e(t('common.empty')) ?></td></tr><?php endif; ?>
   </tbody></table></div>
 <?php if ($me['role'] === 'admin'): ?>
 <form method="post" action="/databases/bind" class="card mt-6 flex flex-wrap items-center gap-3"><?= csrf_field() ?>

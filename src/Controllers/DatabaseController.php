@@ -17,7 +17,7 @@ final class DatabaseController extends Controller
     {
         $u = $this->user();
         $ids = Scope::userIds($u);
-        $sql = 'SELECT i.*, u.username FROM db_instances i JOIN users u ON u.id = i.user_id';
+        $sql = 'SELECT i.*, u.username, d.name AS site FROM db_instances i JOIN users u ON u.id = i.user_id LEFT JOIN domains d ON d.id = i.domain_id';
         $rows = $ids === null ? DB::all("$sql ORDER BY i.name")
             : DB::all("$sql WHERE i.user_id IN (" . implode(',', array_fill(0, count($ids), '?')) . ') ORDER BY i.name', $ids);
         $info = [];
@@ -38,7 +38,17 @@ final class DatabaseController extends Controller
             } catch (\Throwable) {
             }
         }
-        return view('databases/index', ['rows' => $rows, 'info' => $info, 'owners' => $owners, 'pma' => $pma,
+        $site = (int)$this->req->str('site', '0');
+        if ($site) {
+            $rows = array_values(array_filter($rows, static fn($r) => (int)$r['domain_id'] === $site));
+        }
+        $sites = [];
+        foreach (Scope::domains($u) as $d) {
+            if ($d['type'] !== 'alias') {
+                $sites[] = ['id' => (int)$d['id'], 'name' => $d['name'], 'user_id' => (int)$d['user_id']];
+            }
+        }
+        return view('databases/index', ['rows' => $rows, 'info' => $info, 'owners' => $owners, 'pma' => $pma, 'sites' => $sites, 'site' => $site,
             'new' => $_SESSION['new_db'] ?? null] + $this->clear());
     }
 
@@ -52,19 +62,69 @@ final class DatabaseController extends Controller
     {
         $u = $this->user();
         $ownerId = $u['role'] === 'user' ? (int)$u['id'] : (int)$this->req->post('owner', $u['id']);
+        $domainId = (int)$this->req->post('domain_id', 0) ?: null;
+        if ($domainId !== null) {
+            $dom = Scope::domain($u, $domainId) ?? $this->abort(404);
+            $ownerId = (int)$dom['user_id'];                          // a site's database belongs to the site's owner
+        }
         $owner = DB::one('SELECT * FROM users WHERE id = ?', [$ownerId]);
         if (!$owner || !\Havoc\Core\Scope::canManageUser($u, $owner)) {
             $this->abort(404);
         }
         try {
-            $db = DatabaseService::create($u, $ownerId, $this->req->str('name'), $this->req->str('password') ?: null);
+            $db = DatabaseService::create($u, $ownerId, $this->req->str('name'), $this->req->str('password') ?: null, $domainId);
             $_SESSION['new_db'] = ['name' => $db['name'], 'password' => $db['password']];      // shown once
         } catch (\DomainException $e) {
             $this->flash('error', str_starts_with($e->getMessage(), 'db.') ? t($e->getMessage()) : $e->getMessage());
         } catch (\Throwable $e) {
             $this->flash('error', $e->getMessage());
         }
+        return $this->back();
+    }
+
+    /** Back to the site page when the form came from there. */
+    private function back(): Response
+    {
+        $from = (int)$this->req->post('from_domain', 0);
+        return $this->to($from && Scope::domain($this->user(), $from) ? "/domains/$from#databases" : '/databases');
+    }
+
+    public function site(): Response
+    {
+        $r = $this->row();
+        $id = (int)$this->req->post('domain_id', 0) ?: null;
+        try {
+            DatabaseService::assign($this->user(), $r, $id);
+            $this->flash('success', t('common.saved'));
+        } catch (\Throwable $e) {
+            $this->flash('error', str_starts_with($e->getMessage(), 'db.') ? t($e->getMessage()) : $e->getMessage());
+        }
+        return $this->back();
+    }
+
+    public function detect(): Response
+    {
+        try {
+            $f = DatabaseService::detect($this->user());
+            $this->flash('success', $f ? t('db.detected', ['list' => implode(', ', array_map(fn($k, $v) => "$k → $v", array_keys($f), $f))]) : t('db.detected_none'));
+        } catch (\Throwable $e) {
+            $this->flash('error', $e->getMessage());
+        }
         return $this->to('/databases');
+    }
+
+    /** One click into phpMyAdmin for this database, no password (temporary database user, single-use ticket). */
+    public function pmaOpen(): Response
+    {
+        $r = $this->row();
+        try {
+            $t = Ctl::call('pma.ticket', ['db' => $r['name']], 30);
+            Audit::log('db.pma', $r['name']);
+            return Response::redirect('/phpmyadmin/havoc-signon.php?t=' . $t['ticket']);
+        } catch (\Throwable $e) {
+            $this->flash('error', t('pma.sso_failed') . ': ' . $e->getMessage());
+            return $this->back();
+        }
     }
 
     private function generate(): string

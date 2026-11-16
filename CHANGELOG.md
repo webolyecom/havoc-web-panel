@@ -2,6 +2,17 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.9.1] – 2026-11-16
+### Added
+- **Per-site search (Meilisearch)**: on a site's page, "Enable search" gives the site its own index prefix (`shop_example_com__…`) and two API keys that only work for those indexes: an admin key for the site's server code and a search-only key for the browser. Index list with document counts, new keys, disable (optionally deleting the indexes). The indexes (settings and documents) are included in the account's backups (with databases), restored with them, and copied by site transfers (the site gets new keys on the new server). New alert rule: a site's search data above N MB.
+- **Databases belong to sites**: assign a database to a site when creating it or later (Databases page: site column, filter by site, "Assign automatically" reads wp-config.php, .env and other config files). The site page shows its databases with size and tables, creates new ones for the site and attaches existing ones. WordPress installs assign their database. Transfers preselect the site's databases. The Claude connector shows the site of each database and can create one for a site.
+- **One-click phpMyAdmin**: a "phpMyAdmin" button at every database (and on the site page) opens it without a password, using a temporary login that can only see that database (single-use ticket, user removed after 2 hours).
+### Fixed
+- Restoring a backup from the panel failed (wrong helper call for files and databases).
+- Databases with triggers, views or routines could not be restored ("SUPER privilege needed"): they are now imported as the database's own user with DEFINER clauses removed.
+### Changed
+- The Meilisearch "new master key" warning mentions that the sites' search keys change too.
+
 ## [0.9.0] – 2026-11-16
 ### Added
 - **Site transfer** (Server → Site transfer): copy sites from another server running Havoc WEB Panel. The old server creates a **transfer key** (one string with its address, a secret and its certificate's public-key pin; valid 1 h – 7 days, all or chosen sites, optionally one IP address, revocable). The new server pastes it, sees the sites with sizes, databases ("used by this site" detected from config files) and checks (domain already here, missing PHP version, disk space, subdomain parent), chooses the owner (same user name, created with the same panel password, or an existing user) and starts. Per site: export on the old server, resumable chunked download with SHA-256 verification, then the site with its PHP and site settings, files, databases (renamed to this account's prefix, users keep their password hashes, triggers and views keep working), config files and WordPress paths updated, aliases, redirects, cron jobs and the SSL certificate (replaced by Let's Encrypt automatically once DNS points here). A failed site is rolled back and can be retried. Nothing is changed or deleted on the old server.

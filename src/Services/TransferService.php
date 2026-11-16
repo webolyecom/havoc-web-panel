@@ -93,13 +93,16 @@ final class TransferService
             $parent = $d['parent_id'] ? DB::one('SELECT name FROM domains WHERE id = ?', [$d['parent_id']]) : null;
             $out[] = ['id' => (int)$d['id'], 'name' => $d['name'], 'type' => $d['type'], 'parent' => $parent['name'] ?? null, 'owner' => $d['username'],
                 'php' => $d['php_version'], 'ssl' => $d['ssl_mode'], 'size' => (int)$s['size'],
+                'search' => MeiliService::installed() && (bool)MeiliService::site((int)$d['id']),
+                'assigned' => array_column(DB::all('SELECT name FROM db_instances WHERE domain_id = ?', [$d['id']]), 'name'),
                 'aliases' => array_column(DB::all("SELECT name FROM domains WHERE parent_id = ? AND type = 'alias'", [$d['id']]), 'name'),
-                'dbs' => array_map(static fn($n, $x) => ['name' => $n, 'size' => (int)$x['size'], 'used' => (bool)$x['used']], array_keys($s['dbs']), $s['dbs'])];
+                'dbs' => array_map(static fn($n, $x) => ['name' => $n, 'size' => (int)$x['size'],
+                    'used' => (bool)$x['used'] || (bool)DB::one('SELECT id FROM db_instances WHERE name = ? AND domain_id = ?', [$n, $d['id']])], array_keys($s['dbs']), $s['dbs'])];
         }
         return $out;
     }
 
-    public static function startExport(array $key, int $domainId, array $dbs, bool $ssl): string
+    public static function startExport(array $key, int $domainId, array $dbs, bool $ssl, bool $search = true): string
     {
         $d = null;
         foreach (self::allowedDomains($key) as $x) {
@@ -113,7 +116,7 @@ final class TransferService
         $own = array_column(DB::all('SELECT name FROM db_instances WHERE user_id = ?', [$d['user_id']]), 'name');
         $dbs = array_values(array_intersect($own, $dbs));
         $id = bin2hex(random_bytes(16));
-        DB::insert('transfer_exports', ['id' => $id, 'key_id' => $key['id'], 'domain_id' => $d['id'], 'options' => json_encode(['dbs' => $dbs, 'ssl' => $ssl]),
+        DB::insert('transfer_exports', ['id' => $id, 'key_id' => $key['id'], 'domain_id' => $d['id'], 'options' => json_encode(['dbs' => $dbs, 'ssl' => $ssl, 'search' => $search]),
             'created_at' => time()]);
         Audit::log('transfer.export', $d['name'], ['dbs' => count($dbs), 'from' => $key['last_ip']], ['id' => $key['created_by'], 'username' => 'transfer']);
         BackupService::spawn('transfer:export', $id);
@@ -133,8 +136,9 @@ final class TransferService
                 throw new \RuntimeException('Site no longer exists');
             }
             $o = json_decode((string)$x['options'], true) ?: [];
+            $search = !empty($o['search']) && MeiliService::installed() ? MeiliService::site((int)$d['id']) : null;
             $r = Ctl::call('transfer.export', ['id' => $id, 'account' => 'hv' . $d['user_id'], 'domain' => $d['name'], 'dbs' => $o['dbs'] ?? [],
-                'ssl' => !empty($o['ssl']) && $d['ssl_mode'] !== 'none', 'ssl_mode' => $d['ssl_mode']], 7200);
+                'ssl' => !empty($o['ssl']) && $d['ssl_mode'] !== 'none', 'ssl_mode' => $d['ssl_mode'], 'meili' => $search['prefix'] ?? null], 7200);
             $settings = array_intersect_key($d, array_flip(['php_version', 'php_extensions', 'opcache_enabled', 'opcache_memory', 'force_https', 'hsts', 'waf',
                 'logs_enabled', 'php_ini', 'php_ini_admin', 'nginx_custom', 'ssl_mode']));
             $parent = $d['parent_id'] ? DB::one('SELECT name FROM domains WHERE id = ?', [$d['parent_id']]) : null;
@@ -144,7 +148,9 @@ final class TransferService
                 'aliases' => array_column(DB::all("SELECT name FROM domains WHERE parent_id = ? AND type = 'alias'", [$d['id']]), 'name'),
                 'redirects' => DB::all('SELECT source, target, code FROM redirects WHERE domain_id = ?', [$d['id']]),
                 'cron' => DB::all('SELECT label, schedule, command, enabled, log_output FROM cron_jobs WHERE domain_id = ?', [$d['id']]),
-                'databases' => array_map(static fn($n) => ['name' => $n, 'hash' => $r['db_users'][$n] ?? null], $o['dbs'] ?? []),
+                'databases' => array_map(static fn($n) => ['name' => $n, 'hash' => $r['db_users'][$n] ?? null,
+                    'site' => (bool)DB::one('SELECT id FROM db_instances WHERE name = ? AND domain_id = ?', [$n, $d['id']])], $o['dbs'] ?? []),
+                'search' => $search['prefix'] ?? null,
                 'source' => ['version' => UpdateService::current(), 'host' => gethostname() ?: '']];
             DB::q("UPDATE transfer_exports SET status = 'ready', files = ?, manifest = ? WHERE id = ?", [json_encode($r['files']), json_encode($manifest), $id]);
         } catch (\Throwable $e) {
@@ -343,7 +349,7 @@ final class TransferService
         try {
             // 1. export on the source
             self::progress($id, 'export', 2, t('transfer.l_export'));
-            $exportId = (string)self::call($src, 'POST', '/transfer/v1/exports', ['domain_id' => (int)$o['source_id'], 'dbs' => $o['dbs'] ?? [], 'ssl' => !empty($o['ssl'])])['id'];
+            $exportId = (string)self::call($src, 'POST', '/transfer/v1/exports', ['domain_id' => (int)$o['source_id'], 'dbs' => $o['dbs'] ?? [], 'ssl' => !empty($o['ssl']), 'search' => !empty($o['search'])])['id'];
             $deadline = time() + 7200;
             do {
                 sleep(2);
@@ -364,7 +370,7 @@ final class TransferService
             $total = max(1, array_sum(array_column($x['files'], 'size')));
             $done = 0;
             foreach ($x['files'] as $f) {
-                if (!preg_match('/^(files\.tar\.gz|ssl\.json|db-[a-z0-9_]{1,40}\.sql\.gz)$/D', (string)$f['name'])) {
+                if (!preg_match('/^(files\.tar\.gz|ssl\.json|meili\.tar\.gz|db-[a-z0-9_]{1,40}\.sql\.gz)$/D', (string)$f['name'])) {
                     throw new \RuntimeException('Unexpected file in export');
                 }
                 $path = "$stage/{$f['name']}";
@@ -451,7 +457,8 @@ final class TransferService
                 if (DB::one('SELECT id FROM db_instances WHERE name = ?', ["hv{$owner['id']}_$short"])) {
                     $short = DatabaseService::freeName((int)$owner['id'], substr($short, 0, 13));
                 }
-                $new = DatabaseService::create(self::SYSTEM, (int)$owner['id'], $short);
+                // databases are assigned to the site (all chosen ones belong to it, as on the old server or by its config)
+                $new = DatabaseService::create(self::SYSTEM, (int)$owner['id'], $short, null, (int)$d['id']);
                 $created['dbs'][] = $new['name'];
                 $r = Ctl::call('transfer.import_db', ['id' => $exportId, 'account' => $acct, 'name' => $new['name'], 'file' => "db-{$db['name']}.sql.gz",
                     'password' => $new['password'], 'hash' => $db['hash'] ?? ''], 7200);
@@ -508,6 +515,22 @@ final class TransferService
                     CronService::sync((int)$owner['id']);
                 } catch (\Throwable $e) {
                     $result['warnings'][] = t('transfer.w_cron', ['e' => mb_substr($e->getMessage(), 0, 120)]);
+                }
+            }
+
+            // 8b. search indexes: new keys here (the site's configuration needs them), same index names
+            if (!empty($m['search']) && is_file("$stage/meili.tar.gz")) {
+                if (MeiliService::installed()) {
+                    try {
+                        $site = MeiliService::enable(self::SYSTEM, DB::one('SELECT * FROM domains WHERE id = ?', [$d['id']]));
+                        $r = Ctl::call('meili.site_import', ['id' => $exportId, 'from' => (string)$m['search'], 'to' => $site['prefix']], 3600);
+                        self::progress($id, 'config', 91, t('transfer.l_search', ['n' => count($r['indexes'] ?? [])]));
+                        $result['warnings'][] = t('transfer.w_search_keys');
+                    } catch (\Throwable $e) {
+                        $result['warnings'][] = t('transfer.w_search', ['e' => mb_substr($e->getMessage(), 0, 160)]);
+                    }
+                } else {
+                    $result['warnings'][] = t('transfer.w_search_missing');
                 }
             }
 

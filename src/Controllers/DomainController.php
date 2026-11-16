@@ -5,6 +5,7 @@ namespace Havoc\Controllers;
 
 use Havoc\Core\{Audit, Ctl, DB, Response, Scope, Settings};
 use Havoc\Ctl\Validator;
+use Havoc\Services\MeiliService;
 use Havoc\Services\{DomainService, SslService};
 
 final class DomainController extends Controller
@@ -75,7 +76,59 @@ final class DomainController extends Controller
             'redirects' => DB::all('SELECT * FROM redirects WHERE domain_id = ? ORDER BY id', [$d['id']]),
             'aliases' => DB::all("SELECT id, name FROM domains WHERE parent_id = ? AND type = 'alias' ORDER BY name", [$d['id']]),
             'enabled' => $d['php_extensions'] ? json_decode($d['php_extensions'], true) : $ext['default'],
-            'app' => \Havoc\Services\AppService::forDomain((int)$d['id']), 'newApp' => $this->pullNewApp((int)$d['id'])]);
+            'app' => \Havoc\Services\AppService::forDomain((int)$d['id']), 'newApp' => $this->pullNewApp((int)$d['id'])] + $this->dbCard($d) + $this->searchCard($d));
+    }
+
+    /** The site's databases (sizes from MariaDB) and the owner's databases that belong to no site yet. */
+    private function dbCard(array $d): array
+    {
+        $dbs = DB::all('SELECT * FROM db_instances WHERE domain_id = ? ORDER BY name', [$d['id']]);
+        $info = [];
+        if ($dbs) {
+            try {
+                $info = Ctl::call('db.info', ['names' => array_column($dbs, 'name')])['databases'] ?? [];
+            } catch (\Throwable) {
+            }
+        }
+        return ['dbs' => $dbs, 'dbInfo' => $info, 'pmaOn' => is_file('/opt/havoc-pma/index.php'),
+            'freeDbs' => DB::all('SELECT id, name FROM db_instances WHERE user_id = ? AND domain_id IS NULL ORDER BY name', [$d['user_id']])];
+    }
+
+    private function searchCard(array $d): array
+    {
+        if (!MeiliService::installed()) {
+            return ['search' => null];
+        }
+        $site = MeiliService::site((int)$d['id']);
+        $info = null;
+        if ($site) {
+            try {
+                $info = MeiliService::info($site);
+            } catch (\Throwable $e) {
+                $info = ['error' => $e->getMessage()];
+            }
+        }
+        return ['search' => ['site' => $site, 'info' => $info, 'prefix' => MeiliService::prefix($d['name'])]];
+    }
+
+    public function search(): Response
+    {
+        $d = $this->domain();
+        if (!MeiliService::installed()) {
+            $this->abort(404);
+        }
+        try {
+            match ($this->param('op')) {
+                'enable' => MeiliService::enable($this->user(), $d),
+                'rotate' => ($s = MeiliService::site((int)$d['id'])) ? MeiliService::rotate($this->user(), $d, $s) : null,
+                'disable' => MeiliService::disable($this->user(), $d, (bool)$this->req->post('delete_indexes')),
+                default => $this->abort(404),
+            };
+            $this->flash('success', t('search.done_' . $this->param('op')));
+        } catch (\Throwable $e) {
+            $this->flash('error', $e->getMessage());
+        }
+        return $this->to('/domains/' . $d['id'] . '#search');
     }
 
     private function pullNewApp(int $id): ?array

@@ -39,6 +39,7 @@ final class NotificationController extends Controller
             'notify.r_load' => (string)round((float)$r->post('r_load', 0), 1),
             'notify.r_services' => $r->post('r_services') ? '1' : '0',
             'notify.r_ssl' => (string)(int)$r->post('r_ssl', 0),
+            'notify.r_meili' => (string)max(0, min(1048576, (int)$r->post('r_meili', 0))),
             'notify.r_update' => $r->post('r_update') ? '1' : '0',
             'notify.r_backup' => $r->post('r_backup') ? '1' : '0',
         ];

@@ -28,11 +28,12 @@
       <div><p class="label"><?= e(t('transfer.databases')) ?></p>
         <?php foreach ($d['dbs'] as $db): ?>
           <label class="flex items-center gap-2"><input type="checkbox" name="<?= $key ?>[dbs][<?= e($db['name']) ?>]" value="1" <?= $db['used'] || count($d['dbs']) === 1 ? 'checked' : '' ?>>
-            <span class="font-mono"><?= e($db['name']) ?></span> <span class="text-xs text-slate-500"><?= e(bytes((int)$db['size'])) ?><?= $db['used'] ? ' · ' . e(t('transfer.db_used')) : '' ?></span></label>
+            <span class="font-mono"><?= e($db['name']) ?></span> <span class="text-xs text-slate-500"><?= e(bytes((int)$db['size'])) ?><?= in_array($db['name'], $d['assigned'] ?? [], true) ? ' · ' . e(t('transfer.db_site')) : ($db['used'] ? ' · ' . e(t('transfer.db_used')) : '') ?></span></label>
         <?php endforeach; ?>
         <?php if (!$d['dbs']): ?><p class="text-slate-400"><?= e(t('transfer.no_dbs')) ?></p><?php endif; ?></div>
       <div><p class="label"><?= e(t('transfer.also')) ?></p>
         <label class="flex items-center gap-2 <?= $d['ssl'] === 'none' ? 'opacity-50' : '' ?>"><input type="checkbox" name="<?= $key ?>[ssl]" value="1" <?= $d['ssl'] !== 'none' ? 'checked' : 'disabled' ?>> <?= e(t('transfer.copy_ssl')) ?></label>
+        <?php if (!empty($d['search'])): ?><label class="flex items-center gap-2"><input type="checkbox" name="<?= $key ?>[search]" value="1" checked> <?= e(t('transfer.copy_search')) ?></label><?php endif; ?>
         <p class="mt-1 text-xs text-slate-500"><?= e(t('transfer.always')) ?></p></div>
     </div>
     <?php endif; ?>

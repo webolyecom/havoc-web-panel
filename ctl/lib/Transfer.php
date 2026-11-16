@@ -143,6 +143,21 @@ final class Transfer
             [$c, $o] = Sys::run([self::client(), '--batch', '-N', '-e', "SHOW CREATE USER `$n`@`localhost`"]);
             $users[$n] = $c === 0 && preg_match("/IDENTIFIED BY PASSWORD '(\\*[0-9A-F]{40})'/", $o, $m) ? $m[1] : null;
         }
+        if (!empty($a['meili'])) {
+            // the site's search indexes (settings + documents), packed by root from Meilisearch's own API
+            $w = '/var/tmp/havoc-mx-' . bin2hex(random_bytes(6));
+            mkdir($w, 0700);
+            try {
+                if (MeiliSites::export((string)$a['meili'], $w) > 0) {
+                    [$c, $e] = Sys::runIO([is_file('/usr/bin/tar') ? '/usr/bin/tar' : '/bin/tar', '-czf', '-', '-C', $w, '.'], null, "$dir/meili.tar.gz");
+                    if ($c > 1) {
+                        throw new \RuntimeException('Packing search data failed: ' . mb_substr($e, 0, 200));
+                    }
+                }
+            } finally {
+                Sys::run(['rm', '-rf', '--', $w]);
+            }
+        }
         if (!empty($a['ssl'])) {
             $live = in_array($a['ssl_mode'] ?? '', ['custom', 'cloudflare'], true) ? "/etc/havoc/ssl/$dom" : "/etc/letsencrypt/live/$dom";
             $cert = @file_get_contents("$live/fullchain.pem");

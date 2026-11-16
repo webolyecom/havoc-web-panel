@@ -61,7 +61,11 @@ return static function (Router $r): void {
     $r->post('/databases/pma/{op}', [DatabaseController::class, 'pma'], ['admin']);
     $r->get('/databases/tuning', [DatabaseController::class, 'tuning'], ['admin']);
     $r->post('/databases/tuning', [DatabaseController::class, 'tuningSave'], ['admin']);
+    $r->post('/databases/detect', [DatabaseController::class, 'detect'], ['auth']);
+    $r->post('/databases/{id}/site', [DatabaseController::class, 'site'], ['auth']);
+    $r->post('/databases/{id}/pma', [DatabaseController::class, 'pmaOpen'], ['auth']);
     $r->post('/databases/{id}/password', [DatabaseController::class, 'password'], ['auth']);
+    $r->post('/domains/{id}/search/{op}', [DomainController::class, 'search'], ['auth']);
     $r->post('/databases/{id}/remote', [DatabaseController::class, 'remote'], ['auth']);
     $r->post('/databases/{id}/delete', [DatabaseController::class, 'delete'], ['auth']);
 

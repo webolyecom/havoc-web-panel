@@ -156,4 +156,5 @@ if ! /usr/sbin/nginx -t -c /etc/havoc/nginx/nginx.conf; then
   exit 1
 fi
 systemctl reload havoc-panel-nginx
+/opt/havoc/ctl/havocctl pma.sso_setup <<< '{}' >/dev/null || echo "Note: one-click login could not be set up."
 VER=$(ls "$DIR" | sed -n 's/^RELEASE-DATE-//p'); echo "phpMyAdmin $VER installed (PHP $PHPV). Open https://<panel>/phpmyadmin/"
