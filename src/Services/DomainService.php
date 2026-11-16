@@ -131,6 +131,11 @@ final class DomainService
         foreach (DB::all("SELECT * FROM domains WHERE parent_id = ? AND type = 'sub'", [$d['id']]) as $child) {
             self::delete($actor, $child, $purge);              // subdomains own vhosts/FPM units: remove them properly
         }
+        try {
+            MeiliService::disable($actor, $d, $purge);           // its search keys always, its indexes with the files
+        } catch (\Throwable $e) {
+            error_log('search disable: ' . $e->getMessage());
+        }
         foreach (DB::all('SELECT * FROM ftp_accounts WHERE domain_id = ?', [$d['id']]) as $f) {
             try {
                 Ctl::call('ftp.delete', ['protocol' => $f['protocol'], 'login' => $f['login']]);

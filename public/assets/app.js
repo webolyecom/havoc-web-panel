@@ -121,6 +121,17 @@
     const old = b.textContent; b.textContent = '✓'; setTimeout(() => { b.textContent = old; }, 1500);
   }));
   document.querySelectorAll('[data-select-all]').forEach((f) => f.addEventListener('focus', () => f.select()));
+  // selects that save on change (database -> site)
+  document.querySelectorAll('select[data-autosubmit]').forEach((sel) => sel.addEventListener('change', () => sel.form?.requestSubmit()));
+  // show / hide a secret field
+  document.querySelectorAll('[data-reveal]').forEach((b) => b.addEventListener('click', () => {
+    const f = document.querySelector(b.dataset.reveal);
+    if (f) f.type = f.type === 'password' ? 'text' : 'password';
+  }));
+  // assign an existing database to this site: the form posts to the chosen database
+  document.querySelectorAll('[data-assign-form]').forEach((f) => f.addEventListener('submit', () => {
+    f.action = '/databases/' + f.querySelector('[data-assign-select]').value + '/site';
+  }));
   // confirm dialogs
   document.addEventListener('submit', (e) => {
     const m = e.target.dataset?.confirm;

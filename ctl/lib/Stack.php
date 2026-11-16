@@ -180,7 +180,7 @@ final class Stack
     private const MDATA = '/var/lib/meilisearch';
     private const MJOB  = 'havoc-meili-install';
 
-    private static function meiliConf(): array
+    public static function meiliConf(): array
     {
         $c = [];
         if (is_file(self::MCONF)) {

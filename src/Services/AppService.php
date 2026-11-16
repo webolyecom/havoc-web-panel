@@ -48,7 +48,7 @@ final class AppService
             throw new \DomainException('app.bad_email');
         }
         $title = mb_substr(trim((string)($opt['title'] ?? '')), 0, 120) ?: $d['name'];
-        $db = DatabaseService::create($actor, (int)$owner['id'], DatabaseService::freeName((int)$owner['id'], 'wp'));
+        $db = DatabaseService::create($actor, (int)$owner['id'], DatabaseService::freeName((int)$owner['id'], 'wp'), null, (int)$d['id']);
         $pass = DatabaseService::password();
         $id = DB::insert('apps', ['domain_id' => (int)$d['id'], 'app' => 'wordpress', 'status' => 'installing', 'db_name' => $db['name'],
             'admin_user' => $user, 'via' => $via === 'claude' ? 'claude' : 'panel', 'updated_at' => gmdate('Y-m-d H:i:s'),

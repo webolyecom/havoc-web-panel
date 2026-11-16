@@ -277,9 +277,23 @@ final class Backup
                     $hasDb = true;
                 }
             }
+            // search indexes of the account's sites (Meilisearch): settings + documents per index
+            $hasMeili = false;
+            if ($db && !empty($a['meili'])) {
+                foreach (array_slice((array)$a['meili'], 0, 100) as $prefix) {
+                    try {
+                        $hasMeili = MeiliSites::export((string)$prefix, "$w/meili") > 0 || $hasMeili;
+                    } catch (\Throwable $e) {
+                        error_log('backup: search export: ' . $e->getMessage());
+                    }
+                }
+                if ($hasMeili) {
+                    Sys::run(['chown', '-R', $pw['uid'] . ':' . $pw['gid'], "$w/meili"]);
+                }
+            }
             // the archive is built by tar running as the tenant (it only reads what the tenant itself can read, so symlinks
             // or races inside the home directory gain nothing); root only opens the output file in the backup directory
-            if ($hasDb) {
+            if ($hasDb || $hasMeili) {
                 chgrp($w, (int)$pw['gid']);
                 chmod($w, 0750);
                 chgrp("$w/db", (int)$pw['gid']);
@@ -293,10 +307,13 @@ final class Backup
             if ($hasDb) {
                 array_push($cmd, '-C', $w, 'db');                          // db first: restore can stop reading early
             }
+            if ($hasMeili) {
+                array_push($cmd, '-C', $w, 'meili');
+            }
             if ($files && is_dir("/home/$acct/domains")) {
                 array_push($cmd, '-C', "/home/$acct", 'domains');
             }
-            if (count($cmd) === 10) {
+            if (!$hasDb && !$hasMeili && !($files && is_dir("/home/$acct/domains"))) {
                 throw new \RuntimeException('Nothing to back up');
             }
             [$c, $e] = Sys::runIO($cmd, null, $out);
@@ -335,7 +352,7 @@ final class Backup
         $as = self::asUser($pw);
         $log = [];
         if (!empty($a['files'])) {
-            [$c, $e] = Sys::runIO([...$as, $tar, '-xzf', $path, '-C', "/home/$acct", '--no-same-owner', 'domains']);
+            [$c, $e] = Sys::runIO([...$as, $tar, '-xzf', $path, '-C', "/home/$acct", '--no-same-owner', 'domains'], null, null);
             $log[] = $c <= 1 ? 'files restored' : 'files: ' . $e;
         }
         if (!empty($a['db'])) {
@@ -344,27 +361,58 @@ final class Backup
                 if (!is_string($n) || !preg_match('/^' . $acct . '_[a-z0-9_]{1,16}$/D', $n)) {
                     throw new \InvalidArgumentException('Invalid database name');
                 }
-                $w = self::tmp($pw);
-                try {
-                    [$c] = Sys::runIO([...$as, $tar, '-xzf', $path, '-C', $w, '--occurrence=1', "db/$n.sql"]);
-                    if (!is_file("$w/db/$n.sql")) {
-                        $log[] = "$n: not in archive";
-                        continue;
-                    }
-                    // import with a throw-away MySQL user that can only touch this one database, client running as the tenant
+                // is it in the archive? (db/ comes first, so tar stops early)
+                [$c, $lst] = Sys::run([...$as, $tar, '-tzf', $path, '--occurrence=1', "db/$n.sql"], null, 600);
+                if ($c !== 0 || trim($lst) !== "db/$n.sql") {
+                    $log[] = "$n: not in archive";
+                    continue;
+                }
+                // imported as the database's own user, so triggers, views and routines are owned by it and keep working
+                // (their DEFINER clauses are dropped: only SUPER may set another one). Its password is set to a temporary
+                // one for the import and the original hash is put back afterwards. Without a usable hash (e.g. the user
+                // is missing) a throw-away user that can only reach this database does the import.
+                [$c, $o] = Sys::run([$client, '--batch', '-N', '-e', "SHOW CREATE USER `$n`@`localhost`"]);
+                $hash = $c === 0 && preg_match("/IDENTIFIED BY PASSWORD '(\\*[0-9A-F]{40})'/", $o, $m) ? $m[1] : null;
+                $p = bin2hex(random_bytes(12));
+                if ($hash) {
+                    $u = $n;
+                    self::sql("ALTER USER `$n`@`localhost` IDENTIFIED BY '$p';\nFLUSH PRIVILEGES;\n");
+                } else {
                     $u = 'hvr' . bin2hex(random_bytes(5));
-                    $p = bin2hex(random_bytes(12));
                     $g = str_replace('_', '\\_', $n);
                     self::sql("CREATE USER '$u'@'localhost' IDENTIFIED BY '$p';\nGRANT ALL PRIVILEGES ON `$g`.* TO '$u'@'localhost';\nFLUSH PRIVILEGES;\n");
-                    try {
-                        [$c, $e] = Sys::runIO([...$as, $client, '-u', $u, $n], "$w/db/$n.sql", null, ['MYSQL_PWD' => $p]);
-                        $log[] = $c === 0 ? "$n restored" : "$n: " . $e;
-                    } finally {
-                        self::sql("DROP USER IF EXISTS '$u'@'localhost';\nFLUSH PRIVILEGES;\n");
-                    }
-                } finally {
-                    self::cleanup($w);
                 }
+                try {
+                    // the whole pipeline runs as the tenant: root never reads a file the tenant could swap
+                    $sh = 'set -o pipefail; "$1" -xzOf "$2" --occurrence=1 "db/$3.sql" | sed -E \'s/ DEFINER=`[^`]{1,80}`@`[^`]{1,255}`//g\' | "$4" -u "$5" "$3"';
+                    [$c, $e] = Sys::runIO([...$as, '/bin/bash', '-c', $sh, 'restore', $tar, $path, $n, $client, $u], null, null, ['MYSQL_PWD' => $p]);
+                    $log[] = $c === 0 ? "$n restored" : "$n: " . mb_substr(trim($e), 0, 400);
+                } finally {
+                    self::sql($hash
+                        ? "ALTER USER `$n`@`localhost` IDENTIFIED BY PASSWORD '$hash';\nFLUSH PRIVILEGES;\n"
+                        : "DROP USER IF EXISTS '$u'@'localhost';\nFLUSH PRIVILEGES;\n");
+                }
+            }
+        }
+        if (!empty($a['db']) && !empty($a['meili'])) {
+            $w = self::tmp($pw);
+            try {
+                [$c] = Sys::runIO([...$as, $tar, '-xzf', $path, '-C', $w, 'meili'], null, null);
+                if (is_dir("$w/meili") && !is_link("$w/meili")) {
+                    $safe = MeiliSites::lockIn("$w/meili");
+                    $w2 = dirname($safe);
+                    foreach (array_slice((array)$a['meili'], 0, 100) as $prefix) {
+                        try {
+                            $n = count(MeiliSites::import($safe, (string)$prefix, (string)$prefix));
+                            $n && $log[] = "search: $n index(es) restored";
+                        } catch (\Throwable $e) {
+                            $log[] = 'search: ' . $e->getMessage();
+                        }
+                    }
+                    Sys::run(['rm', '-rf', '--', $w2]);
+                }
+            } finally {
+                self::cleanup($w);
             }
         }
         return self::withToken(['log' => $log]);

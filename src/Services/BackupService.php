@@ -65,6 +65,7 @@ final class BackupService
         }
         try {
             $r = Ctl::call('backup.create', ['account' => 'hv' . $b['user_id'], 'db_names' => self::dbNames((int)$b['user_id']),
+                'meili' => MeiliService::prefixesFor((int)$b['user_id']),
                 'files' => $b['scope'] !== 'db', 'db' => $b['scope'] !== 'files', 'target' => self::targetConfig($b['target_id'] ? (int)$b['target_id'] : null)], self::TIMEOUT);
             self::keepToken($b['target_id'] ? (int)$b['target_id'] : null, $r);
             DB::update('backups', $id, ['status' => 'done', 'path' => $r['file'], 'size' => $r['size'], 'remote' => (int)$r['remote']]);
@@ -83,6 +84,7 @@ final class BackupService
         DB::update('backups', $id, ['status' => 'restoring', 'note' => null]);
         try {
             $r = Ctl::call('backup.restore', ['account' => 'hv' . $b['user_id'], 'file' => $b['path'], 'files' => $scope !== 'db', 'db' => $scope !== 'files',
+                'meili' => MeiliService::prefixesFor((int)$b['user_id']),
                 'db_names' => self::dbNames((int)$b['user_id']), 'target' => self::targetConfig($b['target_id'] ? (int)$b['target_id'] : null)], self::TIMEOUT);
             self::keepToken($b['target_id'] ? (int)$b['target_id'] : null, $r);
             DB::update('backups', $id, ['status' => 'done', 'note' => substr('restore: ' . implode('; ', $r['log'] ?? []), 0, 500)]);
@@ -108,6 +110,13 @@ final class BackupService
     /** Called hourly by havoc-backup.timer. */
     public static function runDue(): void
     {
+        if (is_file('/opt/havoc-pma/index.php')) {
+            try {
+                Ctl::call('pma.cleanup', [], 120);            // temporary phpMyAdmin logins older than 2 hours
+            } catch (\Throwable $e) {
+                error_log('pma cleanup: ' . $e->getMessage());
+            }
+        }
         try {
             TransferService::cleanup();                       // export packages older than a day
         } catch (\Throwable $e) {

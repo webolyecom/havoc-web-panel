@@ -118,6 +118,22 @@ final class AlertService
                 $p['load'] = t('notify.m_load', ['load' => number_format($load5, 2), 'cores' => $cores]);
             }
         }
+        $meiliMb = (int)NotifyService::get('notify.r_meili');
+        if ($meiliMb > 0 && MeiliService::installed()) {
+            $sites = DB::all('SELECT m.prefix, d.name FROM meili_sites m JOIN domains d ON d.id = m.domain_id');
+            if ($sites) {
+                try {
+                    $sizes = \Havoc\Core\Ctl::call('meili.site_sizes', ['prefixes' => array_column($sites, 'prefix')], 60)['sizes'] ?? [];
+                    foreach ($sites as $x) {
+                        $b = (int)($sizes[$x['prefix']] ?? 0);
+                        if ($b >= $meiliMb * 1048576) {
+                            $p['meili:' . $x['name']] = t('notify.m_meili', ['domain' => $x['name'], 'size' => self::size($b)]);
+                        }
+                    }
+                } catch (\Throwable) {
+                }
+            }
+        }
         if (NotifyService::get('notify.r_services') === '1') {
             $p += self::services();
         }

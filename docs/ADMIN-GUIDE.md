@@ -118,6 +118,9 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 * The copied certificate is marked `ssl_transferred`; Let's Encrypt replaces it as soon as DNS points to the new server (no attempt limit).
 * A panel reached under an address other panels cannot use can set `'transfer' => ['base_url' => 'https://panel.example.com']` in config.php.
 
+## Backup restore notes
+* Databases are restored as the database's own user (its password is set to a temporary one for the import and the original hash is put back), with DEFINER clauses removed, so triggers, views and routines are recreated and keep working. The extraction and import run as the hosting account. Before 0.9.1 restoring from the panel failed (wrong helper call) and databases with triggers could not be restored.
+
 ## Cloud backup notes
 * Google Drive uses the `drive.file` scope: the panel sees only the files it uploaded. Connecting runs `rclone authorize` as the panel user on 127.0.0.1:53682 for at most 15 minutes; the user pastes the address the browser ended on.
 * With an encryption password the archive is encrypted by rclone crypt before upload (file names stay readable, content is not). Without the password a backup cannot be restored.
@@ -126,7 +129,8 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 * Add-ons are installed in the background by `bin/havoc-redis-job`, `bin/havoc-meili-install` and `bin/havoc-addon-job` (systemd-run units `havoc-redis-job`, `havoc-meili-install`, `havoc-addon-<name>`); `journalctl -u <unit>` shows the output.
 * Fail2ban settings are written to `/etc/fail2ban/jail.d/havoc.conf` (managed file) and the panel filter to `/etc/fail2ban/filter.d/havoc-panel.conf`. Failed panel logins go to the journal with the identifier `havoc-panel` (`journalctl -t havoc-panel`). Add your own address to the whitelist before testing.
 * Memcached has no authentication: like Redis without a password, every hosting account can reach it on localhost.
-* Redis and Meilisearch are single shared instances bound to localhost; every hosting account can reach localhost, so keep the Redis password and the Meilisearch master key set. Per-account isolation (Redis ACL users, per-tenant indexes) is not implemented.
+* Redis and Meilisearch are single shared instances bound to localhost; every hosting account can reach localhost, so keep the Redis password and the Meilisearch master key set. Redis has no per-account isolation (no ACL users).
+* Per-site search: a site's indexes are named `<domain with . → _>__…` (e.g. `shop_example_com__products`; domains cannot contain `_`, so prefixes never overlap). The panel creates two Meilisearch API keys limited to `<prefix>*`: an admin key (documents, indexes, settings, tasks, stats; cannot create keys or touch other indexes) and a search key. Key values derive from the master key, so a new master key changes every site's keys (the new values are shown on the site page). Backups (with databases) and transfers carry each index's settings and documents (`meili/<index>/settings.json`, `documents.ndjson`), read and written through the Meilisearch API by root; restoring replaces the site's indexes.
 * Meilisearch is installed by `bin/havoc-meili-install` (systemd-run job): latest GitHub release, SHA-256 compared with the digest GitHub publishes for the asset (the install aborts without one), then a hardened `meilisearch.service` (own user, `ProtectSystem=strict`). The vendor's apt repository is not used because it is unsigned (`[trusted=yes]`). Updating Meilisearch to a new version may need a dump/import of the indexes.
 * Firewall: ufw only (no CSF). `fw.enable` always opens SSH ports (from sshd_config), the panel port, 80 and 443 first; those rules can't be deleted from the panel, and the helper rejects banning the admin's own address.
 
@@ -141,6 +145,7 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 ## Panel port, phpMyAdmin, config editors
 * Port change: the panel nginx listens on old + new port, ufw opens the new one, and `havoc-port-revert` (systemd timer, 5 min) switches back unless the change is confirmed from a request that arrived on the new port.
 * phpMyAdmin: `/phpmyadmin/` on the panel port; nginx `auth_request` against the panel session, then phpMyAdmin cookie login with a database user (root not allowed). Files in `/opt/havoc-pma` (root-owned), runs as `havoc-pma` with its own PHP-FPM (prefers PHP 8.3).
+* One-click login ("phpMyAdmin" button at a database or on the site page): the panel asks the helper for a ticket; root creates a temporary MySQL user `hvpma_…` with rights on that one database only (valid 2 hours) and writes a single-use ticket (60 seconds) to `/var/lib/havoc-pma/tickets/`. `/phpmyadmin/havoc-signon.php` (behind the same panel-session check) redeems it into phpMyAdmin's signon server (server 2, session `HavocPmaSSO`). Expired users and tickets are removed hourly (backup timer) and before each new ticket. Existing phpMyAdmin installs get the signon server on upgrade (`havocctl pma.sso_setup`).
 * Per-site Nginx rules live in `/etc/nginx/havoc-custom/<domain>.conf`, included in the site's server block. User rules are parsed and limited to a directive whitelist, because the web server (www-data) belongs to every hosting group and directives like `root`, `alias` or `include` could read other customers' files.
 * MariaDB tuning is written to `/etc/mysql/mariadb.conf.d/90-havoc-tuning.cnf`; a failed restart restores the previous file.
 

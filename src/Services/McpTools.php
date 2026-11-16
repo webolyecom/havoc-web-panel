@@ -110,6 +110,7 @@ final class McpTools
             $t('issue_ssl', 'Request SSL certificate', 'Requests (or retries) a free Let\'s Encrypt certificate for a website. The domain must point to this server.', ['domain' => $domain], ['domain'], true),
             $t('create_database', 'Create database', 'Creates a MariaDB database with its own user and returns the credentials (shown only once).', [
                 'name' => ['type' => 'string', 'description' => 'Short name: 1-16 lowercase letters, digits or _. The full name gets the account prefix (e.g. hv3_shop).'],
+                'domain' => ['type' => 'string', 'description' => 'Optional: the website the database belongs to (shown with the site in the panel).'],
             ], ['name'], true, false),
         ];
     }
@@ -314,9 +315,10 @@ final class McpTools
     private function t_list_databases(array $a): array
     {
         $ids = Scope::userIds($this->user);
-        $rows = $ids === null ? DB::all('SELECT name, user_id FROM db_instances ORDER BY name')
-            : ($ids ? DB::all('SELECT name, user_id FROM db_instances WHERE user_id IN (' . implode(',', array_map('intval', $ids)) . ') ORDER BY name') : []);
-        return ['databases' => array_map(static fn($r) => ['name' => $r['name'], 'user' => $r['name'], 'host' => 'localhost'], $rows)];
+        $sql = 'SELECT i.name, i.user_id, d.name AS site FROM db_instances i LEFT JOIN domains d ON d.id = i.domain_id';
+        $rows = $ids === null ? DB::all("$sql ORDER BY i.name")
+            : ($ids ? DB::all("$sql WHERE i.user_id IN (" . implode(',', array_map('intval', $ids)) . ') ORDER BY i.name') : []);
+        return ['databases' => array_map(static fn($r) => ['name' => $r['name'], 'user' => $r['name'], 'host' => 'localhost', 'site' => $r['site']], $rows)];
     }
 
     private function t_get_app_status(array $a): array
@@ -430,12 +432,14 @@ final class McpTools
     private function t_create_database(array $a): array
     {
         try {
-            $db = DatabaseService::create($this->user, (int)$this->user['id'], (string)($a['name'] ?? ''));
+            $site = !empty($a['domain']) ? $this->d($a) : null;
+            $db = DatabaseService::create($this->user, $site ? (int)$site['user_id'] : (int)$this->user['id'], (string)($a['name'] ?? ''), null, $site ? (int)$site['id'] : null);
         } catch (\DomainException $e) {
             throw new \DomainException(match ($e->getMessage()) {
                 'db.invalid' => 'Name: 1-16 lowercase letters, digits or _.',
                 'db.quota' => 'The database limit of the account package is reached.',
                 'db.exists' => 'A database with this name already exists.',
+                'db.site_invalid' => 'The website must belong to the same account and must not be an alias.',
                 default => $e->getMessage(),
             });
         }

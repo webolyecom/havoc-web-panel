@@ -64,6 +64,7 @@ $chk = static fn(string $v) => $v === '1' ? 'checked' : '';
       <label class="flex items-start gap-2 text-sm"><input type="checkbox" class="mt-0.5" name="r_backup" value="1" <?= $chk($c['r_backup']) ?>><span><?= e(t('notify.r_backup')) ?></span></label>
       <label class="flex items-start gap-2 text-sm"><input type="checkbox" class="mt-0.5" name="r_update" value="1" <?= $chk($c['r_update']) ?>><span><?= e(t('notify.r_update')) ?></span></label>
     </div>
+    <div class="max-w-xs"><label class="label"><?= e(t('notify.r_meili')) ?></label><input class="input" type="number" name="r_meili" min="0" value="<?= e($c['r_meili']) ?>"><p class="mt-1 text-xs text-slate-500"><?= e(t('notify.r_meili_hint')) ?></p></div>
     <div class="grid gap-4 border-t border-slate-100 pt-4 dark:border-slate-800 sm:grid-cols-3">
       <div><label class="label"><?= e(t('notify.repeat')) ?></label><input class="input" type="number" name="repeat" min="0" max="720" value="<?= e($c['repeat']) ?>"><p class="mt-1 text-xs text-slate-500"><?= e(t('notify.repeat_hint')) ?></p></div>
       <div><label class="label"><?= e(t('notify.lang')) ?></label><select class="input" name="lang"><?php foreach (Havoc\Core\I18n::SUPPORTED as $k => $l): ?><option value="<?= e($k) ?>" <?= $c['lang'] === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>

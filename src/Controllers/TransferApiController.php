@@ -58,7 +58,7 @@ final class TransferApiController extends Controller
         return $this->guard(function (array $k) {
             $j = $this->req->json();
             $dbs = array_values(array_filter((array)($j['dbs'] ?? []), 'is_string'));
-            return Response::json(['id' => TransferService::startExport($k, (int)($j['domain_id'] ?? 0), $dbs, !empty($j['ssl']))], 201);
+            return Response::json(['id' => TransferService::startExport($k, (int)($j['domain_id'] ?? 0), $dbs, !empty($j['ssl']), !array_key_exists('search', $j) || !empty($j['search']))], 201);
         });
     }
 

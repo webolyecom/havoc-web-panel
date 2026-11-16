@@ -19,7 +19,7 @@ final class NotifyService
         'notify.telegram' => '0', 'notify.tg_chat' => '',
         'notify.lang' => 'en', 'notify.repeat' => '24', 'notify.recovery' => '1',
         'notify.r_disk' => '90', 'notify.r_mem' => '95', 'notify.r_load' => '0', 'notify.r_services' => '1', 'notify.r_ssl' => '14',
-        'notify.r_update' => '1', 'notify.r_backup' => '1',
+        'notify.r_update' => '1', 'notify.r_backup' => '1', 'notify.r_meili' => '0',
     ];
 
     public static function get(string $k): string
