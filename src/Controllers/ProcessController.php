@@ -26,7 +26,7 @@ final class ProcessController extends Controller
         foreach (DB::all("SELECT u.id, u.username, (SELECT name FROM domains d WHERE d.user_id = u.id AND d.type <> 'alias' ORDER BY d.id LIMIT 1) AS site FROM users u") as $u) {
             $owners['hv' . $u['id']] = ['panel_user' => $u['username'], 'site' => $u['site']];
         }
-        $labels = ['root' => 'system', 'www-data' => 'web server', 'havoc' => 'panel', 'mysql' => 'MariaDB', 'redis' => 'Redis',
+        $labels = ['root' => 'system', 'www-data' => 'web server', 'havoc' => 'panel', 'mysql' => 'MariaDB', 'redis' => 'Redis', 'memcache' => 'Memcached',
             'meilisearch' => 'Meilisearch', 'bind' => 'DNS', 'ftp' => 'FTP', 'nobody' => 'system'];
         foreach ($r['processes'] as &$p) {
             $o = $owners[$p['user']] ?? null;

@@ -99,6 +99,19 @@
     });
   }));
 
+  // Fail2ban: add the visitor's own address to the whitelist field
+  document.querySelectorAll('[data-append-ip]').forEach((b) => b.addEventListener('click', () => {
+    const ta = b.closest('form')?.querySelector('textarea[name="ignoreip"]');
+    if (!ta) return;
+    const list = ta.value.split(/\s+/).filter(Boolean);
+    if (!list.includes(b.dataset.appendIp)) ta.value = [...list, b.dataset.appendIp].join('\n');
+    b.remove();
+  }));
+  // Notifications: pick a Telegram chat found through the bot
+  document.querySelectorAll('[data-set-chat]').forEach((b) => b.addEventListener('click', () => {
+    const f = document.getElementById('tg-chat');
+    if (f) { f.value = b.dataset.setChat; f.focus(); }
+  }));
   // confirm dialogs
   document.addEventListener('submit', (e) => {
     const m = e.target.dataset?.confirm;

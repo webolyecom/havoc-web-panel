@@ -2,6 +2,17 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.8.0] – 2026-11-16
+### Added
+- **Add-ons** menu: Redis, Meilisearch, Memcached, Fail2ban and Node.js in one place, with an overview (installed / running) and a page per add-on. Everything installs and uninstalls in the background with progress on the page.
+- **Memcached**: Debian packages + PHP extension for every PHP version, localhost only with UDP off, cache size and connection settings (with rollback), statistics (memory, items, hit rate, clients), empty cache.
+- **Fail2ban**: protects SSH/SFTP, FTP (Pure-FTPd) and the panel login (failed logins and 2FA codes are written to the journal as `havoc-panel`), optional repeat-offender jail; rules (attempts, time window, ban time), whitelist with "add my address", banned addresses per jail with unban, manual ban. Settings are checked with `fail2ban-client -t` before reloading.
+- **Node.js**: 22, 24 or 26 LTS from the official NodeSource repository, version switch, optional global pm2 / yarn / pnpm.
+- **Notifications** (Server → Notifications): e-mail through any SMTP server (STARTTLS / SSL, own client) and Telegram (bot token, chat ID found automatically). Reports full disks, high memory or load, stopped services (web server, MariaDB, panel, FTP, DNS, add-ons, each site's PHP), SSL certificates about to expire, failed backups and new panel versions. A problem is reported when it is still there on the next check, repeated every N hours and followed by a "resolved" message; test buttons, "check now" and a delivery log. Runs every 5 minutes (`havoc-alerts.timer`, as the panel user).
+### Changed
+- The Redis & Meilisearch page moved to Add-ons (old address redirects).
+- Secrets for notifications (SMTP password, bot token) are stored encrypted.
+
 ## [0.7.2] – 2026-11-16
 ### Added
 - **Redis install / uninstall** from the panel, like Meilisearch: installs the Debian packages in the background (progress shown on the page), sets a memory limit (1/8 of the RAM), LRU eviction and a random password, and the PHP extension (phpredis) for every installed PHP version. Uninstall keeps the configuration and data unless "also delete" is ticked; reinstalling keeps the existing password.

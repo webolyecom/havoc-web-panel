@@ -10,7 +10,7 @@ final class Stack
     private const RINC  = '/etc/redis/havoc.conf';
     private const POLICIES = ['noeviction', 'allkeys-lru', 'allkeys-lfu', 'volatile-lru', 'volatile-lfu', 'allkeys-random', 'volatile-random', 'volatile-ttl'];
 
-    private static function state(string $unit): array
+    public static function state(string $unit): array
     {
         $r = [];
         [, $o] = Sys::run(['systemctl', 'show', $unit, '-p', 'LoadState', '-p', 'ActiveState', '-p', 'UnitFileState']);
@@ -22,7 +22,7 @@ final class Stack
     }
 
     /** State of a background job unit started with systemd-run, plus its last output while it runs or after it failed. */
-    private static function job(string $unit): array
+    public static function job(string $unit): array
     {
         $st = trim(Sys::run(['systemctl', 'show', $unit, '-p', 'ActiveState', '--value'])[1]);
         $log = in_array($st, ['active', 'activating', 'failed'], true)
@@ -30,7 +30,7 @@ final class Stack
         return [$st, $log];
     }
 
-    private static function startJob(string $unit, array $cmd): void
+    public static function startJob(string $unit, array $cmd): void
     {
         [$st] = self::job($unit);
         if (in_array($st, ['active', 'activating'], true)) {
@@ -42,7 +42,7 @@ final class Stack
         Sys::ok(['systemd-run', '--no-block', '--unit=' . $unit, ...$cmd]);
     }
 
-    private static function memMb(): int
+    public static function memMb(): int
     {
         return preg_match('/MemTotal:\s+(\d+)/', (string)file_get_contents('/proc/meminfo'), $m) ? intdiv((int)$m[1], 1024) : 0;
     }

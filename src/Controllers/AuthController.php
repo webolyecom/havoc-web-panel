@@ -61,6 +61,7 @@ final class AuthController extends Controller
             return $this->to(self::next());
         }
         RateLimiter::hit($ip, $u['username']);
+        Auth::logFailure($ip, (string)$u['username']);
         $this->flash('error', t('auth.invalid_code'));
         return $this->to('/login/2fa');
     }

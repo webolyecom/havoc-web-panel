@@ -1,0 +1,121 @@
+#!/bin/bash
+# Installs, changes or removes the optional add-ons Memcached, Fail2ban and Node.js.
+# Started by `havocctl addon.*` through systemd-run (unit havoc-addon-<name>), so the output goes to the journal.
+#   havoc-addon-job memcached install|remove|purge
+#   havoc-addon-job fail2ban  install|remove|purge
+#   havoc-addon-job nodejs    install <major> [global packages...] | remove | purge | globals [packages...]
+set -euo pipefail
+umask 022
+export DEBIAN_FRONTEND=noninteractive
+APT=(apt-get -y -q -o DPkg::Lock::Timeout=300 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+name="${1:-}"; op="${2:-}"; shift 2 || true
+
+php_versions() { for d in /etc/php/*/fpm; do [ -d "$d" ] && basename "$(dirname "$d")"; done; }
+php_ext() {   # php_ext install|remove <extension>
+  for v in $(php_versions); do
+    if [ "$1" = install ]; then
+      apt-cache show "php$v-$2" >/dev/null 2>&1 && { "${APT[@]}" install "php$v-$2" || echo "Note: php$v-$2 could not be installed."; }
+    elif dpkg-query -W -f='${Status}' "php$v-$2" 2>/dev/null | grep -q 'install ok installed'; then
+      "${APT[@]}" remove "php$v-$2" || true
+    fi
+  done
+  # site PHP masters (havoc-fpm-<id>) pick the extension up on restart
+  for u in $(systemctl list-units 'havoc-fpm-*' --state=active --no-legend --plain 2>/dev/null | awk '{print $1}'); do systemctl try-restart "$u" || true; done
+}
+
+case "$name:$op" in
+memcached:install)
+  echo "Installing Memcached..."
+  "${APT[@]}" update >/dev/null || true
+  "${APT[@]}" install memcached libmemcached-tools
+  C=/etc/memcached.conf
+  # localhost only, no UDP (amplification attacks), memory 1/16 of the RAM (64 MB - 1 GB) unless already set by the panel
+  grep -q '^# Managed by Havoc' $C || {
+    mem=$(awk '/MemTotal/{print int($2/1024/16)}' /proc/meminfo); [ "$mem" -lt 64 ] && mem=64; [ "$mem" -gt 1024 ] && mem=1024
+    sed -i -e "s/^-m .*/-m $mem/" -e '/^-l /d' -e '/^-U /d' $C
+    printf '\n# Managed by Havoc WEB Panel\n-l 127.0.0.1\n-U 0\n' >> $C
+  }
+  grep -q '^-c ' $C || echo '-c 1024' >> $C
+  php_ext install memcached
+  systemctl enable memcached >/dev/null 2>&1 || true
+  systemctl restart memcached
+  for i in $(seq 1 20); do
+    if printf 'version\r\nquit\r\n' | timeout 3 bash -c 'exec 3<>/dev/tcp/127.0.0.1/11211; cat >&3; cat <&3' 2>/dev/null | grep -q VERSION; then
+      echo "Memcached $(memcached -V | awk '{print $2}') is running on 127.0.0.1:11211."; exit 0
+    fi
+    sleep 0.5
+  done
+  echo "Memcached was installed but does not answer; check: journalctl -u memcached"; exit 1
+  ;;
+memcached:remove|memcached:purge)
+  systemctl disable --now memcached >/dev/null 2>&1 || true
+  php_ext remove memcached
+  if [ "$op" = purge ]; then "${APT[@]}" purge memcached libmemcached-tools; rm -f /etc/memcached.conf; else "${APT[@]}" remove memcached libmemcached-tools; fi
+  echo "Memcached was removed."
+  ;;
+
+fail2ban:install)
+  echo "Installing Fail2ban..."
+  "${APT[@]}" update >/dev/null || true
+  "${APT[@]}" install fail2ban python3-systemd nftables
+  # the panel writes /etc/fail2ban/jail.d/havoc.conf and the havoc-panel filter (havocctl fail2ban.apply)
+  /opt/havoc/ctl/havocctl fail2ban.apply <<< '{"initial":true}' >/dev/null
+  systemctl enable fail2ban >/dev/null 2>&1 || true
+  systemctl restart fail2ban
+  for i in $(seq 1 20); do
+    if fail2ban-client ping 2>/dev/null | grep -q pong; then
+      echo "Fail2ban $(fail2ban-client --version | grep -oE '[0-9.]+' | head -1) is running. Jails: $(fail2ban-client status | sed -n 's/.*Jail list:\s*//p')"; exit 0
+    fi
+    sleep 0.5
+  done
+  echo "Fail2ban was installed but does not answer; check: journalctl -u fail2ban"; exit 1
+  ;;
+fail2ban:remove|fail2ban:purge)
+  systemctl disable --now fail2ban >/dev/null 2>&1 || true      # stopping also lifts every ban
+  if [ "$op" = purge ]; then
+    "${APT[@]}" purge fail2ban; rm -rf /etc/fail2ban /var/lib/fail2ban /var/log/fail2ban.log*
+  else
+    "${APT[@]}" remove fail2ban
+  fi
+  echo "Fail2ban was removed; all bans were lifted."
+  ;;
+
+nodejs:install)
+  major="${1:-24}"; shift || true
+  [[ "$major" =~ ^(22|24|26)$ ]] || { echo "Unsupported Node.js version: $major"; exit 1; }
+  echo "Installing Node.js $major LTS from NodeSource..."
+  "${APT[@]}" install ca-certificates curl gnupg
+  install -d -m 755 /etc/apt/keyrings
+  curl -fsSL --proto '=https' --tlsv1.2 https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --batch --yes --dearmor -o /etc/apt/keyrings/nodesource.gpg
+  chmod 644 /etc/apt/keyrings/nodesource.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$major.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
+  printf 'Package: nodejs\nPin: origin deb.nodesource.com\nPin-Priority: 600\n' > /etc/apt/preferences.d/nodesource
+  "${APT[@]}" update
+  # another major version (or the distribution's nodejs) installed: remove it first, apt would not downgrade
+  cur=$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || true)
+  if [ -n "$cur" ] && [ "$cur" != "$major" ]; then echo "Replacing Node.js $cur with $major..."; "${APT[@]}" purge nodejs; fi
+  "${APT[@]}" install nodejs
+  node -v | grep -q "^v$major\." || { echo "NodeSource did not provide Node.js $major for this system."; exit 1; }
+  echo "$major" > /etc/havoc/nodejs-major
+  [ "$#" -gt 0 ] && "$0" nodejs globals "$@"
+  echo "Node.js $(node -v), npm $(npm -v) installed."
+  ;;
+nodejs:globals)
+  # keeps exactly the selected global tools among the ones the panel manages
+  for p in pm2 yarn pnpm; do
+    want=0; for a in "$@"; do [ "$a" = "$p" ] && want=1; done
+    have=0; [ -d "/usr/lib/node_modules/$p" ] && have=1
+    if [ $want = 1 ] && [ $have = 0 ]; then echo "npm install -g $p"; npm install -g --no-fund --no-audit "$p"; fi
+    if [ $want = 0 ] && [ $have = 1 ]; then echo "npm uninstall -g $p"; npm uninstall -g "$p"; fi
+  done
+  echo "Global tools: ${*:-none}."
+  ;;
+nodejs:remove|nodejs:purge)
+  "${APT[@]}" purge nodejs
+  rm -f /etc/apt/sources.list.d/nodesource.list /etc/apt/preferences.d/nodesource /etc/apt/keyrings/nodesource.gpg /etc/havoc/nodejs-major
+  [ "$op" = purge ] && rm -rf /usr/lib/node_modules
+  "${APT[@]}" update >/dev/null || true
+  echo "Node.js was removed."
+  ;;
+*) echo "usage: havoc-addon-job memcached|fail2ban|nodejs install|remove|purge ..."; exit 2 ;;
+esac

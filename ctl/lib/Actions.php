@@ -10,7 +10,7 @@ final class Actions
         'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'php.list', 'php.extensions', 'service.list', 'service.control',
         'account.ensure', 'account.delete', 'domain.apply', 'domain.delete',
         'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply', 'proc.list', 'proc.signal',
-        'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'redis.install', 'redis.uninstall', 'redis.key', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
+        'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'redis.install', 'redis.uninstall', 'redis.key', 'addon.overview', 'addon.status', 'addon.install', 'addon.uninstall', 'memcached.set', 'memcached.flush', 'fail2ban.apply', 'fail2ban.ban', 'node.globals', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
         'fw.status', 'fw.enable', 'fw.disable', 'fw.allow', 'fw.ban', 'fw.whitelist', 'fw.preset', 'fw.delete', 'dns.apply', 'dns.delete', 'ftp.create', 'ftp.update', 'ftp.password', 'ftp.delete', 'backup.create', 'backup.restore', 'backup.delete', 'backup.test', 'fs.exec', 'db.create', 'db.drop', 'db.password', 'db.remote', 'db.bind', 'db.info',
     ];
 
@@ -884,6 +884,15 @@ final class Actions
     public function redis_install(array $a): array { return Stack::redisInstall(); }
     public function redis_uninstall(array $a): array { return Stack::redisUninstall($a); }
     public function redis_key(array $a): array { return Stack::redisKey(); }
+    public function addon_overview(array $a): array { return Addons::overview(); }
+    public function addon_status(array $a): array { return Addons::status($a); }
+    public function addon_install(array $a): array { return Addons::install($a); }
+    public function addon_uninstall(array $a): array { return Addons::uninstall($a); }
+    public function memcached_set(array $a): array { return Addons::memcachedSet($a); }
+    public function memcached_flush(array $a): array { return Addons::memcachedFlush(); }
+    public function fail2ban_apply(array $a): array { return Addons::f2bApply($a); }
+    public function fail2ban_ban(array $a): array { return Addons::f2bBan($a); }
+    public function node_globals(array $a): array { return Addons::nodeGlobals($a); }
     public function meili_status(array $a): array { return Stack::meiliStatus(); }
     public function meili_install(array $a): array { return Stack::meiliInstall(); }
     public function meili_uninstall(array $a): array { return Stack::meiliUninstall($a); }

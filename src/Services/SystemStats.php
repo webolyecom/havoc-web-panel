@@ -68,17 +68,6 @@ final class SystemStats
                 $mem[$m[1]] = (int)$m[2] * 1024;
             }
         }
-        $disks = [];
-        foreach (['/' => '/', '/home' => '/home', '/var' => '/var'] as $label => $path) {
-            $t = @disk_total_space($path);
-            $f = @disk_free_space($path);
-            if ($t && $f !== false) {
-                $key = (string)(@stat($path)['dev'] ?? $path);        // same filesystem as one shown before: skip
-                if (!isset($disks[$key])) {
-                    $disks[$key] = ['mount' => $label, 'total' => $t, 'free' => $f, 'pct' => round(100 * ($t - $f) / $t, 1)];
-                }
-            }
-        }
         $mysql = '';
         if (is_executable('/usr/bin/mariadb') || is_executable('/usr/sbin/mariadbd')) {
             $v = (string)@shell_exec('/usr/sbin/mariadbd --version 2>/dev/null');
@@ -89,11 +78,28 @@ final class SystemStats
             'cpu' => $model, 'cores' => max(1, preg_match_all('/^processor\s*:/m', $cpuinfo)),
             'mem_total' => $mem['MemTotal'] ?? 0, 'mem_used' => ($mem['MemTotal'] ?? 0) - ($mem['MemAvailable'] ?? 0),
             'swap_total' => $mem['SwapTotal'] ?? 0, 'swap_used' => ($mem['SwapTotal'] ?? 0) - ($mem['SwapFree'] ?? 0),
-            'disks' => array_values($disks), 'ips' => self::ips(),
+            'disks' => self::disks(), 'ips' => self::ips(),
             'uptime' => (int)explode(' ', (string)@file_get_contents('/proc/uptime'))[0],
             'load' => array_map('floatval', array_slice(explode(' ', (string)@file_get_contents('/proc/loadavg')), 0, 3)),
             'php' => \Havoc\Services\DomainService::phpVersions(), 'mariadb' => $mysql, 'timezone' => date_default_timezone_get(), 'time' => time(),
         ];
+    }
+
+    /** Free space of /, /home and /var (a mount on the same filesystem as one already listed is skipped). */
+    public static function disks(): array
+    {
+        $disks = [];
+        foreach (['/', '/home', '/var'] as $path) {
+            $t = @disk_total_space($path);
+            $f = @disk_free_space($path);
+            if ($t && $f !== false) {
+                $key = (string)(@stat($path)['dev'] ?? $path);
+                if (!isset($disks[$key])) {
+                    $disks[$key] = ['mount' => $path, 'total' => $t, 'free' => $f, 'pct' => round(100 * ($t - $f) / $t, 1)];
+                }
+            }
+        }
+        return array_values($disks);
     }
 
     /** Public addresses of the server's interfaces (private/link-local ones only when there is nothing else). */

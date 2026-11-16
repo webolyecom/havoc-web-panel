@@ -8,7 +8,7 @@ final class Validator
 {
     public const PHP_VERSIONS = ['8.1', '8.2', '8.3', '8.4'];
     public const SERVICES = [
-        'nginx', 'lshttpd', 'lsws', 'mariadb', 'redis-server', 'meilisearch', 'proftpd', 'pure-ftpd',
+        'nginx', 'lshttpd', 'lsws', 'mariadb', 'redis-server', 'meilisearch', 'memcached', 'proftpd', 'pure-ftpd',
         'bind9', 'named', 'cron', 'fail2ban', 'ufw', 'csf', 'lfd', 'havoc-panel-nginx', 'havoc-panel-fpm',
     ];
     public const PROTECTED_SERVICES = ['havoc-panel-nginx', 'havoc-panel-fpm'];   // restart only, never stop

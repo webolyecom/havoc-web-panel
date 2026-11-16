@@ -50,6 +50,13 @@ switch ($cmd) {
         }
         \Havoc\Services\UsageService::scan();
         break;
+    case 'alerts:check':
+        // run by the havoc-alerts timer every 5 minutes
+        $r = \Havoc\Services\AlertService::check();
+        if ($r['sent']) {
+            echo "alerts: {$r['problems']} open problem(s), {$r['sent']} line(s) sent\n";
+        }
+        break;
     case 'ssl:auto':
         \Havoc\Services\SslService::run((int)($argv[2] ?? 0), ($argv[3] ?? '') === 'force');
         break;

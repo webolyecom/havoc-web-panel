@@ -17,7 +17,7 @@ log "Code"
 rm -rf /opt/havoc.old && cp -a /opt/havoc /opt/havoc.old
 rsync -a --delete --exclude node_modules --exclude .git "$SRC/" /opt/havoc/
 chown -R root:root /opt/havoc
-chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-redis-job /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
+chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-redis-job /opt/havoc/bin/havoc-addon-job /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
 chmod 755 /opt/havoc/bin/havoc /opt/havoc/bin/havoc-cronwrap /opt/havoc/ctl/fsworker
 rm -f /opt/havoc/bin/havoc-es-install
 
@@ -60,6 +60,28 @@ echo "Updates come from: https://github.com/$(sed -n 's/^HAVOC_UPDATE_REPO=//p' 
 
 log "Database migrations"
 runuser -u havoc -- php /opt/havoc/bin/havoc migrate
+
+log "Notifications timer (every 5 minutes)"
+cat > /etc/systemd/system/havoc-alerts.service <<UNIT
+[Unit]
+Description=Havoc notifications (server checks)
+[Service]
+Type=oneshot
+User=havoc
+ExecStart=/usr/bin/php /opt/havoc/bin/havoc alerts:check
+TimeoutStartSec=300
+UNIT
+cat > /etc/systemd/system/havoc-alerts.timer <<UNIT
+[Unit]
+Description=Run the Havoc notification checks every 5 minutes
+[Timer]
+OnCalendar=*:0/5
+Persistent=false
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now havoc-alerts.timer >/dev/null 2>&1 || true
 
 log "Restarting the panel"
 systemctl daemon-reload

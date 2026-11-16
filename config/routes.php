@@ -5,6 +5,8 @@ use Havoc\Controllers\AppController;
 use Havoc\Controllers\McpController;
 use Havoc\Controllers\OAuthController;
 use Havoc\Controllers\ProcessController;
+use Havoc\Controllers\AddonController;
+use Havoc\Controllers\NotificationController;
 use Havoc\Controllers\UploadController;
 use Havoc\Controllers\{ApiController, AuthController, BackupController, BrandingController, CronController, DashboardController, DatabaseController, DnsController, DomainController, FileController, FirewallController, FtpController, LimitsController, LogController, PackageController, ServerController, SettingsController, StackController, TrafficController, UserController, WafController, WebServerController};
 use Havoc\Core\Router;
@@ -125,15 +127,24 @@ return static function (Router $r): void {
 
     // Redis / Meilisearch / firewall (admin only). Specific routes first.
     $r->get('/stack', [StackController::class, 'index'], ['admin']);
+    $r->get('/addons', [AddonController::class, 'index'], ['admin']);
+    $r->get('/addons/{name}', [AddonController::class, 'show'], ['admin']);
+    $r->post('/addons/{name}/install', [AddonController::class, 'install'], ['admin']);
+    $r->post('/addons/{name}/uninstall', [AddonController::class, 'uninstall'], ['admin']);
+    $r->post('/addons/{name}/service/{op}', [AddonController::class, 'service'], ['admin']);
+    $r->post('/addons/memcached/settings', [AddonController::class, 'memcachedSave'], ['admin']);
+    $r->post('/addons/memcached/flush', [AddonController::class, 'memcachedFlush'], ['admin']);
+    $r->post('/addons/fail2ban/settings', [AddonController::class, 'f2bSave'], ['admin']);
+    $r->post('/addons/fail2ban/{op}', [AddonController::class, 'f2bBan'], ['admin']);
+    $r->post('/addons/nodejs/globals', [AddonController::class, 'nodeGlobals'], ['admin']);
+    $r->get('/server/notifications', [NotificationController::class, 'index'], ['admin']);
+    $r->post('/server/notifications', [NotificationController::class, 'save'], ['admin']);
+    $r->post('/server/notifications/test/{channel}', [NotificationController::class, 'test'], ['admin']);
+    $r->post('/server/notifications/telegram-chats', [NotificationController::class, 'telegramChats'], ['admin']);
     $r->post('/stack/redis', [StackController::class, 'redisSave'], ['admin']);
-    $r->post('/stack/redis/install', [StackController::class, 'redisInstall'], ['admin']);
-    $r->post('/stack/redis/uninstall', [StackController::class, 'redisUninstall'], ['admin']);
     $r->post('/stack/redis/key', [StackController::class, 'redisKey'], ['admin']);
-    $r->post('/stack/meili/install', [StackController::class, 'meiliInstall'], ['admin']);
-    $r->post('/stack/meili/uninstall', [StackController::class, 'meiliUninstall'], ['admin']);
     $r->post('/stack/meili/configure', [StackController::class, 'meiliConfigure'], ['admin']);
     $r->post('/stack/meili/key/{op}', [StackController::class, 'meiliKey'], ['admin']);
-    $r->post('/stack/svc/{name}/{op}', [StackController::class, 'toggle'], ['admin']);
     $r->get('/firewall', [FirewallController::class, 'index'], ['admin']);
     $r->post('/firewall/allow', [FirewallController::class, 'allow'], ['admin']);
     $r->post('/firewall/ban', [FirewallController::class, 'ban'], ['admin']);

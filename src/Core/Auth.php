@@ -47,6 +47,7 @@ final class Auth
         $ok = password_verify($password, $hash);
         if (!$u || !$ok || $u['status'] !== 'active') {
             RateLimiter::hit($ip, $username);
+            self::logFailure($ip, $username);
             Audit::log('auth.failed', $username, [], ['id' => null, 'username' => $username]);
             return ['invalid', null];
         }
@@ -60,6 +61,22 @@ final class Auth
         }
         self::login($u, $ip);
         return ['ok', $u];
+    }
+
+    /**
+     * Writes a failed login to the system journal (identifier "havoc-panel") for Fail2ban. The address comes first and
+     * the user name is reduced to safe characters, so a crafted user name cannot make Fail2ban ban another address.
+     */
+    public static function logFailure(string $ip, string $username): void
+    {
+        if (filter_var($ip, FILTER_VALIDATE_IP) === false || !function_exists('openlog')) {
+            return;
+        }
+        $user = substr((string)preg_replace('/[^A-Za-z0-9._@-]/', '?', $username), 0, 64);
+        if (@openlog('havoc-panel', LOG_PID, LOG_AUTH)) {
+            @syslog(LOG_WARNING, "Panel login failed from $ip (user: $user)");
+            @closelog();
+        }
     }
 
     public static function login(array $u, string $ip): void
