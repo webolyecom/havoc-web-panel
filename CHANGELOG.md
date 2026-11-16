@@ -2,6 +2,11 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.9.2] – 2026-11-16
+### Changed
+- **New site page**: clicking a domain opens an overview with a summary (PHP, SSL, applications, databases, document root) and icon tiles in groups (Site, PHP, Security, Domains, Data), like cPanel. Each tile opens its own page: Applications (WordPress), PHP version & extensions, PHP settings (php.ini), SSL / TLS, Security & logging, Nginx rules, Aliases, Redirects, Databases, Search and Delete site. Every page has a switcher to the other pages, and saving a form returns to the same page. The overview no longer calls the helper, so it opens faster.
+- Deleting a site has its own page that lists everything that is removed.
+
 ## [0.9.1] – 2026-11-16
 ### Added
 - **Per-site search (Meilisearch)**: on a site's page, "Enable search" gives the site its own index prefix (`shop_example_com__…`) and two API keys that only work for those indexes: an admin key for the site's server code and a search-only key for the browser. Index list with document counts, new keys, disable (optionally deleting the indexes). The indexes (settings and documents) are included in the account's backups (with databases), restored with them, and copied by site transfers (the site gets new keys on the new server). New alert rule: a site's search data above N MB.

@@ -28,13 +28,13 @@ final class AppController extends Controller
         } catch (\Throwable $e) {
             $this->flash('error', $e->getMessage());
         }
-        return $this->to('/domains/' . (int)$d['id'] . '#apps');
+        return $this->to('/domains/' . (int)$d['id'] . '/wordpress');
     }
 
     public function clear(): Response
     {
         $d = $this->domain();
         AppService::clearFailed($d);
-        return $this->to('/domains/' . (int)$d['id'] . '#apps');
+        return $this->to('/domains/' . (int)$d['id'] . '/wordpress');
     }
 }

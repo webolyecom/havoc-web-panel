@@ -89,6 +89,16 @@ $navIcon = static function (string $name): string {
         'logout' => 'M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M12 13.5 15.5 10 12 6.5M15.5 10H8',
         'panel' => 'M3 4h14v12H3zM8 4v12M13 8.5 11.5 10l1.5 1.5',
         'user' => 'M10 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4 17c0-3.3 2.7-5 6-5s6 1.7 6 5',
+        'lock' => 'M5 9h10v8H5zM7.5 9V6.5a2.5 2.5 0 0 1 5 0V9M10 12.25v1.5',
+        'code' => 'M7 6 3 10l4 4M13 6l4 4-4 4M11.5 4.5l-3 11',
+        'link' => 'M8.5 11.5a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-1 1M11.5 8.5a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l1-1',
+        'redirect' => 'M4 16v-6a3.5 3.5 0 0 1 3.5-3.5H16M12.5 3l3.5 3.5-3.5 3.5',
+        'trash' => 'M3.5 6h13M8 6V3.5h4V6M5 6l.8 10.5h8.4L15 6M8.5 9v5M11.5 9v5',
+        'doc' => 'M5 2.5h7l3 3V17.5H5zM12 2.5v3h3M7.5 10h5M7.5 13h5',
+        'wp' => 'M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM5.5 7.5 8 14.5l2-5 2 5 2.5-7',
+        'php' => 'M2.5 10c0-2.8 3.4-5 7.5-5s7.5 2.2 7.5 5-3.4 5-7.5 5-7.5-2.2-7.5-5ZM5.5 12.5l1-5h1.6a1.25 1.25 0 0 1 0 2.5H6.5M12 12.5l1-5h1.6a1.25 1.25 0 0 1 0 2.5H13M9.5 7.5l-1 5M9 10h2.5l-.5 2.5',
+        'external' => 'M11.5 3.5h5v5M16.5 3.5 9 11M14 11.5V16.5H3.5V6H8.5',
+        'arrow-left' => 'M16 10H4M8.5 5.5 4 10l4.5 4.5',
     ][$name] ?? '';
     return '<svg viewBox="0 0 20 20" class="h-[18px] w-[18px] shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' . $p . '"/></svg>';
 };
