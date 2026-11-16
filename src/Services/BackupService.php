@@ -21,6 +21,20 @@ final class BackupService
         return is_array($cfg) ? ['type' => $row['type']] + $cfg : null;
     }
 
+    /** rclone refreshed an OAuth token during a helper call: keep the new one (some services rotate refresh tokens). */
+    public static function keepToken(?int $targetId, array $r): void
+    {
+        if (!$targetId || empty($r['token']) || !is_string($r['token'])) {
+            return;
+        }
+        $cfg = self::targetConfig($targetId);
+        if ($cfg && isset($cfg['token'])) {
+            unset($cfg['type']);
+            $cfg['token'] = $r['token'];
+            DB::q('UPDATE backup_targets SET config_enc = ? WHERE id = ?', [Crypt::encrypt(json_encode($cfg)), $targetId]);
+        }
+    }
+
     private static function dbNames(int $userId): array
     {
         return array_column(DB::all('SELECT name FROM db_instances WHERE user_id = ? ORDER BY name', [$userId]), 'name');
@@ -52,6 +66,7 @@ final class BackupService
         try {
             $r = Ctl::call('backup.create', ['account' => 'hv' . $b['user_id'], 'db_names' => self::dbNames((int)$b['user_id']),
                 'files' => $b['scope'] !== 'db', 'db' => $b['scope'] !== 'files', 'target' => self::targetConfig($b['target_id'] ? (int)$b['target_id'] : null)], self::TIMEOUT);
+            self::keepToken($b['target_id'] ? (int)$b['target_id'] : null, $r);
             DB::update('backups', $id, ['status' => 'done', 'path' => $r['file'], 'size' => $r['size'], 'remote' => (int)$r['remote']]);
             Audit::log('backup.create', $r['file'], [], ['id' => $b['user_id'], 'username' => 'system']);
         } catch (\Throwable $e) {
@@ -69,6 +84,7 @@ final class BackupService
         try {
             $r = Ctl::call('backup.restore', ['account' => 'hv' . $b['user_id'], 'file' => $b['path'], 'files' => $scope !== 'db', 'db' => $scope !== 'files',
                 'db_names' => self::dbNames((int)$b['user_id']), 'target' => self::targetConfig($b['target_id'] ? (int)$b['target_id'] : null)], self::TIMEOUT);
+            self::keepToken($b['target_id'] ? (int)$b['target_id'] : null, $r);
             DB::update('backups', $id, ['status' => 'done', 'note' => substr('restore: ' . implode('; ', $r['log'] ?? []), 0, 500)]);
         } catch (\Throwable $e) {
             DB::update('backups', $id, ['status' => 'done', 'note' => substr('restore failed: ' . $e->getMessage(), 0, 500)]);
@@ -79,8 +95,9 @@ final class BackupService
     {
         if ($b['path']) {
             try {
-                Ctl::call('backup.delete', ['account' => 'hv' . $b['user_id'], 'file' => $b['path'],
+                $r = Ctl::call('backup.delete', ['account' => 'hv' . $b['user_id'], 'file' => $b['path'],
                     'target' => self::targetConfig($b['target_id'] ? (int)$b['target_id'] : null)], 300);
+                self::keepToken($b['target_id'] ? (int)$b['target_id'] : null, $r);
             } catch (\Throwable $e) {
                 error_log('backup delete: ' . $e->getMessage());
             }
@@ -91,6 +108,11 @@ final class BackupService
     /** Called hourly by havoc-backup.timer. */
     public static function runDue(): void
     {
+        try {
+            TransferService::cleanup();                       // export packages older than a day
+        } catch (\Throwable $e) {
+            error_log('transfer cleanup: ' . $e->getMessage());
+        }
         foreach (DB::all('SELECT * FROM backup_jobs WHERE enabled = 1') as $j) {
             $interval = $j['frequency'] === 'weekly' ? 7 * 86400 : 86400 - 1800;
             if ($j['last_run'] && time() - strtotime($j['last_run'] . ' UTC') < $interval) {

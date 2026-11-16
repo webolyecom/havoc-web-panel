@@ -2,6 +2,14 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.9.0] – 2026-11-16
+### Added
+- **Site transfer** (Server → Site transfer): copy sites from another server running Havoc WEB Panel. The old server creates a **transfer key** (one string with its address, a secret and its certificate's public-key pin; valid 1 h – 7 days, all or chosen sites, optionally one IP address, revocable). The new server pastes it, sees the sites with sizes, databases ("used by this site" detected from config files) and checks (domain already here, missing PHP version, disk space, subdomain parent), chooses the owner (same user name, created with the same panel password, or an existing user) and starts. Per site: export on the old server, resumable chunked download with SHA-256 verification, then the site with its PHP and site settings, files, databases (renamed to this account's prefix, users keep their password hashes, triggers and views keep working), config files and WordPress paths updated, aliases, redirects, cron jobs and the SSL certificate (replaced by Let's Encrypt automatically once DNS points here). A failed site is rolled back and can be retried. Nothing is changed or deleted on the old server.
+- **Backups to Google Drive, OneDrive and Dropbox**: connect with your account (rclone's own authorization; paste the address the browser ends on), Google Drive limited to the files the panel creates. Refreshed tokens are saved. "Free space" per target.
+- **Optional encryption** for every remote backup target (rclone crypt, password chosen by you).
+### Changed
+- Database migrations can rebuild tables safely (foreign keys paused and checked).
+
 ## [0.8.0] – 2026-11-16
 ### Added
 - **Add-ons** menu: Redis, Meilisearch, Memcached, Fail2ban and Node.js in one place, with an overview (installed / running) and a page per add-on. Everything installs and uninstalls in the background with progress on the page.

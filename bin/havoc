@@ -50,6 +50,12 @@ switch ($cmd) {
         }
         \Havoc\Services\UsageService::scan();
         break;
+    case 'transfer:export':
+        \Havoc\Services\TransferService::runExport((string)($argv[2] ?? ''));
+        break;
+    case 'transfer:run':
+        \Havoc\Services\TransferService::run((int)($argv[2] ?? 0));
+        break;
     case 'alerts:check':
         // run by the havoc-alerts timer every 5 minutes
         $r = \Havoc\Services\AlertService::check();

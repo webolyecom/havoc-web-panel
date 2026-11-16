@@ -85,9 +85,23 @@ final class DB
         foreach ($files as $f) {
             $n = (int)basename($f);
             if ($n > $v) {
+                $sql = (string)file_get_contents($f);
+                // table rebuilds (SQLite cannot change a CHECK constraint) must not fire ON DELETE actions of other tables
+                $noFk = str_contains($sql, '-- havoc:foreign-keys-off');
+                if ($noFk) {
+                    self::pdo()->exec('PRAGMA foreign_keys=OFF');
+                }
                 self::pdo()->beginTransaction();
-                self::pdo()->exec((string)file_get_contents($f));
+                self::pdo()->exec($sql);
+                if ($noFk && self::pdo()->query('PRAGMA foreign_key_check')->fetch()) {
+                    self::pdo()->rollBack();
+                    self::pdo()->exec('PRAGMA foreign_keys=ON');
+                    throw new \RuntimeException('Migration ' . basename($f) . ' broke a foreign key');
+                }
                 self::pdo()->commit();
+                if ($noFk) {
+                    self::pdo()->exec('PRAGMA foreign_keys=ON');
+                }
                 self::pdo()->exec('PRAGMA user_version = ' . $n);
                 $v = $n;
             }

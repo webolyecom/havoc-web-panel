@@ -85,6 +85,8 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 | Redis (one-click install / uninstall from the Debian packages with the PHP extension, random password by default, show password, used memory / keys / clients, activate/deactivate, maxmemory, eviction policy, AOF, password) and Meilisearch (one-click install from the official release binary with SHA-256 check / uninstall, production mode with master key on 127.0.0.1:7700, indexing memory, show/rotate master key) | ✅ implemented (shared, server-wide) |
 | Memcached (one-click install / uninstall with the PHP extension, localhost only, UDP off, cache size, connections, statistics, empty cache), Fail2ban (SSH/SFTP, FTP, panel login and repeat-offender jails, rules, whitelist, banned list with unban, manual ban), Node.js (22 / 24 / 26 LTS from NodeSource, version switch, global pm2 / yarn / pnpm) — all under Add-ons | ✅ implemented |
 | Notifications by e-mail (own SMTP client) and Telegram: disk, memory, load, stopped services, SSL expiry, failed backups, new release; confirmed on the next check, reminders, resolved messages | ✅ implemented (havoc-alerts.timer, every 5 minutes) |
+| Backups to Google Drive, OneDrive and Dropbox (connected with rclone's own authorization, no app secret in the panel; refreshed tokens are saved), optional rclone crypt encryption for every remote target, free space per target | ✅ implemented |
+| Site transfer between Havoc panels (transfer key = address + secret + certificate pin; files, databases with password hashes, settings, aliases, redirects, cron, SSL; resumable verified download; rollback on failure) | ✅ implemented |
 | Firewall (ufw): open ports/ranges, IP block, whitelist, presets, delete; lock-out protection | ✅ implemented |
 | WAF (ModSecurity v3 + OWASP CRS, Nginx): global off/detect/on, per-domain switch, CRS rule exclusions (global or per domain), structured block rules, tenant-scoped WAF log viewer, one-click component install | ✅ implemented |
 | Resource limits: disk + database size, inodes, monthly bandwidth per account (30-min scanner), 80 % warning banner, optional enforcement (sites answer 503 while over quota); live RAM/CPU per domain; CPU/RAM enforced by cgroups on the FPM units | ✅ implemented |
@@ -109,6 +111,16 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 * Admin sets nameservers and the default server IP under DNS. Customers delegate their domain to those nameservers at the registrar.
 * A host name containing a dot is treated as fully qualified, a single label is relative to the zone, `@` is the zone apex.
 * Not included yet: DNSSEC, secondary/slave zones, NS records for sub-delegation, import/export of zone files.
+
+## Site transfer notes
+* The source panel answers `/transfer/v1/*` only with a valid, unexpired, unrevoked key (optionally locked to one IP address); it can list and export only the sites chosen for the key. Packages are built in `/var/backups/havoc/transfer/<id>/` (files by tar running as the account, `mariadb-dump --single-transaction`) and removed after the download or after 24 hours.
+* The destination downloads into `/var/backups/havoc/incoming/<id>/` in 32 MB ranges, verifies SHA-256, then imports as the receiving account: tar extracts only the domain's folder, the SQL dump (DEFINER clauses removed) is imported with the site's own database user, then the user gets its old password hash back. Database names get this server's prefix (`hv<old>_x` → `hv<new>_x`); config files (wp-config.php, .env, …) are updated, and WordPress paths are fixed with WP-CLI.
+* The copied certificate is marked `ssl_transferred`; Let's Encrypt replaces it as soon as DNS points to the new server (no attempt limit).
+* A panel reached under an address other panels cannot use can set `'transfer' => ['base_url' => 'https://panel.example.com']` in config.php.
+
+## Cloud backup notes
+* Google Drive uses the `drive.file` scope: the panel sees only the files it uploaded. Connecting runs `rclone authorize` as the panel user on 127.0.0.1:53682 for at most 15 minutes; the user pastes the address the browser ended on.
+* With an encryption password the archive is encrypted by rclone crypt before upload (file names stay readable, content is not). Without the password a backup cannot be restored.
 
 ## Redis / Meilisearch / firewall notes
 * Add-ons are installed in the background by `bin/havoc-redis-job`, `bin/havoc-meili-install` and `bin/havoc-addon-job` (systemd-run units `havoc-redis-job`, `havoc-meili-install`, `havoc-addon-<name>`); `journalctl -u <unit>` shows the output.
