@@ -68,12 +68,59 @@ final class Backup
         }
     }
 
-    // ---- remote targets (rclone, configured purely through environment variables) -----------------------------
+    // ---- remote targets (rclone: environment variables; OAuth services through a temporary config file) ----------
 
-    /** @return array{env:array,base:string} */
+    public const OAUTH = ['gdrive' => 'drive', 'onedrive' => 'onedrive', 'dropbox' => 'dropbox'];
+
+    /** A refreshed OAuth token written back by rclone during the last call (the panel stores it). */
+    private static ?string $newToken = null;
+
+    /** @return array{env:array,base:string,conf?:string,root?:string} */
     public static function target(array $t): array
     {
+        $r = self::plainTarget($t);
+        $pass = (string)($t['crypt'] ?? '');
+        if ($pass !== '') {
+            // optional client-side encryption: rclone crypt wrapped around the remote (file names stay readable)
+            if (strlen($pass) < 8 || strlen($pass) > 200 || str_contains($pass, "\0")) {
+                throw new \InvalidArgumentException('Encryption password must be 8-200 characters');
+            }
+            $r['root'] = $r['base'];
+            $r['env'] += ['RCLONE_CONFIG_HVC_TYPE' => 'crypt', 'RCLONE_CONFIG_HVC_REMOTE' => $r['base'],
+                'RCLONE_CONFIG_HVC_PASSWORD' => trim(Sys::ok(['rclone', 'obscure', '-'], $pass)),
+                'RCLONE_CONFIG_HVC_FILENAME_ENCRYPTION' => 'off', 'RCLONE_CONFIG_HVC_DIRECTORY_NAME_ENCRYPTION' => 'false'];
+            $r['base'] = 'HVC:';
+        }
+        return $r;
+    }
+
+    /** @return array{env:array,base:string,conf?:string} */
+    private static function plainTarget(array $t): array
+    {
         $type = $t['type'] ?? '';
+        if (isset(self::OAUTH[$type])) {
+            $path = trim((string)($t['path'] ?? ''), '/');
+            if (!preg_match('#^[A-Za-z0-9._\- /]{1,200}$#D', $path) || str_contains($path, '..')) {
+                throw new \InvalidArgumentException('Invalid folder name');
+            }
+            $tok = json_decode((string)($t['token'] ?? ''), true);
+            if (!is_array($tok) || !is_string($tok['access_token'] ?? null) || strlen((string)$t['token']) > 8192) {
+                throw new \InvalidArgumentException('Not connected: missing or invalid token');
+            }
+            $conf = "[HV]\ntype = " . self::OAUTH[$type] . "\ntoken = " . json_encode($tok, JSON_UNESCAPED_SLASHES) . "\n";
+            if ($type === 'gdrive') {
+                $conf .= "scope = drive.file\n";
+            } elseif ($type === 'onedrive') {
+                $id = (string)($t['drive_id'] ?? '');
+                $dt = (string)($t['drive_type'] ?? '');
+                if (!preg_match('/^[A-Za-z0-9!_.\-]{1,128}$/D', $id) || !in_array($dt, ['personal', 'business', 'documentLibrary'], true)) {
+                    throw new \InvalidArgumentException('Invalid OneDrive drive');
+                }
+                $conf .= "drive_id = $id\ndrive_type = $dt\n";
+            }
+            return ['env' => [], 'base' => 'HV:' . $path, 'conf' => $conf];
+        }
+        $path = (string)($t['path'] ?? '');
         $path = (string)($t['path'] ?? '');
         if (!preg_match('#^[A-Za-z0-9._\-/]{0,200}$#D', $path) || str_contains($path, '..')) {
             throw new \InvalidArgumentException('Invalid remote path');
@@ -140,14 +187,57 @@ final class Backup
     private static function rclone(array $t, array $args, int $timeout = 7200): string
     {
         $r = self::target($t);
-        return Sys::ok(['rclone', '--config', '/dev/null', '--contimeout', '20s', '--low-level-retries', '2', ...array_map(fn($a) => $a === '@BASE' ? $r['base'] : $a, $args)], null, $timeout, $r['env']);
+        $conf = '/dev/null';
+        if (isset($r['conf'])) {
+            // OAuth: rclone refreshes the access token and writes the new one back into this file
+            $conf = '/var/tmp/havoc-rc-' . bin2hex(random_bytes(8)) . '.conf';
+            Sys::write($conf, $r['conf'], 0600);
+        }
+        try {
+            $map = fn($a) => match ($a) { '@BASE' => $r['base'], '@ROOT' => $r['root'] ?? $r['base'], default => $a };
+            return Sys::ok(['rclone', '--config', $conf, '--contimeout', '20s', '--low-level-retries', '3', ...array_map($map, $args)], null, $timeout, $r['env']);
+        } finally {
+            if ($conf !== '/dev/null') {
+                $after = (string)@file_get_contents($conf);
+                @unlink($conf);
+                if (preg_match('/^token = (\{.*\})$/m', $after, $m) && json_decode($m[1], true) && $m[1] !== json_encode(json_decode((string)$t['token'], true), JSON_UNESCAPED_SLASHES)) {
+                    self::$newToken = $m[1];
+                }
+            }
+        }
+    }
+
+    /** Adds a refreshed OAuth token to an action result. */
+    private static function withToken(array $r): array
+    {
+        if (self::$newToken !== null) {
+            $r['token'] = self::$newToken;
+            self::$newToken = null;
+        }
+        return $r;
     }
 
     public static function test(array $t): array
     {
-        self::rclone($t, ['mkdir', '@BASE'], 60);
-        self::rclone($t, ['lsf', '--max-depth', '1', '@BASE'], 60);
-        return [];
+        self::rclone($t, ['mkdir', '@BASE'], 90);
+        self::rclone($t, ['lsf', '--max-depth', '1', '@BASE'], 90);
+        return self::withToken(self::aboutRaw($t));
+    }
+
+    /** Free and used space of the account (not every service reports it). */
+    public static function about(array $t): array
+    {
+        return self::withToken(self::aboutRaw($t));
+    }
+
+    private static function aboutRaw(array $t): array
+    {
+        try {
+            $j = json_decode(self::rclone($t, ['about', '--json', preg_replace('/:.*$/', ':', self::target($t)['root'] ?? self::target($t)['base'])], 60), true);
+        } catch (\Throwable) {
+            return ['about' => null];
+        }
+        return ['about' => is_array($j) ? array_intersect_key($j, array_flip(['total', 'used', 'free', 'trashed'])) : null];
     }
 
     // ---- operations ------------------------------------------------------------------------------------------
@@ -224,7 +314,7 @@ final class Backup
             self::rclone($a['target'], ['copyto', $out, '@BASE/' . $name]);
             $remote = true;
         }
-        return ['file' => $name, 'size' => (int)filesize($out), 'remote' => $remote];
+        return self::withToken(['file' => $name, 'size' => (int)filesize($out), 'remote' => $remote]);
     }
 
     public static function restore(array $a): array
@@ -277,7 +367,7 @@ final class Backup
                 }
             }
         }
-        return ['log' => $log];
+        return self::withToken(['log' => $log]);
     }
 
     public static function delete(array $a): array
@@ -291,6 +381,6 @@ final class Backup
             } catch (\Throwable) {
             }
         }
-        return [];
+        return self::withToken([]);
     }
 }

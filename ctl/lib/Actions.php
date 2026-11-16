@@ -9,9 +9,9 @@ final class Actions
     public const ALLOWED = [
         'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'php.list', 'php.extensions', 'service.list', 'service.control',
         'account.ensure', 'account.delete', 'domain.apply', 'domain.delete',
-        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply', 'proc.list', 'proc.signal',
+        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply', 'proc.list', 'proc.signal', 'transfer.sizes', 'transfer.export', 'transfer.export_delete', 'transfer.stage', 'transfer.import_files', 'transfer.import_db', 'transfer.patch', 'transfer.wp_replace', 'transfer.check',
         'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'redis.install', 'redis.uninstall', 'redis.key', 'addon.overview', 'addon.status', 'addon.install', 'addon.uninstall', 'memcached.set', 'memcached.flush', 'fail2ban.apply', 'fail2ban.ban', 'node.globals', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
-        'fw.status', 'fw.enable', 'fw.disable', 'fw.allow', 'fw.ban', 'fw.whitelist', 'fw.preset', 'fw.delete', 'dns.apply', 'dns.delete', 'ftp.create', 'ftp.update', 'ftp.password', 'ftp.delete', 'backup.create', 'backup.restore', 'backup.delete', 'backup.test', 'fs.exec', 'db.create', 'db.drop', 'db.password', 'db.remote', 'db.bind', 'db.info',
+        'fw.status', 'fw.enable', 'fw.disable', 'fw.allow', 'fw.ban', 'fw.whitelist', 'fw.preset', 'fw.delete', 'dns.apply', 'dns.delete', 'ftp.create', 'ftp.update', 'ftp.password', 'ftp.delete', 'backup.create', 'backup.restore', 'backup.delete', 'backup.test', 'backup.about', 'fs.exec', 'db.create', 'db.drop', 'db.password', 'db.remote', 'db.bind', 'db.info',
     ];
 
     public function webserver_detect(array $a): array
@@ -870,6 +870,7 @@ final class Actions
     public function backup_restore(array $a): array { return Backup::restore($a); }
     public function backup_delete(array $a): array { return Backup::delete($a); }
     public function backup_test(array $a): array { return Backup::test((array)($a['target'] ?? [])); }
+    public function backup_about(array $a): array { return Backup::about((array)($a['target'] ?? [])); }
 
     public function ftp_create(array $a): array { return Ftp::save($a, true); }
     public function ftp_update(array $a): array { return Ftp::save($a, false); }
@@ -884,6 +885,15 @@ final class Actions
     public function redis_install(array $a): array { return Stack::redisInstall(); }
     public function redis_uninstall(array $a): array { return Stack::redisUninstall($a); }
     public function redis_key(array $a): array { return Stack::redisKey(); }
+    public function transfer_sizes(array $a): array { return Transfer::sizes($a); }
+    public function transfer_export(array $a): array { return Transfer::export($a); }
+    public function transfer_export_delete(array $a): array { return Transfer::exportDelete($a); }
+    public function transfer_stage(array $a): array { return Transfer::stage($a); }
+    public function transfer_import_files(array $a): array { return Transfer::importFiles($a); }
+    public function transfer_import_db(array $a): array { return Transfer::importDb($a); }
+    public function transfer_patch(array $a): array { return Transfer::patch($a); }
+    public function transfer_wp_replace(array $a): array { return Transfer::wpReplace($a); }
+    public function transfer_check(array $a): array { return Transfer::check($a); }
     public function addon_overview(array $a): array { return Addons::overview(); }
     public function addon_status(array $a): array { return Addons::status($a); }
     public function addon_install(array $a): array { return Addons::install($a); }

@@ -10,7 +10,7 @@ Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, fi
 from one clean interface, or simply ask Claude to do it. No license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.8.0-0b7fa0.svg)
+![Version](https://img.shields.io/badge/version-0.9.0-0b7fa0.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg)
 ![Debian](https://img.shields.io/badge/Debian-12%20%7C%2013-a81d33.svg)
 ![Status](https://img.shields.io/badge/status-beta-f59e0b.svg)
@@ -75,9 +75,14 @@ Contributions back to the project are very welcome, but never required.
 - **File manager** with a CodeMirror code editor, drag-and-drop chunked uploads (up to 2 GB), zip / tar.gz, search, bulk permissions
 - **Log center**: access, error and PHP logs of every site, live viewer with filters, download and cleanup
 
-### ⏱️ Automation
+### ⏱️ Automation & backups
 - **Cron jobs** with presets, a visual builder, human-readable description and next run times, output logs and *Run now*
-- Scheduled **backups** (files + databases) to local disk, S3, FTP or SFTP, with one-click restore
+- Scheduled **backups** (files + databases) with retention, one-click restore, and copies on **Google Drive, OneDrive, Dropbox**, S3 (Cloudflare R2, Backblaze B2…), FTP or SFTP; optional client-side **encryption**
+
+### 🚚 Site transfer
+- Move sites **from another Havoc server**: paste a transfer key, pick the sites, done
+- Files, databases (users keep their passwords), PHP and site settings, aliases, redirects, cron jobs and the SSL certificate; the owner is created with the same panel password
+- Resumable, checksum-verified download; failed sites are rolled back and can be retried; nothing changes on the old server
 
 </td>
 <td width="50%" valign="top">
@@ -265,8 +270,9 @@ After logging in for the first time:
 4. **Upload your files**: with the *File Manager*, FTP/SFTP accounts or a one-time *Upload link*.
 5. **Protect the server**: *Add-ons → Fail2ban → Install*, then add your own IP address to the whitelist.
 6. **Get alerts**: *Server → Notifications*: enter an SMTP account and/or a Telegram bot, click *Send test*, choose what to report.
-7. **Set up backups**: *Backups*: schedule daily backups to local disk, S3, FTP or SFTP.
-8. **Optional**: install Redis or Memcached for caching, Meilisearch for search, Node.js for build tools, and connect Claude (see above).
+7. **Set up backups**: *Backups*: connect Google Drive, OneDrive or Dropbox (or S3 / FTP / SFTP), then schedule daily backups and choose how many to keep.
+8. **Moving from another Havoc server?** On the old server: *Site transfer → Create transfer key*. On the new one: *Site transfer*, paste the key, pick the sites.
+9. **Optional**: install Redis or Memcached for caching, Meilisearch for search, Node.js for build tools, and connect Claude (see above).
 
 ---
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace Havoc\Controllers;
 
 use Havoc\Core\{Audit, Crypt, Ctl, DB, Response, Scope};
-use Havoc\Services\BackupService;
+use Havoc\Services\{BackupService, CloudAuth};
 
 final class BackupController extends Controller
 {
@@ -33,7 +33,8 @@ final class BackupController extends Controller
         $targets = [];
         foreach (DB::all("SELECT x.*, u.username FROM backup_targets x JOIN users u ON u.id = x.user_id$in ORDER BY x.id", $p) as $t) {
             $cfg = json_decode((string)Crypt::decrypt((string)$t['config_enc']), true) ?: [];
-            $targets[] = ['id' => $t['id'], 'type' => $t['type'], 'label' => $cfg['label'] ?? $t['type'], 'username' => $t['username'], 'user_id' => $t['user_id']];
+            $targets[] = ['id' => $t['id'], 'type' => $t['type'], 'label' => $cfg['label'] ?? $t['type'], 'username' => $t['username'], 'user_id' => $t['user_id'],
+                'encrypted' => !empty($cfg['crypt']), 'path' => (string)($cfg['path'] ?? '')];
         }
         $owners = $u['role'] === 'user' ? [$u] : Scope::users($u);
         if ($u['role'] === 'reseller') {
@@ -107,6 +108,7 @@ final class BackupController extends Controller
             $cfg[$k] = substr($this->req->str($k), 0, 300);
         }
         $cfg['tls'] = (bool)$this->req->post('tls');
+        $cfg['crypt'] = substr((string)$this->req->post('crypt', ''), 0, 200);
         try {
             Ctl::call('backup.test', ['target' => ['type' => $type] + $cfg], 90);      // validate + connect before saving
         } catch (\Throwable $e) {
@@ -117,6 +119,101 @@ final class BackupController extends Controller
         Audit::log('backup.target', $type);
         $this->flash('success', t('common.saved'));
         return $this->to('/backups');
+    }
+
+    // ---- Google Drive / OneDrive / Dropbox ----------------------------------------------------------------------
+
+    public function cloudStart(): Response
+    {
+        $owner = $this->ownerId();
+        $type = $this->req->str('type');
+        if (!isset(CloudAuth::TYPES[$type])) {
+            $this->abort(422);
+        }
+        $crypt = substr((string)$this->req->post('crypt', ''), 0, 200);
+        $path = trim($this->req->str('path', 'Havoc Backups'), '/ ') ?: 'Havoc Backups';
+        if ($crypt !== '' && strlen($crypt) < 8) {
+            $this->flash('error', t('cloud.e_crypt'));
+            return $this->to('/backups#targets');
+        }
+        if (!preg_match('#^[A-Za-z0-9._\- /]{1,200}$#D', $path) || str_contains($path, '..')) {
+            $this->flash('error', t('cloud.e_folder'));
+            return $this->to('/backups#targets');
+        }
+        try {
+            $url = CloudAuth::start($type);
+        } catch (\Throwable $e) {
+            $this->flash('error', $e->getMessage());
+            return $this->to('/backups#targets');
+        }
+        $_SESSION['cloud_pending'] = ['owner' => $owner, 'type' => $type, 'url' => $url, 'label' => mb_substr($this->req->str('label') ?: CloudAuth::TYPES[$type][1], 0, 80),
+            'path' => $path, 'crypt' => $crypt];
+        return $this->to('/backups/cloud');
+    }
+
+    public function cloudPage(): Response
+    {
+        $p = $_SESSION['cloud_pending'] ?? null;
+        if (!$p) {
+            return $this->to('/backups');
+        }
+        return view('backups/cloud', ['p' => $p, 'name' => CloudAuth::TYPES[$p['type']][1]]);
+    }
+
+    public function cloudFinish(): Response
+    {
+        $p = $_SESSION['cloud_pending'] ?? null;
+        if (!$p) {
+            return $this->to('/backups');
+        }
+        try {
+            $token = CloudAuth::finish($this->req->str('address'));
+            $cfg = ['label' => $p['label'], 'path' => $p['path'], 'token' => $token, 'crypt' => $p['crypt']];
+            if ($p['type'] === 'onedrive') {
+                $cfg += CloudAuth::oneDrive($token);
+            }
+            $r = Ctl::call('backup.test', ['target' => ['type' => $p['type']] + $cfg], 120);
+            if (!empty($r['token'])) {
+                $cfg['token'] = $r['token'];
+            }
+        } catch (\Throwable $e) {
+            $this->flash('error', t('backups.target_failed') . ': ' . $e->getMessage());
+            return $this->to('/backups/cloud');
+        }
+        unset($_SESSION['cloud_pending']);
+        DB::insert('backup_targets', ['user_id' => (int)$p['owner'], 'type' => $p['type'], 'config_enc' => Crypt::encrypt(json_encode($cfg))]);
+        Audit::log('backup.target', $p['type']);
+        $this->flash('success', t('cloud.connected', ['name' => CloudAuth::TYPES[$p['type']][1]]) . self::space($r['about'] ?? null));
+        return $this->to('/backups#targets');
+    }
+
+    public function cloudCancel(): Response
+    {
+        unset($_SESSION['cloud_pending'], $_SESSION['cloud_auth']);
+        return $this->to('/backups#targets');
+    }
+
+    private static function space(?array $a): string
+    {
+        if (!$a || !isset($a['total'])) {
+            return '';
+        }
+        return ' ' . t('cloud.space', ['free' => bytes((int)($a['free'] ?? max(0, (int)$a['total'] - (int)($a['used'] ?? 0)))), 'total' => bytes((int)$a['total'])]);
+    }
+
+    /** Free space on the target (shown as a message). */
+    public function targetAbout(): Response
+    {
+        $t = Scope::row($this->user(), 'backup_targets', (int)$this->param('id')) ?? $this->abort(404);
+        try {
+            $r = Ctl::call('backup.about', ['target' => BackupService::targetConfig((int)$t['id'])], 90);
+            BackupService::keepToken((int)$t['id'], $r);
+            $msg = self::space($r['about'] ?? null);
+            $this->flash($msg !== '' ? 'success' : 'error', $msg !== '' ? trim($msg) : t('cloud.no_space_info'));
+        } catch (\Throwable $e) {
+            $this->flash('error', t('backups.target_failed') . ': ' . $e->getMessage());
+        }
+        return $this->to('/backups#targets');
     }
 
     public function targetDelete(): Response

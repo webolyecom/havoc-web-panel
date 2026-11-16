@@ -112,6 +112,15 @@
     const f = document.getElementById('tg-chat');
     if (f) { f.value = b.dataset.setChat; f.focus(); }
   }));
+  // copy a field's value (transfer key)
+  document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+    const f = document.querySelector(b.dataset.copy);
+    if (!f) return;
+    f.select();
+    try { await navigator.clipboard.writeText(f.value); } catch { document.execCommand('copy'); }
+    const old = b.textContent; b.textContent = '✓'; setTimeout(() => { b.textContent = old; }, 1500);
+  }));
+  document.querySelectorAll('[data-select-all]').forEach((f) => f.addEventListener('focus', () => f.select()));
   // confirm dialogs
   document.addEventListener('submit', (e) => {
     const m = e.target.dataset?.confirm;

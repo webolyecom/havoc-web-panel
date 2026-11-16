@@ -29,7 +29,7 @@ final class SslService
     public static function queue(array $d, bool $reset = true, bool $force = false): void
     {
         // automatic runs never replace a custom or Cloudflare certificate; an explicit request ($force) may
-        if ($d['type'] === 'alias' || (!$force && in_array($d['ssl_mode'], ['custom', 'cloudflare'], true))) {
+        if ($d['type'] === 'alias' || (!$force && in_array($d['ssl_mode'], ['custom', 'cloudflare'], true) && empty($d['ssl_transferred']))) {
             return;
         }
         $f = ['ssl_auto' => 'running', 'ssl_auto_note' => null];
@@ -57,7 +57,9 @@ final class SslService
         }
         try {
             $d = DB::one('SELECT * FROM domains WHERE id = ?', [$id]);
-            if (!$d || $d['type'] === 'alias' || $d['status'] !== 'active' || (!$force && in_array($d['ssl_mode'], ['custom', 'cloudflare'], true))) {
+            // a certificate copied from the old server is replaced as soon as DNS points here (no attempt limit for it)
+            $moved = !empty($d['ssl_transferred']);
+            if (!$d || $d['type'] === 'alias' || $d['status'] !== 'active' || (!$force && !$moved && in_array($d['ssl_mode'], ['custom', 'cloudflare'], true))) {
                 return;
             }
             $attempt = (int)$d['ssl_auto_attempts'] + 1;
@@ -69,7 +71,7 @@ final class SslService
             $pre = Ctl::call('ssl.precheck', ['names' => $names], 120)['results'] ?? [];
             $main = $pre[$d['name']] ?? ['ok' => false, 'reason' => 'http_fail'];
             if (empty($main['ok'])) {
-                $mark($attempt >= self::MAX_ATTEMPTS ? 'failed' : 'pending', 'dns:' . ($main['reason'] ?? 'http_fail') . (isset($main['ip']) ? ':' . $main['ip'] : ''));
+                $mark($attempt >= self::MAX_ATTEMPTS && !$moved ? 'failed' : 'pending', 'dns:' . ($main['reason'] ?? 'http_fail') . (isset($main['ip']) ? ':' . $main['ip'] : ''));
                 return;
             }
             $ok = array_values(array_filter($names, fn($n) => !empty($pre[$n]['ok'])));
@@ -77,10 +79,10 @@ final class SslService
             try {
                 Ctl::call('ssl.letsencrypt', ['domain' => $d['name'], 'aliases' => array_values(array_diff($ok, [$d['name']])), 'email' => self::email($d)], 300);
             } catch (\Throwable $e) {
-                $mark($attempt >= 3 ? 'failed' : 'pending', $e->getMessage());   // real ACME errors: few retries (rate limits)
+                $mark($attempt >= 3 && !$moved ? 'failed' : 'pending', $e->getMessage());   // real ACME errors: few retries (rate limits)
                 return;
             }
-            $fields = ['ssl_mode' => 'letsencrypt'];
+            $fields = ['ssl_mode' => 'letsencrypt', 'ssl_transferred' => 0];
             if (self::autoHttps() && !$d['force_https']) {
                 $fields['force_https'] = 1;
             }

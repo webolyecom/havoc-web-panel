@@ -83,6 +83,11 @@ final class AppInstaller
         return ['version' => $run(['core', 'version']), 'url' => $url, 'admin_url' => $url . '/wp-admin/', 'locale' => $locale];
     }
 
+    public static function wpcliPath(): string
+    {
+        return self::wpcli();
+    }
+
     /** WP-CLI phar, refreshed weekly, verified against the published SHA-512. */
     private static function wpcli(): string
     {

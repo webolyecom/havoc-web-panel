@@ -67,18 +67,39 @@ $targetSel = function () use ($targets) {
   <?php if (!$backups): ?><tr><td colspan="7" class="py-8 text-center text-slate-400"><?= e(t('common.empty')) ?></td></tr><?php endif; ?>
   </tbody></table></div>
 
-<h2 class="h2 mb-3 mt-8"><?= e(t('backups.targets')) ?></h2>
-<div class="card mb-4 space-y-2">
+<h2 class="h2 mb-1 mt-8" id="targets"><?= e(t('backups.targets')) ?></h2>
+<p class="mb-3 max-w-3xl text-sm text-slate-500"><?= e(t('cloud.targets_intro')) ?></p>
+<?php $typeNames = ['gdrive' => 'Google Drive', 'onedrive' => 'OneDrive', 'dropbox' => 'Dropbox', 's3' => 'S3', 'ftp' => 'FTP', 'sftp' => 'SFTP']; ?>
+<div class="card mb-4 divide-y divide-slate-100 p-0 dark:divide-slate-800">
   <?php foreach ($targets as $x): ?>
-    <form method="post" action="/backups/targets/<?= (int)$x['id'] ?>/delete" class="flex items-center justify-between text-sm" data-confirm="<?= e(t('common.confirm')) ?>"><?= csrf_field() ?>
-      <span><?= e($x['label']) ?> <span class="badge badge-ok"><?= e($x['type']) ?></span> <span class="text-slate-400"><?= e($x['username']) ?></span></span>
-      <button class="btn-ghost text-xs text-red-600"><?= e(t('common.delete')) ?></button></form>
+    <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
+      <span><span class="font-medium"><?= e($x['label']) ?></span> <span class="badge badge-ok"><?= e($typeNames[$x['type']] ?? $x['type']) ?></span>
+        <?php if ($x['encrypted']): ?><span class="badge bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">🔒 <?= e(t('cloud.encrypted')) ?></span><?php endif; ?>
+        <?php if ($x['path'] !== ''): ?><span class="font-mono text-xs text-slate-400"><?= e($x['path']) ?></span><?php endif; ?>
+        <span class="text-slate-400"><?= e($x['username']) ?></span></span>
+      <span class="flex gap-1">
+        <form method="post" action="/backups/targets/<?= (int)$x['id'] ?>/about"><?= csrf_field() ?><button class="btn-ghost text-xs"><?= e(t('cloud.check_space')) ?></button></form>
+        <form method="post" action="/backups/targets/<?= (int)$x['id'] ?>/delete" data-confirm="<?= e(t('common.confirm')) ?>"><?= csrf_field() ?><button class="btn-ghost text-xs text-red-600"><?= e(t('common.delete')) ?></button></form>
+      </span></div>
   <?php endforeach; ?>
-  <?php if (!$targets): ?><p class="text-sm text-slate-400"><?= e(t('common.empty')) ?></p><?php endif; ?>
+  <?php if (!$targets): ?><p class="px-5 py-4 text-sm text-slate-400"><?= e(t('common.empty')) ?></p><?php endif; ?>
+</div>
+<?php $cryptField = '<div><label class="label">' . e(t('cloud.crypt')) . ' <span class="text-slate-400">(' . e(t('backups.optional')) . ')</span></label><input class="input" type="password" name="crypt" minlength="8" autocomplete="new-password" placeholder="' . e(t('cloud.crypt_ph')) . '"><p class="mt-1 text-xs text-slate-500">' . e(t('cloud.crypt_hint')) . '</p></div>'; ?>
+<div class="mb-4 grid gap-4 lg:grid-cols-3">
+<?php foreach (['gdrive' => ['Google Drive', 'cloud.free_gdrive'], 'onedrive' => ['OneDrive', 'cloud.free_onedrive'], 'dropbox' => ['Dropbox', 'cloud.free_dropbox']] as $type => [$title, $free]): ?>
+  <details class="card"><summary class="cursor-pointer font-semibold">+ <?= e($title) ?> <span class="ml-1 text-xs font-normal text-slate-500"><?= e(t($free)) ?></span></summary>
+    <form method="post" action="/backups/cloud" class="mt-3 space-y-2"><?= csrf_field() ?><input type="hidden" name="type" value="<?= $type ?>">
+      <?= $ownerSel() ?>
+      <div><label class="label"><?= e(t('common.name')) ?></label><input class="input" name="label" value="<?= e($title) ?>" required></div>
+      <div><label class="label"><?= e(t('cloud.folder')) ?></label><input class="input" name="path" value="Havoc Backups"></div>
+      <?= $cryptField ?>
+      <button class="btn"><?= e(t('cloud.connect', ['name' => $title])) ?></button>
+    </form></details>
+<?php endforeach; ?>
 </div>
 <div class="grid gap-4 lg:grid-cols-3">
 <?php foreach (['sftp' => 'SFTP', 'ftp' => 'FTP', 's3' => 'S3'] as $type => $title): ?>
-  <details class="card"><summary class="cursor-pointer font-semibold">+ <?= e($title) ?></summary>
+  <details class="card"><summary class="cursor-pointer font-semibold">+ <?= e($title) ?><?php if ($type === 's3'): ?> <span class="ml-1 text-xs font-normal text-slate-500"><?= e(t('cloud.s3_hint')) ?></span><?php endif; ?></summary>
     <form method="post" action="/backups/targets" class="mt-3 space-y-2"><?= csrf_field() ?><input type="hidden" name="type" value="<?= $type ?>">
       <?= $ownerSel() ?>
       <input class="input" name="label" placeholder="<?= e(t('common.name')) ?>" required>
@@ -96,6 +117,7 @@ $targetSel = function () use ($targets) {
         <input class="input" name="path" placeholder="/backups">
         <?php if ($type === 'ftp'): ?><label class="flex items-center gap-2 text-sm"><input type="checkbox" name="tls" value="1"> <?= e(t('backups.tls')) ?></label><?php endif; ?>
       <?php endif; ?>
+      <?= $cryptField ?>
       <button class="btn"><?= e(t('backups.test_save')) ?></button>
     </form></details>
 <?php endforeach; ?>
