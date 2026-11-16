@@ -6,8 +6,8 @@
 
 **A modern, secure and completely free web hosting control panel for Debian 12 & 13.**
 
-Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, firewall and more
-from one clean interface, with no license fees, ever.
+Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, firewall, add-ons and alerts
+from one clean interface, or simply ask Claude to do it. No license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
 ![Version](https://img.shields.io/badge/version-0.8.0-0b7fa0.svg)
@@ -20,6 +20,7 @@ from one clean interface, with no license fees, ever.
 [Features](#-features) ·
 [Screenshots](#-screenshots) ·
 [Installation](#-installation) ·
+[First steps](#-first-steps) ·
 [Documentation](docs/ADMIN-GUIDE.md) ·
 [Contributing](CONTRIBUTING.md)
 
@@ -53,8 +54,9 @@ Contributions back to the project are very welcome, but never required.
 
 ### 🤖 Manage your sites by talking to Claude
 - Built-in **Claude connector** (MCP): add it in Claude and say *"add example.com and install WordPress"* or *"publish this page on my site"*
-- Claude adds sites, installs WordPress, writes files, requests SSL, creates databases, reads logs, all with your panel login and rights, never deleting anything
-- Every action in the audit log; end the connection any time
+- Claude adds sites, installs WordPress, writes and edits files, requests SSL, creates databases and reads logs, with your panel login and rights, and never deletes anything
+- **One-time upload links** for big or private code: the zip goes straight from your browser to the server, never through Claude
+- Every change keeps the previous file version; every action is in the audit log
 
 ### 🌐 Websites
 - Domains, subdomains, addon domains, aliases (parked) and redirects
@@ -70,36 +72,41 @@ Contributions back to the project are very welcome, but never required.
 - Automatic rollback if the new server does not answer
 
 ### 📁 Files & logs
-- Advanced **file manager** with a CodeMirror code editor, drag-and-drop chunked uploads (up to 2 GB), zip / tar.gz, search, bulk permissions
+- **File manager** with a CodeMirror code editor, drag-and-drop chunked uploads (up to 2 GB), zip / tar.gz, search, bulk permissions
 - **Log center**: access, error and PHP logs of every site, live viewer with filters, download and cleanup
 
 ### ⏱️ Automation
-- **Cron jobs** with presets (every minute, 5 / 15 / 30 min, hourly…), a visual builder, human-readable description and next run times, output logs and *Run now*
+- **Cron jobs** with presets, a visual builder, human-readable description and next run times, output logs and *Run now*
 - Scheduled **backups** (files + databases) to local disk, S3, FTP or SFTP, with one-click restore
 
 </td>
 <td width="50%" valign="top">
 
-### 🗄️ Databases & services
-- MariaDB databases and users, remote access per database
-- One-click **phpMyAdmin** (latest release, behind the panel login)
+### 🧩 Add-ons (one-click install / uninstall)
+- **Redis**: memory limit, eviction policy, persistence, random password, PHP extension
+- **Meilisearch**: official release with checksum check, master key, indexing memory
+- **Memcached**: cache size, connections, statistics, empty cache, PHP extension
+- **Fail2ban**: protects SSH/SFTP, FTP and the panel login; rules, whitelist, ban / unban from the panel
+- **Node.js**: 22 / 24 / 26 LTS from NodeSource, version switch, pm2 / yarn / pnpm
+
+### 🔔 Monitoring & notifications
+- **Dashboard** with the server's IP addresses, OS, live CPU, load, network, memory and free disk
+- **Processes** page: live list with per-user totals; end runaway processes of hosting accounts
+- **Alerts by e-mail (SMTP) and Telegram**: full disks, high memory or load, stopped services, expiring SSL certificates, failed backups, new panel versions; reminders and "resolved" messages
+- Server monitor, service control, resource limits, traffic statistics with CSV export
+
+### 🗄️ Databases, DNS & FTP
+- MariaDB databases and users, remote access per database, one-click **phpMyAdmin**
 - **MariaDB performance tuning** with RAM-based profiles and automatic rollback
-- **Add-ons**, one-click install / uninstall with their own settings pages: **Redis**, **Meilisearch**, **Memcached**, **Node.js** (LTS from NodeSource, pm2 / yarn / pnpm)
+- Authoritative **DNS** (BIND9) with record validation
+- **FTP** (Pure-FTPd, TLS) and **SFTP** (chrooted) accounts
 
 ### 🔐 Security
 - Admin / reseller / user roles with strict tenant isolation
 - **Two-factor authentication (TOTP)**, brute-force protection, audit log
 - CSRF protection, strict Content-Security-Policy, prepared statements, Argon2id
 - **ModSecurity WAF** with OWASP CRS, **firewall** (ufw) with lock-out protection
-- **Fail2ban** add-on: bans addresses that keep failing SSH, FTP or panel logins; ban / unban and whitelist from the panel
 - Privileged actions run through a small, whitelisted root helper; the web panel itself runs unprivileged
-
-### 📡 DNS, FTP & monitoring
-- Authoritative **DNS** (BIND9) with record validation
-- **FTP** (Pure-FTPd, TLS) and **SFTP** (chrooted) accounts
-- Server overview on the dashboard (IP addresses, OS, CPU, memory, free disk), live process list with ending of runaway account processes
-- Server monitor, service control, resource limits, traffic statistics with CSV export
-- **Notifications by e-mail (SMTP) and Telegram**: full disks, high memory or load, stopped services, expiring SSL certificates, failed backups, new panel versions — with reminders and "resolved" messages
 
 ### 🏢 For hosting companies
 - **Resellers**, hosting packages with CPU / RAM / disk / bandwidth limits
@@ -118,24 +125,32 @@ Contributions back to the project are very welcome, but never required.
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/domain.png" alt="Domain settings"><br><sub><b>Domain settings</b>: PHP version, OPcache, extensions, SSL and security in one place.</sub></td>
+<td width="50%"><img src="docs/screenshots/addons.png" alt="Add-ons"><br><sub><b>Add-ons</b>: Redis, Meilisearch, Memcached, Fail2ban and Node.js, installed and removed with one click.</sub></td>
+<td width="50%"><img src="docs/screenshots/fail2ban.png" alt="Fail2ban"><br><sub><b>Fail2ban</b>: protection for SSH, FTP and the panel login, with ban list, unban and whitelist.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/notifications.png" alt="Notifications"><br><sub><b>Notifications</b>: e-mail and Telegram alerts for disks, services, SSL, backups and updates.</sub></td>
+<td width="50%"><img src="docs/screenshots/processes.png" alt="Processes"><br><sub><b>Processes</b>: live process list with per-user totals; end runaway account processes.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/claude-connector.png" alt="Claude connector"><br><sub><b>Claude connector</b>: approve Claude once, then manage your sites by chatting.</sub></td>
+<td width="50%"><img src="docs/screenshots/redis.png" alt="Add-on settings"><br><sub><b>Add-on settings</b>: every add-on has its own page with status and settings.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/domain.png" alt="Domain settings"><br><sub><b>Domain settings</b>: PHP version, OPcache, extensions, SSL, WordPress and security in one place.</sub></td>
 <td width="50%"><img src="docs/screenshots/domain-dark.png" alt="Dark theme"><br><sub><b>Dark theme</b>: every page, remembered per user.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/file-manager.png" alt="File manager"><br><sub><b>File manager</b>: upload, edit, compress, extract and set permissions.</sub></td>
-<td><img src="docs/screenshots/code-editor.png" alt="Code editor"><br><sub><b>Code editor</b>: syntax highlighting, <kbd>Ctrl</kbd>+<kbd>S</kbd> to save.</sub></td>
+<td width="50%"><img src="docs/screenshots/file-manager.png" alt="File manager"><br><sub><b>File manager</b>: upload, edit, compress, extract and set permissions.</sub></td>
+<td width="50%"><img src="docs/screenshots/code-editor.png" alt="Code editor"><br><sub><b>Code editor</b>: syntax highlighting, <kbd>Ctrl</kbd>+<kbd>S</kbd> to save.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/web-server.png" alt="Web server selection"><br><sub><b>Web server selection</b>: Nginx, OpenLiteSpeed or LiteSpeed Enterprise.</sub></td>
-<td><img src="docs/screenshots/log-viewer.png" alt="Log viewer"><br><sub><b>Live log viewer</b>: access, error and PHP logs with filters.</sub></td>
+<td width="50%"><img src="docs/screenshots/web-server.png" alt="Web server selection"><br><sub><b>Web server selection</b>: Nginx, OpenLiteSpeed or LiteSpeed Enterprise.</sub></td>
+<td width="50%"><img src="docs/screenshots/log-viewer.png" alt="Live log viewer"><br><sub><b>Live log viewer</b>: access, error and PHP logs with filters.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/cron.png" alt="Cron jobs"><br><sub><b>Cron jobs</b>: presets, schedule builder and next run times.</sub></td>
-<td><img src="docs/screenshots/mariadb-tuning.png" alt="MariaDB tuning"><br><sub><b>MariaDB tuning</b>: profiles calculated from the server's memory.</sub></td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/redis-meilisearch.png" alt="Redis and Meilisearch"><br><sub><b>Redis & Meilisearch</b>: one-click install and configuration.</sub></td>
-<td><img src="docs/screenshots/login.png" alt="Login"><br><sub><b>Login</b>: with optional two-factor authentication.</sub></td>
+<td width="50%"><img src="docs/screenshots/cron.png" alt="Cron jobs"><br><sub><b>Cron jobs</b>: presets, schedule builder and next run times.</sub></td>
+<td width="50%"><img src="docs/screenshots/mariadb-tuning.png" alt="MariaDB tuning"><br><sub><b>MariaDB tuning</b>: profiles calculated from the server's memory.</sub></td>
 </tr>
 </table>
 
@@ -158,6 +173,7 @@ Havoc WEB Panel is also an [MCP](https://modelcontextprotocol.io) server, so Cla
 **What Claude can do:** list and inspect sites, search code, read files (or just some lines), edit files by changing only the relevant text, write one or many files, extract an uploaded zip / tar.gz, download a file from an https link into a site, undo its own changes (file history), read logs, add domains and subdomains, install WordPress, request SSL, change PHP version / HTTPS redirect, create databases.
 
 **Keeping it cheap:** for large or private code, ask Claude for an *upload link*: you drop the zip into that page in your browser, it goes straight to the server, and Claude extracts it. The files never pass through Claude. For changes, Claude searches, reads only the lines it needs and edits just those; every changed file keeps its previous version.
+
 **What Claude cannot do:** delete websites, databases or files. It acts with the rights of the panel user who approved it, so a customer's connection only reaches that customer's sites. Every action is written to the audit log; connections are listed and can be ended under **Settings → Claude connector**, and the administrator can switch the connector off for the whole panel.
 
 Technically: Streamable HTTP MCP endpoint at `/mcp`, OAuth 2.1 with dynamic client registration and PKCE (S256), rotating refresh tokens, tokens stored as hashes.
@@ -171,7 +187,7 @@ Technically: Streamable HTTP MCP endpoint at `/mcp`, OAuth 2.1 with dynamic clie
 | **Operating system** | A fresh **Debian 12 (Bookworm)** or **Debian 13 (Trixie)** server |
 | **Access** | `root` (or a user with `sudo`) |
 | **Hardware** | 64-bit x86_64 (arm64 is expected to work but is less tested). 1 GB RAM minimum, 2 GB or more recommended |
-| **Network** | A public IPv4 address. Ports 80 and 443 (websites) and 2087 (panel) must be reachable |
+| **Network** | A public IPv4 address. Ports 80 and 443 (websites, and the panel under its own host name) and 2087 (panel) must be reachable |
 
 > ⚠️ Install the panel on a **clean server**. It configures Nginx, PHP-FPM, MariaDB, BIND9, Pure-FTPd, ufw and other services and is not meant to be added to a server that already hosts websites with another panel.
 
@@ -239,6 +255,21 @@ Every update keeps your configuration, encryption key, certificates, database an
 
 ---
 
+## 👣 First steps
+
+After logging in for the first time:
+
+1. **Secure your account**: *Settings* → change the password and turn on **two-factor authentication**.
+2. **Give the panel a name**: *Panel settings → Panel address and certificate*: enter a host name such as `panel.example.com` (A record pointing to the server) and click *Get certificate*. The panel is then reachable at `https://panel.example.com` with a trusted certificate (needed for the Claude connector).
+3. **Add a website**: *Domains → Add domain*. Point the domain's DNS to the server; a Let's Encrypt certificate is requested automatically. On the domain page choose the PHP version or click **Install WordPress**.
+4. **Upload your files**: with the *File Manager*, FTP/SFTP accounts or a one-time *Upload link*.
+5. **Protect the server**: *Add-ons → Fail2ban → Install*, then add your own IP address to the whitelist.
+6. **Get alerts**: *Server → Notifications*: enter an SMTP account and/or a Telegram bot, click *Send test*, choose what to report.
+7. **Set up backups**: *Backups*: schedule daily backups to local disk, S3, FTP or SFTP.
+8. **Optional**: install Redis or Memcached for caching, Meilisearch for search, Node.js for build tools, and connect Claude (see above).
+
+---
+
 ## 🏗️ How it works
 
 ```
@@ -249,7 +280,9 @@ Browser ──HTTPS──▶ havoc-panel-nginx ──▶ havoc-panel-fpm  (user 
                                          havocctl (root helper, strict validation)
                                               ├── web server driver: Nginx │ OpenLiteSpeed │ LiteSpeed
                                               ├── PHP-FPM master per site (own Linux user, cgroup limits)
-                                              └── MariaDB, BIND9, Pure-FTPd, ufw, certbot, …
+                                              └── MariaDB, BIND9, Pure-FTPd, ufw, certbot, add-ons, …
+
+havoc-alerts.timer (every 5 min, user "havoc") ──▶ server checks ──▶ e-mail / Telegram
 ```
 
 - The panel is plain **PHP 8.2+ without a framework**, with **SQLite** for its own data and **Tailwind CSS** for the interface.
