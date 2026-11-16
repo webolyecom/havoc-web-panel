@@ -29,6 +29,9 @@ return static function (Router $r): void {
     $r->post('/domains', [DomainController::class, 'store'], ['auth']);
     $r->post('/domains/settings', [DomainController::class, 'settings'], ['admin']);
     $r->get('/domains/{id}', [DomainController::class, 'show'], ['auth']);
+    foreach (DomainController::SECTIONS as $sec) {
+        $r->get('/domains/{id}/' . $sec, [DomainController::class, 'section'], ['auth']);
+    }
     $r->post('/domains/{id}/php', [DomainController::class, 'php'], ['auth']);
     $r->post('/domains/{id}/security', [DomainController::class, 'security'], ['auth']);
     $r->post('/domains/{id}/php-ini', [DomainController::class, 'phpIni'], ['auth']);

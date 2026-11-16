@@ -86,7 +86,7 @@ final class DatabaseController extends Controller
     private function back(): Response
     {
         $from = (int)$this->req->post('from_domain', 0);
-        return $this->to($from && Scope::domain($this->user(), $from) ? "/domains/$from#databases" : '/databases');
+        return $this->to($from && Scope::domain($this->user(), $from) ? "/domains/$from/databases" : '/databases');
     }
 
     public function site(): Response

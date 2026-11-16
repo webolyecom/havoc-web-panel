@@ -10,7 +10,7 @@ Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, fi
 from one clean interface, or simply ask Claude to do it. No license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.9.1-0b7fa0.svg)
+![Version](https://img.shields.io/badge/version-0.9.2-0b7fa0.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg)
 ![Debian](https://img.shields.io/badge/Debian-12%20%7C%2013-a81d33.svg)
 ![Status](https://img.shields.io/badge/status-beta-f59e0b.svg)
@@ -143,8 +143,8 @@ Contributions back to the project are very welcome, but never required.
 <td width="50%"><img src="docs/screenshots/redis.png" alt="Add-on settings"><br><sub><b>Add-on settings</b>: every add-on has its own page with status and settings.</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/domain.png" alt="Domain settings"><br><sub><b>Domain settings</b>: PHP version, OPcache, extensions, SSL, WordPress and security in one place.</sub></td>
-<td width="50%"><img src="docs/screenshots/domain-dark.png" alt="Dark theme"><br><sub><b>Dark theme</b>: every page, remembered per user.</sub></td>
+<td width="50%"><img src="docs/screenshots/domain.png" alt="Domain settings"><br><sub><b>Site page</b>: a summary and one icon per settings page (files, logs, WordPress, PHP, SSL, security, Nginx rules, aliases, redirects, databases, search).</sub></td>
+<td width="50%"><img src="docs/screenshots/domain-dark.png" alt="Dark theme"><br><sub><b>Dark theme</b>: every page, remembered per user (here: a site's PHP page with the page switcher).</sub></td>
 </tr>
 <tr>
 <td width="50%"><img src="docs/screenshots/file-manager.png" alt="File manager"><br><sub><b>File manager</b>: upload, edit, compress, extract and set permissions.</sub></td>

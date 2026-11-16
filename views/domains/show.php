@@ -1,9 +1,50 @@
-<?php use Havoc\Core\I18n; ?>
-<?php $id = (int)$d['id']; ?>
-<div class="mb-6 flex items-center justify-between">
-  <h1 class="h1 mb-0"><?= e($d['name']) ?></h1>
-  <span class="flex gap-2"><form method="post" action="/domains/<?= $id ?>/upload-link"><?= csrf_field() ?><button class="btn-ghost border border-slate-300 dark:border-slate-700"><?= e(t('upload.make_link')) ?></button></form><a class="btn" href="/domains/<?= $id ?>/files"><?= e(t('files.title')) ?></a><a class="btn" href="/domains/<?= $id ?>/logs"><?= e(t('domains.logs')) ?></a></span>
+<?php
+require __DIR__ . '/../_nav.php';        // $navIcon
+require __DIR__ . '/_sections.php';      // $siteSections, $siteHref
+$id = (int)$d['id'];
+[$sslCls, $sslTxt] = Havoc\Services\SslService::describe($d);
+$https = $d['ssl_mode'] !== 'none';
+$url = ($https ? 'https://' : 'http://') . $d['name'];
+$on = static fn(bool $b): string => $b ? t('dsec.on') : t('dsec.off');
+$flags = array_keys(array_filter(['HTTPS' => $d['force_https'], 'HSTS' => $d['hsts'], 'WAF' => $d['waf']]));
+// short status per tile: [text, badge class or '']
+$status = [
+    'files' => [t('dsec.d_files'), ''],
+    'logs' => [$d['logs_enabled'] ? t('dsec.d_logs') : t('dsec.logs_off'), ''],
+    'wordpress' => match ($app['status'] ?? null) {
+        'installed' => ['WordPress ' . (string)$app['version'], 'badge-ok'],
+        'installing' => [t('app.st_installing'), 'badge-warn'],
+        'failed' => [t('app.st_failed'), 'badge-err'],
+        default => [t('dsec.d_wordpress'), ''],
+    },
+    'php' => ['PHP ' . $d['php_version'] . ' · OPcache ' . $on((bool)$d['opcache_enabled']), ''],
+    'php-ini' => [$counts['ini'] ? t('dsec.n_changed', ['n' => $counts['ini']]) : t('dsec.defaults'), ''],
+    'ssl' => $https ? [$d['ssl_mode'] === 'letsencrypt' ? "Let's Encrypt" : ucfirst($d['ssl_mode']), 'badge-ok']
+        : [$sslTxt !== '' ? $sslTxt : t('dsec.no_cert'), 'badge-warn'],
+    'security' => [$flags ? implode(' · ', $flags) : t('dsec.d_security'), ''],
+    'nginx' => [$counts['rules'] ? t('dsec.n_rules', ['n' => $counts['rules']]) : t('dsec.none'), ''],
+    'aliases' => [$counts['aliases'] ? t('dsec.n_aliases', ['n' => $counts['aliases']]) : t('dsec.none'), ''],
+    'redirects' => [$counts['redirects'] ? t('dsec.n_redirects', ['n' => $counts['redirects']]) : t('dsec.none'), ''],
+    'databases' => [$counts['dbs'] ? t('dsec.n_dbs', ['n' => $counts['dbs']]) : t('dsec.none'), ''],
+    'search' => $searchOn ? [t('search.on'), 'badge-ok'] : [t('dsec.off'), ''],
+    'delete' => [t('dsec.d_delete'), ''],
+];
+$groups = ['site' => 'dsec.g_site', 'php' => 'dsec.g_php', 'security' => 'dsec.g_security', 'domains' => 'dsec.g_domains', 'data' => 'dsec.g_data'];
+?>
+<?php if (($app['status'] ?? '') === 'installing' || $d['ssl_auto'] === 'running'): ?><div data-autorefresh></div><?php endif; ?>
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <div class="flex min-w-0 items-center gap-3">
+    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand"><?= $navIcon('globe') ?></span>
+    <div class="min-w-0"><h1 class="h1 mb-0 truncate"><?= e($d['name']) ?></h1>
+      <p class="text-sm text-slate-500"><?= e(t('domains.type_' . $d['type'])) ?> · <?= e($owner) ?> · <span class="badge <?= $d['status'] === 'active' ? 'badge-ok' : 'badge-warn' ?>"><?= e($d['status']) ?></span></p></div>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a class="btn-ghost inline-flex items-center gap-1.5 border border-slate-300 dark:border-slate-700" href="<?= e($url) ?>" target="_blank" rel="noopener"><?= $navIcon('external') ?> <?= e(t('dsec.visit')) ?></a>
+    <form method="post" action="/domains/<?= $id ?>/upload-link"><?= csrf_field() ?><button class="btn-ghost inline-flex items-center gap-1.5 border border-slate-300 dark:border-slate-700"><?= $navIcon('upload') ?> <?= e(t('upload.make_link')) ?></button></form>
+    <a class="btn inline-flex items-center gap-1.5" href="/domains/<?= $id ?>/files"><?= $navIcon('folder') ?> <?= e(t('files.title')) ?></a>
+  </div>
 </div>
+
 <?php $ul = $_SESSION['upload_link'] ?? null; if ($ul && (int)$ul['domain'] === $id): unset($_SESSION['upload_link']); ?>
 <div class="mb-6 space-y-1 rounded-xl border border-brand/30 bg-brand/5 p-4 text-sm">
   <p class="font-semibold"><?= e(t('upload.link_ready', ['t' => $ul['expires']])) ?></p>
@@ -11,238 +52,33 @@
   <p class="text-xs text-slate-500"><?= e(t('upload.link_hint')) ?></p>
 </div>
 <?php endif; ?>
+
+<dl class="card mb-8 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+  <div><dt class="text-xs text-slate-500">PHP</dt><dd class="font-medium"><?= e($d['php_version']) ?></dd></div>
+  <div><dt class="text-xs text-slate-500">SSL</dt><dd><span class="badge <?= $https ? 'badge-ok' : 'badge-warn' ?>"><?= e($https ? $d['ssl_mode'] : t('dsec.no_cert')) ?></span><?php if ($sslTxt !== ''): ?><span class="mt-1 block text-xs text-slate-500"><?= e($sslTxt) ?></span><?php endif; ?></dd></div>
+  <div><dt class="text-xs text-slate-500"><?= e(t('app.title')) ?></dt><dd class="font-medium"><?= e(($app['status'] ?? '') === 'installed' ? 'WordPress ' . $app['version'] : '—') ?></dd></div>
+  <div><dt class="text-xs text-slate-500"><?= e(t('nav.databases')) ?></dt><dd class="font-medium"><?= (int)$counts['dbs'] ?></dd></div>
+  <div class="sm:col-span-2 xl:col-span-4"><dt class="text-xs text-slate-500"><?= e(t('dsec.docroot')) ?></dt><dd class="break-all font-mono text-xs"><?= e((string)($d['docroot'] ?: '—')) ?></dd></div>
+</dl>
+
 <div class="grid gap-6 lg:grid-cols-2">
-  <div class="card space-y-4 lg:col-span-2" id="apps">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <h2 class="h2"><?= e(t('app.title')) ?></h2>
-      <?php if ($app): ?><span class="badge <?= ['installed' => 'badge-ok', 'installing' => 'badge-warn', 'failed' => 'badge-err'][$app['status']] ?? '' ?>"><?= e(t('app.st_' . $app['status'])) ?></span><?php endif; ?>
-    </div>
-    <?php if ($newApp): ?>
-      <div class="space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950/40">
-        <p class="font-semibold"><?= e(t('app.credentials')) ?></p>
-        <p><?= e(t('app.admin_url')) ?>: <a class="link" href="<?= e($newApp['url']) ?>" target="_blank" rel="noopener"><?= e($newApp['url']) ?></a></p>
-        <p><?= e(t('auth.username')) ?>: <code class="font-mono"><?= e($newApp['user']) ?></code> · <?= e(t('auth.password')) ?>: <code class="select-all font-mono"><?= e($newApp['password']) ?></code></p>
-        <p class="text-xs text-slate-500"><?= e(t('app.credentials_once', ['db' => $newApp['db']])) ?></p>
-      </div>
-    <?php endif; ?>
-    <?php if ($app && $app['status'] === 'installing'): ?>
-      <p class="text-sm"><?= e(t('app.installing')) ?></p><div data-autorefresh></div>
-    <?php elseif ($app && $app['status'] === 'installed'): ?>
-      <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-        <span class="font-semibold">WordPress <?= e((string)$app['version']) ?></span>
-        <span><?= e(t('auth.username')) ?>: <code class="font-mono"><?= e((string)$app['admin_user']) ?></code></span>
-        <span><?= e(t('app.database')) ?>: <code class="font-mono"><?= e((string)$app['db_name']) ?></code></span>
-        <?php if ($app['via'] === 'claude'): ?><span class="badge"><?= e(t('app.via_claude')) ?></span><?php endif; ?>
-        <a class="btn ml-auto" href="<?= e((string)$app['admin_url']) ?>" target="_blank" rel="noopener"><?= e(t('app.open_admin')) ?></a>
-      </div>
-      <?php if ($app['note'] === 'http'): ?><p class="text-xs text-amber-700 dark:text-amber-300"><?= e(t('app.http_note')) ?></p><?php endif; ?>
-    <?php else: ?>
-      <?php if ($app && $app['status'] === 'failed'): ?>
-        <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
-          <span><?= e(t('app.failed', ['msg' => (string)$app['note']])) ?></span>
-          <form method="post" action="/domains/<?= $id ?>/apps/clear"><?= csrf_field() ?><button class="btn-ghost text-sm"><?= e(t('app.dismiss')) ?></button></form>
-        </div>
-      <?php else: ?>
-      <form method="post" action="/domains/<?= $id ?>/apps/wordpress" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" data-confirm="<?= e(t('app.confirm', ['domain' => $d['name']])) ?>"><?= csrf_field() ?>
-        <div class="flex items-center gap-3 lg:col-span-5"><span class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#21759b] text-sm font-bold text-white">W</span>
-          <div><p class="font-semibold">WordPress</p><p class="text-xs text-slate-500"><?= e(t('app.wp_hint')) ?></p></div></div>
-        <div><label class="label" for="wp-title"><?= e(t('app.site_title')) ?></label><input class="input" id="wp-title" name="title" maxlength="120" placeholder="<?= e($d['name']) ?>"></div>
-        <div><label class="label" for="wp-user"><?= e(t('app.admin_user')) ?></label><input class="input" id="wp-user" name="admin_user" pattern="[A-Za-z0-9_.\-]{3,40}" placeholder="wpadmin"></div>
-        <div><label class="label" for="wp-mail"><?= e(t('app.admin_email')) ?></label><input class="input" id="wp-mail" type="email" name="admin_email" placeholder="<?= e((string)(Havoc\Core\DB::q('SELECT email FROM users WHERE id = ?', [$d['user_id']])->fetchColumn())) ?>"></div>
-        <div><label class="label" for="wp-locale"><?= e(t('app.language')) ?></label><select class="input" id="wp-locale" name="locale">
-          <?php foreach (Havoc\Services\AppService::LOCALES as $code => $name): ?><option value="<?= e($code) ?>" <?= $code === (I18n::locale() === 'tr' ? 'tr_TR' : 'en_US') ? 'selected' : '' ?>><?= e($name) ?></option><?php endforeach; ?>
-        </select></div>
-        <div class="flex items-end"><button class="btn w-full"><?= e(t('app.install_wp')) ?></button></div>
-      </form>
-      <p class="text-xs text-slate-500"><?= e(t('app.empty_hint')) ?></p>
-      <?php endif; ?>
-    <?php endif; ?>
-  </div>
-  <form method="post" action="/domains/<?= $id ?>/php" class="card space-y-4">
-    <?= csrf_field() ?><h2 class="h2">PHP</h2>
-    <div><label class="label"><?= e(t('domains.php_version')) ?></label><select class="input" name="php"><?php foreach ($php as $v): ?><option <?= $v === $d['php_version'] ? 'selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <label class="flex items-center gap-2"><input type="checkbox" name="opcache" value="1" <?= $d['opcache_enabled'] ? 'checked' : '' ?>> OPcache</label>
-    <div><label class="label">OPcache MB</label><input class="input" type="number" min="32" max="1024" name="opcache_memory" value="<?= (int)$d['opcache_memory'] ?>"></div>
-    <button class="btn"><?= e(t('common.save')) ?></button>
-  </form>
-
-  <form method="post" action="/domains/<?= $id ?>/security" class="card space-y-3">
-    <?= csrf_field() ?><h2 class="h2"><?= e(t('domains.security')) ?></h2>
-    <label class="flex items-center gap-2"><input type="checkbox" name="force_https" value="1" <?= $d['force_https'] ? 'checked' : '' ?>> <?= e(t('ssl.force')) ?></label>
-    <label class="flex items-center gap-2"><input type="checkbox" name="hsts" value="1" <?= $d['hsts'] ? 'checked' : '' ?>> HSTS</label>
-    <label class="flex items-center gap-2"><input type="checkbox" name="waf" value="1" <?= $d['waf'] ? 'checked' : '' ?>> ModSecurity / WAF</label>
-    <label class="flex items-center gap-2"><input type="checkbox" name="logs_enabled" value="1" <?= $d['logs_enabled'] ? 'checked' : '' ?>> <?= e(t('domains.logs_enabled')) ?></label>
-    <button class="btn"><?= e(t('common.save')) ?></button>
-  </form>
-
-  <div class="card space-y-4">
-    <?php [$sslCls, $sslTxt] = Havoc\Services\SslService::describe($d); ?>
-    <?php if ($d['ssl_auto'] === 'running'): ?><div data-autorefresh></div><?php endif; ?>
-    <h2 class="h2">SSL <span class="badge <?= $d['ssl_mode'] === 'none' ? 'badge-warn' : 'badge-ok' ?>"><?= e($d['ssl_mode']) ?></span></h2>
-    <?php if ($sslTxt !== ''): ?><p class="text-sm"><span class="badge <?= e($sslCls) ?>">Let's Encrypt</span> <?= e($sslTxt) ?></p><?php endif; ?>
-    <p class="text-xs text-slate-500"><?= e(t('ssl.names')) ?>: <?= e(implode(', ', Havoc\Services\DomainService::serverNames($d))) ?></p>
-    <?php if ($d['ssl_auto'] !== 'running'): ?>
-    <form method="post" action="/domains/<?= $id ?>/ssl"><?= csrf_field() ?><input type="hidden" name="mode" value="letsencrypt"><button class="btn"><?= e(t($d['ssl_mode'] === 'letsencrypt' ? 'ssl.letsencrypt_again' : 'ssl.letsencrypt')) ?></button></form>
-    <?php endif; ?>
-    <details><summary class="cursor-pointer text-sm text-brand"><?= e(t('ssl.custom')) ?> / Cloudflare Origin</summary>
-      <form method="post" action="/domains/<?= $id ?>/ssl" class="mt-3 space-y-2"><?= csrf_field() ?>
-        <select class="input" name="mode"><option value="custom">Custom</option><option value="cloudflare">Cloudflare Origin</option></select>
-        <textarea class="input font-mono text-xs" name="cert" rows="4" placeholder="-----BEGIN CERTIFICATE-----" required></textarea>
-        <textarea class="input font-mono text-xs" name="key" rows="4" placeholder="-----BEGIN PRIVATE KEY-----" required></textarea>
-        <textarea class="input font-mono text-xs" name="chain" rows="2" placeholder="CA chain (optional)"></textarea>
-        <button class="btn"><?= e(t('ssl.install')) ?></button></form></details>
-  </div>
-
-  <form method="post" action="/domains/<?= $id ?>/php" class="card space-y-3">
-    <?= csrf_field() ?><input type="hidden" name="ext_form" value="1">
-    <input type="hidden" name="php" value="<?= e($d['php_version']) ?>"><input type="hidden" name="opcache" value="<?= $d['opcache_enabled'] ? 1 : '' ?>"><input type="hidden" name="opcache_memory" value="<?= (int)$d['opcache_memory'] ?>">
-    <h2 class="h2"><?= e(t('domains.extensions')) ?></h2>
-    <div class="grid max-h-56 grid-cols-2 gap-1 overflow-y-auto text-sm sm:grid-cols-3">
-      <?php foreach ($ext['available'] as $x): ?><label class="flex items-center gap-2"><input type="checkbox" name="ext[]" value="<?= e($x) ?>" <?= in_array($x, $enabled, true) ? 'checked' : '' ?>> <?= e($x) ?></label><?php endforeach; ?>
-    </div>
-    <button class="btn"><?= e(t('common.save')) ?></button>
-  </form>
-</div>
-
-<?php
-$iniDefs = Havoc\Ctl\PhpIni::USER;
-$isAdmin = Havoc\Core\Auth::user()['role'] === 'admin';
-$snippets = [
-    'WordPress' => "location / {\n    try_files \$uri \$uri/ /index.php?\$args;\n}\nlocation = /xmlrpc.php { deny all; }\nlocation ~* /wp-content/uploads/.*\\.php\$ { deny all; }",
-    'Laravel' => "location / {\n    try_files \$uri \$uri/ /index.php?\$query_string;\n}",
-    t('nginx.sn_cache') => "location ~* \\.(css|js|png|jpe?g|gif|webp|avif|svg|ico|woff2?)\$ {\n    expires 30d;\n    add_header Cache-Control \"public\";\n    access_log off;\n}",
-    t('nginx.sn_hidden') => "location ~ /\\.(git|env|svn|hg) { deny all; }\nlocation ~* \\.(sql|bak|log|ini)\$ { deny all; }",
-    t('nginx.sn_www') => "if (\$host !~* ^www\\.) {\n    return 301 \$scheme://www.\$host\$request_uri;\n}",
-    t('nginx.sn_nowww') => "if (\$host ~* ^www\\.(.+)\$) {\n    return 301 \$scheme://\$1\$request_uri;\n}",
-];
-?>
-<div class="mt-6 grid gap-6">
-  <form method="post" action="/domains/<?= $id ?>/php-ini" class="card space-y-4" id="php-ini"><?= csrf_field() ?>
-    <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="h2"><?= e(t('phpini.title')) ?> <span class="text-sm font-normal text-slate-400">PHP <?= e($d['php_version']) ?></span></h2>
-      <button class="btn"><?= e(t('common.save')) ?></button></div>
-    <p class="text-xs text-slate-500"><?= e(t('phpini.hint')) ?></p>
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <?php foreach ($iniDefs as $k => [$type, $x]): $name = 'ini_' . str_replace('.', '__', $k); $val = (string)($ini[$k] ?? ''); ?>
-        <label class="block"><span class="label font-mono text-xs"><?= e($k) ?></span>
-        <?php if ($type === 'bool' || $type === 'enum'): $opts = $type === 'bool' ? ['On', 'Off'] : $x; ?>
-          <select class="input" name="<?= e($name) ?>"><option value=""><?= e(t('phpini.default')) ?></option>
-            <?php foreach ($opts as $o): ?><option value="<?= e($o) ?>" <?= $val === $o ? 'selected' : '' ?>><?= e($o === '' ? '(empty)' : $o) ?></option><?php endforeach; ?></select>
-        <?php else: ?>
-          <input class="input" name="<?= e($name) ?>" value="<?= e($val) ?>" placeholder="<?= e(t('phpini.default')) ?>" <?= $type === 'tz' ? 'list="tz-list"' : '' ?>>
-        <?php endif; ?></label>
-      <?php endforeach; ?>
-    </div>
-    <datalist id="tz-list"><?php foreach (DateTimeZone::listIdentifiers() as $tz): ?><option value="<?= e($tz) ?>"></option><?php endforeach; ?></datalist>
-    <?php if ($isAdmin): ?>
-      <label class="block"><span class="label"><?= e(t('phpini.admin_extra')) ?></span>
-        <textarea class="input font-mono text-xs" name="ini_admin" rows="4" spellcheck="false" placeholder="opcache.jit = tracing&#10;max_input_nesting_level = 128"><?= e((string)($d['php_ini_admin'] ?? '')) ?></textarea></label>
-    <?php endif; ?>
-  </form>
-
-  <form method="post" action="/domains/<?= $id ?>/nginx" class="card space-y-3" id="nginx-rules"><?= csrf_field() ?>
-    <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="h2"><?= e(t('nginx.title')) ?></h2><button class="btn"><?= e(t('common.save')) ?></button></div>
-    <p class="text-xs text-slate-500"><?= e(t($isAdmin ? 'nginx.hint_admin' : 'nginx.hint_user')) ?></p>
-    <?php $wsActive = Havoc\Services\WebServerService::active(); if ($wsActive !== 'nginx'): ?>
-      <p class="rounded-lg bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"><?= e(t('nginx.inactive', ['name' => Havoc\Services\WebServerService::NAMES[$wsActive]])) ?></p>
-    <?php endif; ?>
-    <div class="flex flex-wrap gap-1.5">
-      <span class="text-xs text-slate-500"><?= e(t('nginx.insert')) ?>:</span>
-      <?php foreach ($snippets as $label => $code): ?><button type="button" class="rounded-full border border-slate-300 px-2.5 py-0.5 text-xs hover:border-brand hover:text-brand dark:border-slate-700" data-snippet="<?= e($code) ?>" data-snippet-target="rules-<?= $id ?>"><?= e($label) ?></button><?php endforeach; ?>
-    </div>
-    <textarea class="input font-mono text-xs leading-5" name="rules" id="rules-<?= $id ?>" rows="14" spellcheck="false" placeholder="# rewrite ^/old$ /new permanent;"><?= e($rules) ?></textarea>
-  </form>
-</div>
-
-<div class="mt-6 grid gap-6 lg:grid-cols-2">
-  <div class="card space-y-3" id="databases">
-    <div class="flex items-center justify-between gap-2"><h2 class="h2 mb-0"><?= e(t('nav.databases')) ?></h2><a class="text-sm text-brand hover:underline" href="/databases?site=<?= $id ?>"><?= e(t('db.manage')) ?> &rarr;</a></div>
-    <?php foreach ($dbs as $x): $i = $dbInfo[$x['name']] ?? ['tables' => 0, 'size' => 0]; ?>
-      <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-white/[0.03]">
-        <span><span class="font-mono font-medium"><?= e($x['name']) ?></span> <span class="text-xs text-slate-500"><?= (int)$i['tables'] ?> <?= e(t('db.tables_short')) ?> · <?= e(bytes((int)$i['size'])) ?></span></span>
-        <span class="flex gap-1">
-          <?php if ($pmaOn): ?><form method="post" action="/databases/<?= (int)$x['id'] ?>/pma" target="_blank"><?= csrf_field() ?><button class="btn py-1 text-xs" title="<?= e(t('pma.sso_hint')) ?>">phpMyAdmin ↗</button></form><?php endif; ?>
-          <form method="post" action="/databases/<?= (int)$x['id'] ?>/site"><?= csrf_field() ?><input type="hidden" name="from_domain" value="<?= $id ?>"><input type="hidden" name="domain_id" value=""><button class="btn-ghost py-1 text-xs" title="<?= e(t('db.unassign_hint')) ?>"><?= e(t('db.unassign')) ?></button></form>
-        </span></div>
+<?php foreach ($groups as $g => $gk): ?>
+  <section class="card p-5">
+    <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500"><?= e(t($gk)) ?></h2>
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <?php foreach ($siteSections as $k => [$ic, $tk, $grp]): if ($grp !== $g || ($k === 'search' && $searchOn === null)) continue; [$st, $bc] = $status[$k]; ?>
+      <a href="<?= e($siteHref($d, $k)) ?>" class="group flex flex-col items-center gap-2 rounded-xl px-2 py-3 text-center transition hover:bg-brand/5 dark:hover:bg-white/[0.04]">
+        <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand transition group-hover:bg-brand group-hover:text-white [&>svg]:h-6 [&>svg]:w-6"><?= $navIcon($ic) ?></span>
+        <span class="text-sm font-medium leading-tight text-slate-800 group-hover:text-brand dark:text-slate-100"><?= e(t($tk)) ?></span>
+        <?php if ($bc !== ''): ?><span class="badge <?= $bc ?> max-w-full truncate"><?= e($st) ?></span>
+        <?php else: ?><span class="text-xs leading-tight text-slate-500"><?= e($st) ?></span><?php endif; ?>
+      </a>
     <?php endforeach; ?>
-    <?php if (!$dbs): ?><p class="text-sm text-slate-400"><?= e(t('db.none_for_site')) ?></p><?php endif; ?>
-    <form method="post" action="/databases" class="flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800"><?= csrf_field() ?>
-      <input type="hidden" name="domain_id" value="<?= $id ?>"><input type="hidden" name="from_domain" value="<?= $id ?>">
-      <div class="flex-1"><label class="label"><?= e(t('db.new_for_site')) ?></label><div class="flex items-center gap-1"><span class="font-mono text-sm text-slate-400">hv<?= (int)$d['user_id'] ?>_</span><input class="input" name="name" required pattern="[a-z0-9_]{1,16}" placeholder="shop"></div></div>
-      <button class="btn"><?= e(t('common.add')) ?></button></form>
-    <?php if ($freeDbs): ?>
-    <form method="post" action="" class="flex flex-wrap items-end gap-2" data-assign-form><?= csrf_field() ?><input type="hidden" name="from_domain" value="<?= $id ?>"><input type="hidden" name="domain_id" value="<?= $id ?>">
-      <div class="flex-1"><label class="label"><?= e(t('db.assign_existing')) ?></label><select class="input" data-assign-select>
-        <?php foreach ($freeDbs as $f): ?><option value="<?= (int)$f['id'] ?>"><?= e($f['name']) ?></option><?php endforeach; ?></select></div>
-      <button class="btn-ghost border border-slate-300 dark:border-slate-700"><?= e(t('db.assign')) ?></button></form>
-    <?php endif; ?>
-  </div>
-
-  <?php if ($search !== null): $ms = $search['site']; $mi = $search['info']; ?>
-  <div class="card space-y-3" id="search">
-    <div class="flex items-center justify-between gap-2"><h2 class="h2 mb-0"><?= e(t('search.title')) ?></h2><?php if ($ms): ?><span class="badge badge-ok"><?= e(t('search.on')) ?></span><?php endif; ?></div>
-    <?php if (!$ms): ?>
-      <p class="text-sm text-slate-500"><?= e(t('search.intro', ['prefix' => $search['prefix']])) ?></p>
-      <form method="post" action="/domains/<?= $id ?>/search/enable"><?= csrf_field() ?><button class="btn"><?= e(t('search.enable')) ?></button></form>
-    <?php elseif (!empty($mi['error'])): ?>
-      <p class="text-sm text-red-600"><?= e($mi['error']) ?></p>
-    <?php else: ?>
-      <dl class="grid gap-2 text-sm">
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-2"><dt class="text-slate-500"><?= e(t('search.address')) ?></dt><dd class="font-mono">http://127.0.0.1:7700</dd></div>
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-2"><dt class="text-slate-500"><?= e(t('search.prefix')) ?></dt><dd class="font-mono"><?= e($ms['prefix']) ?>…</dd></div>
-        <?php foreach (['admin' => 'search.admin_key', 'search' => 'search.search_key'] as $k => $label): ?>
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-2"><dt class="text-slate-500"><?= e(t($label)) ?></dt>
-          <dd class="flex gap-1"><input class="input py-1 font-mono text-xs" type="password" readonly value="<?= e((string)($mi['keys'][$k] ?? '')) ?>" id="mk-<?= $k ?>-<?= $id ?>" data-select-all>
-            <button type="button" class="btn-ghost border border-slate-300 px-2 text-xs dark:border-slate-700" data-reveal="#mk-<?= $k ?>-<?= $id ?>">👁</button>
-            <button type="button" class="btn-ghost border border-slate-300 px-2 text-xs dark:border-slate-700" data-copy="#mk-<?= $k ?>-<?= $id ?>"><?= e(t('transfer.copy')) ?></button></dd></div>
-        <?php endforeach; ?>
-      </dl>
-      <p class="text-xs text-slate-500"><?= e(t('search.keys_hint', ['prefix' => $ms['prefix']])) ?></p>
-      <div class="overflow-x-auto"><table class="table text-sm">
-        <thead><tr><th><?= e(t('search.index')) ?></th><th class="text-right"><?= e(t('search.documents')) ?></th><th class="text-right"><?= e(t('db.size')) ?></th></tr></thead>
-        <tbody>
-        <?php foreach ($mi['indexes'] ?? [] as $ix): ?><tr><td class="font-mono"><?= e($ix['uid']) ?><?= $ix['indexing'] ? ' <span class="badge badge-warn">' . e(t('search.indexing')) . '</span>' : '' ?></td><td class="text-right"><?= number_format((int)$ix['documents']) ?></td><td class="text-right"><?= e(bytes((int)$ix['size'])) ?></td></tr><?php endforeach; ?>
-        <?php if (empty($mi['indexes'])): ?><tr><td colspan="3" class="text-slate-400"><?= e(t('search.no_indexes', ['prefix' => $ms['prefix']])) ?></td></tr><?php endif; ?>
-        </tbody></table></div>
-      <div class="flex flex-wrap gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-        <form method="post" action="/domains/<?= $id ?>/search/rotate" data-confirm="<?= e(t('search.rotate_confirm')) ?>"><?= csrf_field() ?><button class="btn-ghost border border-slate-300 dark:border-slate-700"><?= e(t('search.rotate')) ?></button></form>
-        <form method="post" action="/domains/<?= $id ?>/search/disable" class="flex items-center gap-2" data-confirm="<?= e(t('search.disable_confirm')) ?>"><?= csrf_field() ?>
-          <label class="flex items-center gap-1.5 text-xs"><input type="checkbox" name="delete_indexes" value="1"> <?= e(t('search.delete_indexes')) ?></label>
-          <button class="btn-danger"><?= e(t('search.disable')) ?></button></form>
-      </div>
-      <p class="text-xs text-slate-500"><?= e(t('search.backup_hint')) ?></p>
-    <?php endif; ?>
-  </div>
-  <?php endif; ?>
+    </div>
+  </section>
+<?php endforeach; ?>
 </div>
 
-<div class="mt-6 grid gap-6 lg:grid-cols-2">
-  <div class="card space-y-3">
-    <h2 class="h2"><?= e(t('domains.aliases')) ?></h2>
-    <?php foreach ($aliases as $a): ?>
-      <form method="post" action="/domains/<?= (int)$a['id'] ?>/delete" class="flex items-center justify-between text-sm" data-confirm="<?= e(t('common.confirm')) ?>"><?= csrf_field() ?>
-        <span><?= e($a['name']) ?></span><button class="btn-ghost text-xs text-red-600"><?= e(t('common.delete')) ?></button></form>
-    <?php endforeach; ?>
-    <?php if (!$aliases): ?><p class="text-sm text-slate-400"><?= e(t('common.empty')) ?></p><?php endif; ?>
-    <form method="post" action="/domains" class="flex gap-2"><?= csrf_field() ?>
-      <input type="hidden" name="type" value="alias"><input type="hidden" name="parent" value="<?= $id ?>"><input type="hidden" name="owner" value="<?= (int)$d['user_id'] ?>"><input type="hidden" name="php" value="<?= e($d['php_version']) ?>">
-      <input class="input" name="name" placeholder="alias.com" required><button class="btn"><?= e(t('common.add')) ?></button></form>
-  </div>
-  <div class="card space-y-3">
-    <h2 class="h2"><?= e(t('domains.redirects')) ?></h2>
-    <?php foreach ($redirects as $r): ?>
-      <form method="post" action="/domains/<?= $id ?>/redirects/<?= (int)$r['id'] ?>/delete" class="flex items-center justify-between gap-2 text-sm"><?= csrf_field() ?>
-        <span class="min-w-0 break-all"><code><?= e($r['source']) ?></code> → <code><?= e($r['target']) ?></code> <span class="text-slate-400"><?= (int)$r['code'] ?></span></span>
-        <button class="btn-ghost text-xs text-red-600"><?= e(t('common.delete')) ?></button></form>
-    <?php endforeach; ?>
-    <?php if (!$redirects): ?><p class="text-sm text-slate-400"><?= e(t('common.empty')) ?></p><?php endif; ?>
-    <form method="post" action="/domains/<?= $id ?>/redirects" class="grid gap-2 sm:grid-cols-5"><?= csrf_field() ?>
-      <input class="input sm:col-span-2" name="source" placeholder="/old, /dir/* or /" required>
-      <input class="input sm:col-span-2" name="target" placeholder="https://example.com/new" required>
-      <select class="input" name="code"><?php foreach ([301, 302, 307, 308] as $c): ?><option><?= $c ?></option><?php endforeach; ?></select>
-      <button class="btn sm:col-span-5"><?= e(t('common.add')) ?></button></form>
-    <p class="text-xs text-slate-500"><?= e(t('domains.redirect_hint')) ?></p>
-  </div>
+<div class="mt-10 border-t border-slate-200 pt-4 dark:border-slate-800">
+  <a href="/domains/<?= $id ?>/delete" class="inline-flex items-center gap-1.5 text-sm text-red-600 hover:underline"><?= $navIcon('trash') ?> <?= e(t('dsec.delete')) ?></a>
 </div>
-<form method="post" action="/domains/<?= $id ?>/delete" class="mt-8" data-confirm="<?= e(t('common.confirm')) ?>"><?= csrf_field() ?>
-  <label class="mr-3 text-sm"><input type="checkbox" name="purge" value="1"> <?= e(t('domains.purge')) ?></label>
-  <button class="btn-danger"><?= e(t('common.delete')) ?></button></form>

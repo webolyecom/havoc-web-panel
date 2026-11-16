@@ -54,29 +54,81 @@ final class DomainController extends Controller
             error_log($e->getMessage());
             $this->flash('error', t('common.failed') . ': ' . $e->getMessage());
         }
-        return $this->to('/domains');
+        return $this->backToSite('aliases') ?? $this->to('/domains');
     }
 
+    /** The site pages under /domains/{id}/<section> (GET; the forms post to the same addresses where they exist). */
+    public const SECTIONS = ['wordpress', 'php', 'php-ini', 'ssl', 'security', 'nginx', 'aliases', 'redirects', 'databases', 'search', 'delete'];
+
+    /** Site overview: a short summary and one tile per settings page (cheap: no helper calls). */
     public function show(): Response
     {
         $d = $this->domain();
         if ($d['type'] === 'alias') {
             return $this->to('/domains/' . (int)$d['parent_id']);
         }
-        $ext = ['available' => [], 'default' => []];
-        try {
-            $ext = Ctl::call('php.extensions', ['version' => $d['php_version']]);
-        } catch (\Throwable) {
+        $id = (int)$d['id'];
+        return view('domains/show', ['d' => $d,
+            'owner' => (string)DB::q('SELECT username FROM users WHERE id = ?', [$d['user_id']])->fetchColumn(),
+            'app' => \Havoc\Services\AppService::forDomain($id),
+            'counts' => [
+                'dbs' => (int)DB::q('SELECT COUNT(*) FROM db_instances WHERE domain_id = ?', [$id])->fetchColumn(),
+                'redirects' => (int)DB::q('SELECT COUNT(*) FROM redirects WHERE domain_id = ?', [$id])->fetchColumn(),
+                'aliases' => (int)DB::q("SELECT COUNT(*) FROM domains WHERE parent_id = ? AND type = 'alias'", [$id])->fetchColumn(),
+                'ini' => count(json_decode((string)($d['php_ini'] ?? ''), true) ?: []),
+                'rules' => count(array_filter(explode("\n", (string)($d['nginx_custom'] ?? '')), static fn($l) => trim($l) !== '' && !str_starts_with(trim($l), '#'))),
+            ],
+            'searchOn' => MeiliService::installed() ? (bool)MeiliService::site($id) : null]);
+    }
+
+    /** One settings page of a site. */
+    public function section(): Response
+    {
+        $d = $this->domain();
+        if ($d['type'] === 'alias') {
+            return $this->to('/domains/' . (int)$d['parent_id']);
         }
-        $formIni = $_SESSION['form_ini'] ?? null;
-        $formRules = $_SESSION['form_rules'] ?? null;
-        unset($_SESSION['form_ini'], $_SESSION['form_rules']);
-        return view('domains/show', ['d' => $d, 'php' => DomainService::phpVersions(), 'ext' => $ext,
-            'ini' => $formIni ?? (json_decode((string)($d['php_ini'] ?? ''), true) ?: []), 'rules' => $formRules ?? (string)($d['nginx_custom'] ?? ''),
-            'redirects' => DB::all('SELECT * FROM redirects WHERE domain_id = ? ORDER BY id', [$d['id']]),
-            'aliases' => DB::all("SELECT id, name FROM domains WHERE parent_id = ? AND type = 'alias' ORDER BY name", [$d['id']]),
-            'enabled' => $d['php_extensions'] ? json_decode($d['php_extensions'], true) : $ext['default'],
-            'app' => \Havoc\Services\AppService::forDomain((int)$d['id']), 'newApp' => $this->pullNewApp((int)$d['id'])] + $this->dbCard($d) + $this->searchCard($d));
+        $s = basename($this->req->path);
+        in_array($s, self::SECTIONS, true) || $this->abort(404);
+        $data = ['d' => $d, 'section' => $s, 'searchOn' => MeiliService::installed()];
+        switch ($s) {
+            case 'wordpress':
+                $data += ['app' => \Havoc\Services\AppService::forDomain((int)$d['id']), 'newApp' => $this->pullNewApp((int)$d['id'])];
+                break;
+            case 'php':
+                $ext = ['available' => [], 'default' => []];
+                try {
+                    $ext = Ctl::call('php.extensions', ['version' => $d['php_version']]);
+                } catch (\Throwable) {
+                }
+                $data += ['php' => DomainService::phpVersions(), 'ext' => $ext,
+                    'enabled' => $d['php_extensions'] ? json_decode($d['php_extensions'], true) : $ext['default']];
+                break;
+            case 'php-ini':
+                $formIni = $_SESSION['form_ini'] ?? null;
+                unset($_SESSION['form_ini']);
+                $data['ini'] = $formIni ?? (json_decode((string)($d['php_ini'] ?? ''), true) ?: []);
+                break;
+            case 'nginx':
+                $formRules = $_SESSION['form_rules'] ?? null;
+                unset($_SESSION['form_rules']);
+                $data['rules'] = $formRules ?? (string)($d['nginx_custom'] ?? '');
+                break;
+            case 'aliases':
+                $data['aliases'] = DB::all("SELECT id, name FROM domains WHERE parent_id = ? AND type = 'alias' ORDER BY name", [$d['id']]);
+                break;
+            case 'redirects':
+                $data['redirects'] = DB::all('SELECT * FROM redirects WHERE domain_id = ? ORDER BY id', [$d['id']]);
+                break;
+            case 'databases':
+                $data += $this->dbCard($d);
+                break;
+            case 'search':
+                $data += $this->searchCard($d);
+                $data['search'] !== null || $this->abort(404);
+                break;
+        }
+        return view('domains/section', $data);
     }
 
     /** The site's databases (sizes from MariaDB) and the owner's databases that belong to no site yet. */
@@ -128,7 +180,7 @@ final class DomainController extends Controller
         } catch (\Throwable $e) {
             $this->flash('error', $e->getMessage());
         }
-        return $this->to('/domains/' . $d['id'] . '#search');
+        return $this->to('/domains/' . $d['id'] . '/search');
     }
 
     private function pullNewApp(int $id): ?array
@@ -151,7 +203,7 @@ final class DomainController extends Controller
             $sel = array_values(array_filter((array)$this->req->post('ext', []), fn($e) => is_string($e) && preg_match('/^[a-z0-9_]{2,32}$/D', $e)));
             $fields['php_extensions'] = json_encode($sel);
         }
-        return $this->apply($d, $fields, '/domains/' . $d['id']);
+        return $this->apply($d, $fields, '/domains/' . $d['id'] . '/php');
     }
 
     public function security(): Response
@@ -161,9 +213,9 @@ final class DomainController extends Controller
             'waf' => (int)(bool)$this->req->post('waf'), 'logs_enabled' => (int)(bool)$this->req->post('logs_enabled')];
         if (($fields['force_https'] || $fields['hsts']) && $d['ssl_mode'] === 'none') {
             $this->flash('error', t('ssl.need_cert'));
-            return $this->to('/domains/' . $d['id']);
+            return $this->to('/domains/' . $d['id'] . '/security');
         }
-        return $this->apply($d, $fields, '/domains/' . $d['id']);
+        return $this->apply($d, $fields, '/domains/' . $d['id'] . '/security');
     }
 
     public function ssl(): Response
@@ -179,7 +231,7 @@ final class DomainController extends Controller
             SslService::queue($d, true, true);
             Audit::log('ssl.request', $d['name']);
             $this->flash('success', t('ssl.auto_started'));
-            return $this->to('/domains/' . $d['id']);
+            return $this->to('/domains/' . $d['id'] . '/ssl');
         }
         try {
             if (in_array($mode, ['custom', 'cloudflare'], true)) {
@@ -193,7 +245,14 @@ final class DomainController extends Controller
         } catch (\Throwable $e) {
             $this->flash('error', t('common.failed') . ': ' . $e->getMessage());
         }
-        return $this->to('/domains/' . $d['id']);
+        return $this->to('/domains/' . $d['id'] . '/ssl');
+    }
+
+    /** Forms on a site page send from_domain: go back to that page of the site (if the user may see it). */
+    private function backToSite(string $section): ?Response
+    {
+        $from = (int)$this->req->post('from_domain', 0);
+        return $from && Scope::domain($this->user(), $from) ? $this->to("/domains/$from/$section") : null;
     }
 
     private function apply(array $d, array $fields, string $back): Response
@@ -216,7 +275,7 @@ final class DomainController extends Controller
         } catch (\Throwable $e) {
             $this->flash('error', t('common.failed') . ': ' . $e->getMessage());
         }
-        return $this->to('/domains');
+        return $this->backToSite('aliases') ?? $this->to('/domains');
     }
 
     /** Old per-domain log page: now part of the central log viewer. */
@@ -246,7 +305,7 @@ final class DomainController extends Controller
                 'target' => Validator::redirectTarget($this->req->str('target')), 'code' => Validator::redirectCode($this->req->post('code', 301))];
         } catch (\InvalidArgumentException $e) {
             $this->flash('error', $e->getMessage());
-            return $this->to('/domains/' . $d['id']);
+            return $this->to('/domains/' . $d['id'] . '/redirects');
         }
         $id = DB::insert('redirects', $row);
         try {
@@ -257,7 +316,7 @@ final class DomainController extends Controller
             DB::q('DELETE FROM redirects WHERE id = ?', [$id]);
             $this->flash('error', t('common.failed') . ': ' . $e->getMessage());
         }
-        return $this->to('/domains/' . $d['id']);
+        return $this->to('/domains/' . $d['id'] . '/redirects');
     }
 
     public function redirectDelete(): Response
@@ -270,7 +329,7 @@ final class DomainController extends Controller
         } catch (\Throwable $e) {
             $this->flash('error', $e->getMessage());
         }
-        return $this->to('/domains/' . $d['id']);
+        return $this->to('/domains/' . $d['id'] . '/redirects');
     }
 
     /** Per-domain php.ini: whitelisted directives for everyone, extra lines for admins. */
@@ -298,7 +357,7 @@ final class DomainController extends Controller
             $this->flash('error', t('common.failed') . ': ' . $e->getMessage());
             $_SESSION['form_ini'] = $in;
         }
-        return $this->to('/domains/' . $d['id'] . '#php-ini');
+        return $this->to('/domains/' . $d['id'] . '/php-ini');
     }
 
     /** Per-domain Nginx rules. Users: directive whitelist; admins: free, but every version must pass nginx -t. */
@@ -318,6 +377,6 @@ final class DomainController extends Controller
             $this->flash('error', t('common.failed') . ': ' . $e->getMessage());
             $_SESSION['form_rules'] = $rules;
         }
-        return $this->to('/domains/' . $d['id'] . '#nginx-rules');
+        return $this->to('/domains/' . $d['id'] . '/nginx');
     }
 }
