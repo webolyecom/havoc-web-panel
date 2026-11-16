@@ -85,7 +85,7 @@ $targetSel = function () use ($targets) {
   <?php if (!$targets): ?><p class="px-5 py-4 text-sm text-slate-400"><?= e(t('common.empty')) ?></p><?php endif; ?>
 </div>
 <?php $cryptField = '<div><label class="label">' . e(t('cloud.crypt')) . ' <span class="text-slate-400">(' . e(t('backups.optional')) . ')</span></label><input class="input" type="password" name="crypt" minlength="8" autocomplete="new-password" placeholder="' . e(t('cloud.crypt_ph')) . '"><p class="mt-1 text-xs text-slate-500">' . e(t('cloud.crypt_hint')) . '</p></div>'; ?>
-<div class="mb-4 grid gap-4 lg:grid-cols-3">
+<div class="mb-4 grid items-start gap-4 lg:grid-cols-3">
 <?php foreach (['gdrive' => ['Google Drive', 'cloud.free_gdrive'], 'onedrive' => ['OneDrive', 'cloud.free_onedrive'], 'dropbox' => ['Dropbox', 'cloud.free_dropbox']] as $type => [$title, $free]): ?>
   <details class="card"><summary class="cursor-pointer font-semibold">+ <?= e($title) ?> <span class="ml-1 text-xs font-normal text-slate-500"><?= e(t($free)) ?></span></summary>
     <form method="post" action="/backups/cloud" class="mt-3 space-y-2"><?= csrf_field() ?><input type="hidden" name="type" value="<?= $type ?>">
@@ -97,7 +97,7 @@ $targetSel = function () use ($targets) {
     </form></details>
 <?php endforeach; ?>
 </div>
-<div class="grid gap-4 lg:grid-cols-3">
+<div class="grid items-start gap-4 lg:grid-cols-3">
 <?php foreach (['sftp' => 'SFTP', 'ftp' => 'FTP', 's3' => 'S3'] as $type => $title): ?>
   <details class="card"><summary class="cursor-pointer font-semibold">+ <?= e($title) ?><?php if ($type === 's3'): ?> <span class="ml-1 text-xs font-normal text-slate-500"><?= e(t('cloud.s3_hint')) ?></span><?php endif; ?></summary>
     <form method="post" action="/backups/targets" class="mt-3 space-y-2"><?= csrf_field() ?><input type="hidden" name="type" value="<?= $type ?>">

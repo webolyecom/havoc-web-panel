@@ -39,6 +39,7 @@ final class ApiController extends Controller
         $owner = $u['role'] === 'user' ? (int)$u['id'] : (int)($b['user_id'] ?? $u['id']);
         try {
             $d = DomainService::create($u, $owner, (string)($b['name'] ?? ''), (string)($b['php_version'] ?? '8.2'));
+            $d = Scope::domain($u, (int)$d['id']) ?? $d;   // with the owner's name
             return Response::json(['data' => $this->present($d)], 201);
         } catch (\InvalidArgumentException | \DomainException $e) {
             return Response::json(['error' => $e->getMessage()], 422);

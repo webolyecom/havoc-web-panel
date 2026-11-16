@@ -2,6 +2,13 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [Unreleased]
+### Fixed
+- Backups → remote storage: opening one "add" card no longer stretches the cards next to it.
+- REST API: `POST /api/v1/domains` returned `"owner": null`; it now returns the owner's user name.
+### Documentation
+- README: REST API section (tokens, examples, endpoints, errors), new screenshots (site transfer, cloud backups, databases, per-site search).
+
 ## [0.9.2] – 2026-11-16
 ### Changed
 - **New site page**: clicking a domain opens an overview with a summary (PHP, SSL, applications, databases, document root) and icon tiles in groups (Site, PHP, Security, Domains, Data), like cPanel. Each tile opens its own page: Applications (WordPress), PHP version & extensions, PHP settings (php.ini), SSL / TLS, Security & logging, Nginx rules, Aliases, Redirects, Databases, Search and Delete site. Every page has a switcher to the other pages, and saving a form returns to the same page. The overview no longer calls the helper, so it opens faster.
