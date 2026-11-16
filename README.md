@@ -21,6 +21,7 @@ from one clean interface, or simply ask Claude to do it. No license fees, ever.
 [Screenshots](#-screenshots) ·
 [Installation](#-installation) ·
 [First steps](#-first-steps) ·
+[API](#-rest-api) ·
 [Documentation](docs/ADMIN-GUIDE.md) ·
 [Contributing](CONTRIBUTING.md)
 
@@ -117,7 +118,7 @@ Contributions back to the project are very welcome, but never required.
 ### 🏢 For hosting companies
 - **Resellers**, hosting packages with CPU / RAM / disk / bandwidth limits
 - **White-label**: your own name, logo, colour and panel domain
-- **REST API** with OpenAPI description
+- **[REST API](#-rest-api)** with token access and an OpenAPI description
 - **One-click self-update** from GitHub Releases, optionally automatic
 - English & Turkish interface, light & dark theme, mobile friendly
 
@@ -131,6 +132,18 @@ Contributions back to the project are very welcome, but never required.
 
 <table>
 <tr>
+<td width="50%"><img src="docs/screenshots/domain.png" alt="Domain settings"><br><sub><b>Site page</b>: a summary and one icon per settings page (files, logs, WordPress, PHP, SSL, security, Nginx rules, aliases, redirects, databases, search).</sub></td>
+<td width="50%"><img src="docs/screenshots/domain-dark.png" alt="Dark theme"><br><sub><b>Dark theme</b>: every page, remembered per user (here: a site's PHP page with the page switcher).</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/site-transfer.png" alt="Site transfer"><br><sub><b>Site transfer</b>: paste the other panel's transfer key, pick sites, their databases and search indexes, and move them.</sub></td>
+<td width="50%"><img src="docs/screenshots/cloud-backup.png" alt="Cloud backups"><br><sub><b>Cloud backups</b>: Google Drive, OneDrive, Dropbox, SFTP, FTP or S3, with optional encryption.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/databases.png" alt="Databases"><br><sub><b>Databases</b>: each database belongs to a site (or is assigned automatically) and opens in phpMyAdmin with one click, no password.</sub></td>
+<td width="50%"><img src="docs/screenshots/site-search.png" alt="Per-site search"><br><sub><b>Per-site search</b>: Meilisearch indexes and keys that only work for that site, included in backups and transfers.</sub></td>
+</tr>
+<tr>
 <td width="50%"><img src="docs/screenshots/addons.png" alt="Add-ons"><br><sub><b>Add-ons</b>: Redis, Meilisearch, Memcached, Fail2ban and Node.js, installed and removed with one click.</sub></td>
 <td width="50%"><img src="docs/screenshots/fail2ban.png" alt="Fail2ban"><br><sub><b>Fail2ban</b>: protection for SSH, FTP and the panel login, with ban list, unban and whitelist.</sub></td>
 </tr>
@@ -141,10 +154,6 @@ Contributions back to the project are very welcome, but never required.
 <tr>
 <td width="50%"><img src="docs/screenshots/claude-connector.png" alt="Claude connector"><br><sub><b>Claude connector</b>: approve Claude once, then manage your sites by chatting.</sub></td>
 <td width="50%"><img src="docs/screenshots/redis.png" alt="Add-on settings"><br><sub><b>Add-on settings</b>: every add-on has its own page with status and settings.</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/domain.png" alt="Domain settings"><br><sub><b>Site page</b>: a summary and one icon per settings page (files, logs, WordPress, PHP, SSL, security, Nginx rules, aliases, redirects, databases, search).</sub></td>
-<td width="50%"><img src="docs/screenshots/domain-dark.png" alt="Dark theme"><br><sub><b>Dark theme</b>: every page, remembered per user (here: a site's PHP page with the page switcher).</sub></td>
 </tr>
 <tr>
 <td width="50%"><img src="docs/screenshots/file-manager.png" alt="File manager"><br><sub><b>File manager</b>: upload, edit, compress, extract and set permissions.</sub></td>
@@ -176,13 +185,43 @@ Havoc WEB Panel is also an [MCP](https://modelcontextprotocol.io) server, so Cla
 2. In Claude: **Settings → Connectors → Add custom connector**, enter `https://panel.example.com/mcp` (shown in the panel; the panel is also served on port 443 under its host name), choose *Sign in now* and *Register automatically*, and click *Connect*.
 3. Log in to the panel (with 2FA) and approve. You choose whether Claude may make changes or only read.
 
-**What Claude can do:** list and inspect sites, search code, read files (or just some lines), edit files by changing only the relevant text, write one or many files, extract an uploaded zip / tar.gz, download a file from an https link into a site, undo its own changes (file history), read logs, add domains and subdomains, install WordPress, request SSL, change PHP version / HTTPS redirect, create databases.
+**What Claude can do:** list and inspect sites, search code, read files (or just some lines), edit files by changing only the relevant text, write one or many files, extract an uploaded zip / tar.gz, download a file from an https link into a site, undo its own changes (file history), read logs, add domains and subdomains, install WordPress, request SSL, change PHP version / HTTPS redirect, create databases (also for a given site) and see which site each database belongs to.
 
 **Keeping it cheap:** for large or private code, ask Claude for an *upload link*: you drop the zip into that page in your browser, it goes straight to the server, and Claude extracts it. The files never pass through Claude. For changes, Claude searches, reads only the lines it needs and edits just those; every changed file keeps its previous version.
 
 **What Claude cannot do:** delete websites, databases or files. It acts with the rights of the panel user who approved it, so a customer's connection only reaches that customer's sites. Every action is written to the audit log; connections are listed and can be ended under **Settings → Claude connector**, and the administrator can switch the connector off for the whole panel.
 
 Technically: Streamable HTTP MCP endpoint at `/mcp`, OAuth 2.1 with dynamic client registration and PKCE (S256), rotating refresh tokens, tokens stored as hashes.
+
+---
+
+## 🔌 REST API
+
+A small JSON API for scripts and other tools. It acts with the rights of the user who created the token, so a customer's token only reaches that customer's sites.
+
+1. In the panel: **Settings → API**, enter a name and create a token (`hvc_…`). It is shown only once; the panel stores only its hash. Delete it there to revoke it.
+2. Send it as a Bearer token:
+
+```bash
+TOKEN=hvc_your_token
+PANEL=https://panel.example.com:2087
+
+curl -H "Authorization: Bearer $TOKEN" $PANEL/api/v1/me
+curl -H "Authorization: Bearer $TOKEN" $PANEL/api/v1/domains
+curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"name":"shop.example.com","php_version":"8.4"}' $PANEL/api/v1/domains
+```
+
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/api/v1/me` | The token's user (id, username, role, e-mail) |
+| `GET` | `/api/v1/domains` | Sites the user can see: name, owner, PHP version, SSL, HTTPS redirect, WAF, status |
+| `POST` | `/api/v1/domains` | Add a site: `name`, optional `php_version`, `user_id` (admins and resellers) → `201` |
+| `GET` | `/api/v1/domains/{id}` | One site |
+| `DELETE` | `/api/v1/domains/{id}` | Delete a site; body `{"purge": true}` also deletes its files → `204` |
+| `GET` | `/api/v1/server/stats` | CPU, load, memory, swap, disk, network, uptime |
+
+Errors come back as JSON with a status code: `401` (missing or wrong token), `404` (not found or not yours), `422` (invalid input or quota reached). The full description is in [`docs/openapi.json`](docs/openapi.json) (also served at `/api/v1/openapi.json`) and can be opened in Swagger UI, Postman or Insomnia. For everything else, use the panel or the Claude connector.
 
 ---
 
