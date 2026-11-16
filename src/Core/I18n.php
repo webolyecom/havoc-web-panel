@@ -31,6 +31,14 @@ final class I18n
         return null;
     }
 
+    /** Switches the language outside a web request (notifications sent by the scheduler). */
+    public static function use(string $locale): void
+    {
+        self::$locale = isset(self::SUPPORTED[$locale]) ? $locale : 'en';
+        self::$fallback = require HAVOC_ROOT . '/lang/en.php';
+        self::$msgs = self::$locale === 'en' ? self::$fallback : require HAVOC_ROOT . '/lang/' . self::$locale . '.php';
+    }
+
     public static function locale(): string
     {
         return self::$locale;

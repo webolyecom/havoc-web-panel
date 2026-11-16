@@ -12,7 +12,7 @@ final class Ctl
 {
     public static function call(string $action, array $args = [], int $timeout = 120): array
     {
-        if (!preg_match('/^[a-z]+\.[a-z_]+$/D', $action)) {
+        if (!preg_match('/^[a-z][a-z0-9]*\.[a-z_]+$/D', $action)) {
             throw new \InvalidArgumentException('Bad action');
         }
         $cmd  = [Config::get('ctl.sudo'), '-n', Config::get('ctl.bin'), $action];

@@ -5,7 +5,7 @@ namespace Havoc\Controllers;
 
 use Havoc\Core\{Audit, Ctl, Response};
 
-/** Admin-only: Redis and Meilisearch install / uninstall, on/off and basic settings. Both are shared, server-wide instances. */
+/** Admin-only: Redis and Meilisearch settings (pages, install / uninstall and on/off: AddonController). */
 final class StackController extends Controller
 {
     private function call(string $action, array $args = [], int $timeout = 120): ?array
@@ -18,28 +18,10 @@ final class StackController extends Controller
         }
     }
 
+    /** The old Redis & Meilisearch page lives under Add-ons now. */
     public function index(): Response
     {
-        $secret = $_SESSION['new_secret'] ?? null;
-        unset($_SESSION['new_secret']);
-        return view('stack/index', ['redis' => $this->call('redis.status') ?? [], 'meili' => $this->call('meili.status') ?? [], 'secret' => $secret,
-            'policies' => ['noeviction', 'allkeys-lru', 'allkeys-lfu', 'volatile-lru', 'volatile-lfu', 'allkeys-random', 'volatile-random', 'volatile-ttl']]);
-    }
-
-    /** "Activate" = enable at boot + start, "Deactivate" = stop + disable. */
-    public function toggle(): Response
-    {
-        $name = ['redis' => 'redis-server', 'meili' => 'meilisearch'][$this->param('name')] ?? $this->abort(404);
-        $op = $this->param('op');
-        $steps = ['activate' => ['enable', 'start'], 'deactivate' => ['stop', 'disable'], 'restart' => ['restart']][$op] ?? $this->abort(404);
-        foreach ($steps as $s) {
-            if ($this->call('service.control', ['name' => $name, 'op' => $s], 180) === null) {
-                return $this->to('/stack');
-            }
-        }
-        Audit::log('stack.' . $op, $name);
-        $this->flash('success', t('common.done'));
-        return $this->to('/stack');
+        return $this->to('/addons');
     }
 
     public function redisSave(): Response
@@ -59,26 +41,7 @@ final class StackController extends Controller
         } else {
             unset($_SESSION['new_secret']);
         }
-        return $this->to('/stack');
-    }
-
-    public function redisInstall(): Response
-    {
-        if ($this->call('redis.install') !== null) {
-            Audit::log('redis.install');
-            $this->flash('success', t('stack.installing_started'));
-        }
-        return $this->to('/stack');
-    }
-
-    public function redisUninstall(): Response
-    {
-        $purge = (bool)$this->req->post('purge');
-        if ($this->call('redis.uninstall', ['purge' => $purge]) !== null) {
-            Audit::log('redis.uninstall', '', ['purge' => $purge]);
-            $this->flash('success', t('stack.removing_started'));
-        }
-        return $this->to('/stack');
+        return $this->to('/addons/redis');
     }
 
     public function redisKey(): Response
@@ -87,26 +50,7 @@ final class StackController extends Controller
             $_SESSION['new_secret'] = ['label' => 'Redis requirepass', 'value' => $r['key']];
             Audit::log('redis.key.show');
         }
-        return $this->to('/stack');
-    }
-
-    public function meiliInstall(): Response
-    {
-        if ($this->call('meili.install') !== null) {
-            Audit::log('meili.install');
-            $this->flash('success', t('stack.meili_installing'));
-        }
-        return $this->to('/stack');
-    }
-
-    public function meiliUninstall(): Response
-    {
-        $purge = (bool)$this->req->post('purge');
-        if ($this->call('meili.uninstall', ['purge' => $purge], 120) !== null) {
-            Audit::log('meili.uninstall', '', ['purge' => $purge]);
-            $this->flash('success', t('stack.meili_removed'));
-        }
-        return $this->to('/stack');
+        return $this->to('/addons/redis');
     }
 
     public function meiliConfigure(): Response
@@ -115,7 +59,7 @@ final class StackController extends Controller
             Audit::log('meili.configure');
             $this->flash('success', t('common.saved'));
         }
-        return $this->to('/stack');
+        return $this->to('/addons/meilisearch');
     }
 
     /** Shows the current master key once, or rotates it (rotation invalidates every API key derived from it). */
@@ -127,6 +71,6 @@ final class StackController extends Controller
             $_SESSION['new_secret'] = ['label' => 'Meilisearch master key', 'value' => $r['key']];
             Audit::log($rotate ? 'meili.key.rotate' : 'meili.key.show');
         }
-        return $this->to('/stack');
+        return $this->to('/addons/meilisearch');
     }
 }

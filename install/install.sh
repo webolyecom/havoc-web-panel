@@ -62,7 +62,7 @@ else
   tar -xzf /tmp/havoc.tgz -C /opt/havoc --strip-components=1
 fi
 chown -R root:root /opt/havoc
-chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-redis-job /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
+chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-redis-job /opt/havoc/bin/havoc-addon-job /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
 chmod 755 /opt/havoc/bin/havoc-cronwrap /opt/havoc/ctl/fsworker
 chmod 755 /opt/havoc/bin/havoc
 
@@ -208,6 +208,24 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
+cat > /etc/systemd/system/havoc-alerts.service <<UNIT
+[Unit]
+Description=Havoc notifications (server checks)
+[Service]
+Type=oneshot
+User=havoc
+ExecStart=/usr/bin/php /opt/havoc/bin/havoc alerts:check
+TimeoutStartSec=300
+UNIT
+cat > /etc/systemd/system/havoc-alerts.timer <<UNIT
+[Unit]
+Description=Run the Havoc notification checks every 5 minutes
+[Timer]
+OnCalendar=*:0/5
+Persistent=false
+[Install]
+WantedBy=timers.target
+UNIT
 install -d -m 711 /var/backups/havoc
 install -d -o www-data -g www-data -m 750 /var/log/havoc/waf
 install -d -m 755 /etc/havoc/waf
@@ -283,7 +301,7 @@ runuser -u havoc -- php /opt/havoc/bin/havoc migrate
 CREDS=$(runuser -u havoc -- php /opt/havoc/bin/havoc admin:create admin "admin@$(hostname -f)")
 
 systemctl daemon-reload
-systemctl enable --now havoc-panel-fpm havoc-panel-nginx havoc-backup.timer havoc-usage.timer
+systemctl enable --now havoc-panel-fpm havoc-panel-nginx havoc-backup.timer havoc-usage.timer havoc-alerts.timer
 
 echo nginx > /etc/havoc/webserver
 if [ "$WEBSERVER" != nginx ]; then

@@ -10,7 +10,7 @@ Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, fi
 from one clean interface, with no license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.7.2-0b7fa0.svg)
+![Version](https://img.shields.io/badge/version-0.8.0-0b7fa0.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg)
 ![Debian](https://img.shields.io/badge/Debian-12%20%7C%2013-a81d33.svg)
 ![Status](https://img.shields.io/badge/status-beta-f59e0b.svg)
@@ -84,13 +84,14 @@ Contributions back to the project are very welcome, but never required.
 - MariaDB databases and users, remote access per database
 - One-click **phpMyAdmin** (latest release, behind the panel login)
 - **MariaDB performance tuning** with RAM-based profiles and automatic rollback
-- **Redis** and **Meilisearch** (one-click install / uninstall)
+- **Add-ons**, one-click install / uninstall with their own settings pages: **Redis**, **Meilisearch**, **Memcached**, **Node.js** (LTS from NodeSource, pm2 / yarn / pnpm)
 
 ### 🔐 Security
 - Admin / reseller / user roles with strict tenant isolation
 - **Two-factor authentication (TOTP)**, brute-force protection, audit log
 - CSRF protection, strict Content-Security-Policy, prepared statements, Argon2id
 - **ModSecurity WAF** with OWASP CRS, **firewall** (ufw) with lock-out protection
+- **Fail2ban** add-on: bans addresses that keep failing SSH, FTP or panel logins; ban / unban and whitelist from the panel
 - Privileged actions run through a small, whitelisted root helper; the web panel itself runs unprivileged
 
 ### 📡 DNS, FTP & monitoring
@@ -98,6 +99,7 @@ Contributions back to the project are very welcome, but never required.
 - **FTP** (Pure-FTPd, TLS) and **SFTP** (chrooted) accounts
 - Server overview on the dashboard (IP addresses, OS, CPU, memory, free disk), live process list with ending of runaway account processes
 - Server monitor, service control, resource limits, traffic statistics with CSV export
+- **Notifications by e-mail (SMTP) and Telegram**: full disks, high memory or load, stopped services, expiring SSL certificates, failed backups, new panel versions — with reminders and "resolved" messages
 
 ### 🏢 For hosting companies
 - **Resellers**, hosting packages with CPU / RAM / disk / bandwidth limits
