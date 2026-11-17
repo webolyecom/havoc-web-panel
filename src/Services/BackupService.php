@@ -112,7 +112,7 @@ final class BackupService
     {
         if (is_file('/opt/havoc-pma/index.php')) {
             try {
-                Ctl::call('pma.cleanup', [], 120);            // temporary phpMyAdmin logins older than 2 hours
+                Ctl::call('pma.cleanup', [], 120);            // phpMyAdmin logins unused for 24 hours
             } catch (\Throwable $e) {
                 error_log('pma cleanup: ' . $e->getMessage());
             }

@@ -167,4 +167,17 @@
     poll();
     setInterval(poll, 3000);
   }
+  // session heartbeat: while a panel tab is open the session stays alive (it ends 24 h after the last tab is closed)
+  if ($('form[action="/logout"]')) {
+    let lastPing = Date.now();
+    const ping = async () => {
+      lastPing = Date.now();
+      try {
+        const r = await fetch('/session/ping', { headers: { Accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' });
+        if (r.redirected || r.status === 401) location.reload();      // the session has ended: show the login page
+      } catch (_) {}
+    };
+    setInterval(ping, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastPing > 60 * 1000) ping(); });
+  }
 })();

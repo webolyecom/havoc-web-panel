@@ -2,6 +2,17 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.9.4] – 2026-11-17
+### Changed
+- **Panel sessions no longer end while a panel tab is open.** An open tab sends a small heartbeat every 5 minutes. A session now ends 24 hours after the last request (it was 1 hour), and the browser cookie has the same expiry, so it is deleted 24 hours after the last tab was closed.
+- **"Remember me for 30 days"** on the login page (also with two-factor login): the session and its cookie stay valid for 30 days from the login.
+- **phpMyAdmin no longer logs out while its tab is open.**
+  - Its keep-alive request now runs about every 30 minutes; it also keeps the panel session alive, and the panel's renewed cookie is passed on to the browser.
+  - The one-click login's temporary MySQL user was dropped 2 hours after it was made, even in the middle of work. It now stays while phpMyAdmin uses it and is dropped 24 hours after the last use (at most 30 days).
+  - phpMyAdmin's inactivity limit for manual logins is 24 hours (it was 1 hour).
+  - Session files older than 24 hours are removed hourly.
+- Existing servers get the phpMyAdmin settings with the update; the old `session.lifetime` setting in /etc/havoc/config.php is no longer used.
+
 ## [0.9.3] – 2026-11-17
 ### Fixed
 - **Uploads failed with "Unexpected token '<' … is not valid JSON" / HTTP 500** (upload link page, file manager, Claude connector), or site uploads larger than about 16 KB failed with 500, depending on which web server had started last. The panel's own Nginx and the sites' Nginx shared /var/lib/nginx for request bodies, and each takes that folder over on every start or reload (a new domain or certificate reloads the sites' Nginx). The panel's Nginx now has its own folders in /var/lib/havoc-panel-nginx; the upgrade adds them and reloads the sites' Nginx once.

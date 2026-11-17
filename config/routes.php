@@ -20,6 +20,7 @@ return static function (Router $r): void {
     $r->get('/login/2fa', [AuthController::class, 'twoFaForm'], ['guest']);
     $r->post('/login/2fa', [AuthController::class, 'twoFa'], ['guest']);
     $r->post('/logout', [AuthController::class, 'logout'], ['auth']);
+    $r->get('/session/ping', [AuthController::class, 'ping'], ['auth']);
     $r->get('/lang/{code}', [DashboardController::class, 'lang']);
 
     $r->get('/', [DashboardController::class, 'index'], ['auth']);

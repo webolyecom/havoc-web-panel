@@ -663,4 +663,5 @@ return [
     'dsec.delete_hint' => 'Removes the site with its subdomains, aliases, redirects, FTP accounts, DNS zone, search keys and its web server and PHP configuration. Databases stay (they are only detached from the site). Files and search indexes stay too unless you tick the box. This cannot be undone.',
     'dsec.delete_confirm' => 'Really delete :domain?',
     'dsec.aliases_hint' => 'An alias shows this site under another domain name (same files, same settings).',
+    'auth.remember' => 'Remember me for 30 days',
 ];

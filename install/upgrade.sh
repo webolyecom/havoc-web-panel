@@ -94,6 +94,10 @@ systemctl reload havoc-panel-nginx || systemctl restart havoc-panel-nginx
 # the sites' Nginx takes /var/lib/nginx/* back (the panel's Nginx may have owned it until now)
 if systemctl is-active --quiet nginx; then systemctl reload nginx || true; fi
 
+if [ -f /opt/havoc-pma/index.php ]; then   # phpMyAdmin: one-click login and session settings (idempotent)
+  /opt/havoc/ctl/havocctl pma.sso_setup <<< '{}' >/dev/null 2>&1 || echo "Note: phpMyAdmin session settings could not be applied."
+fi
+
 log "Re-applying site configurations (adds www.<domain>, new PHP/Nginx options)"
 runuser -u havoc -- php /opt/havoc/bin/havoc domains:reapply || true
 
