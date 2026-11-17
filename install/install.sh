@@ -108,6 +108,7 @@ php_admin_value[upload_max_filesize] = 8M
 php_admin_value[memory_limit] = 256M
 FPM
 
+install -d -m 755 /var/lib/havoc-panel-nginx
 cat > /etc/havoc/nginx/nginx.conf <<NGX
 user havoc;
 worker_processes auto;
@@ -118,6 +119,13 @@ http {
   include /etc/nginx/mime.types;
   access_log /var/log/havoc/panel/nginx-access.log;
   server_tokens off;
+  # own temporary folders: the sites' Nginx (www-data) chowns /var/lib/nginx/* to itself on every start/reload,
+  # so sharing them made large panel requests (uploads) or large site uploads fail with 500, whichever started last
+  client_body_temp_path /var/lib/havoc-panel-nginx/body;
+  proxy_temp_path /var/lib/havoc-panel-nginx/proxy;
+  fastcgi_temp_path /var/lib/havoc-panel-nginx/fastcgi;
+  uwsgi_temp_path /var/lib/havoc-panel-nginx/uwsgi;
+  scgi_temp_path /var/lib/havoc-panel-nginx/scgi;
   limit_req_zone \$binary_remote_addr zone=login:10m rate=20r/m;
   server {
     listen $PORT ssl;

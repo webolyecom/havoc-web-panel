@@ -2,8 +2,10 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
-## [Unreleased]
+## [0.9.3] – 2026-11-17
 ### Fixed
+- **Uploads failed with "Unexpected token '<' … is not valid JSON" / HTTP 500** (upload link page, file manager, Claude connector), or site uploads larger than about 16 KB failed with 500, depending on which web server had started last. The panel's own Nginx and the sites' Nginx shared /var/lib/nginx for request bodies, and each takes that folder over on every start or reload (a new domain or certificate reloads the sites' Nginx). The panel's Nginx now has its own folders in /var/lib/havoc-panel-nginx; the upgrade adds them and reloads the sites' Nginx once.
+- The upload link page shows "HTTP <code>" when a server in front returns an error page, instead of a JSON parse error.
 - Backups → remote storage: opening one "add" card no longer stretches the cards next to it.
 - REST API: `POST /api/v1/domains` returned `"owner": null`; it now returns the owner's user name.
 ### Documentation

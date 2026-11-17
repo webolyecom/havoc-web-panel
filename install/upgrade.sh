@@ -38,6 +38,10 @@ grep -q 'fastcgi_read_timeout' $N || sed -i '0,/client_max_body_size 64m;/s//cli
 if ! grep -q 'gzip on' $N; then
   sed -i '0,/fastcgi_read_timeout 660s;/s//fastcgi_read_timeout 660s;\n    gzip on;\n    gzip_types text\/css application\/javascript application\/json image\/svg+xml text\/plain;\n    gzip_min_length 1024;/' $N
 fi
+install -d -m 755 /var/lib/havoc-panel-nginx
+if ! grep -q 'client_body_temp_path' $N; then   # own temporary folders (see install.sh)
+  sed -i '0,/server_tokens off;/s//server_tokens off;\n  client_body_temp_path \/var\/lib\/havoc-panel-nginx\/body;\n  proxy_temp_path \/var\/lib\/havoc-panel-nginx\/proxy;\n  fastcgi_temp_path \/var\/lib\/havoc-panel-nginx\/fastcgi;\n  uwsgi_temp_path \/var\/lib\/havoc-panel-nginx\/uwsgi;\n  scgi_temp_path \/var\/lib\/havoc-panel-nginx\/scgi;/' $N
+fi
 if ! /usr/sbin/nginx -t -c $N; then
   echo "Panel web server configuration test failed; restoring the previous file."; cp -a $N.bak $N
 fi
@@ -87,6 +91,8 @@ log "Restarting the panel"
 systemctl daemon-reload
 systemctl restart havoc-panel-fpm
 systemctl reload havoc-panel-nginx || systemctl restart havoc-panel-nginx
+# the sites' Nginx takes /var/lib/nginx/* back (the panel's Nginx may have owned it until now)
+if systemctl is-active --quiet nginx; then systemctl reload nginx || true; fi
 
 log "Re-applying site configurations (adds www.<domain>, new PHP/Nginx options)"
 runuser -u havoc -- php /opt/havoc/bin/havoc domains:reapply || true

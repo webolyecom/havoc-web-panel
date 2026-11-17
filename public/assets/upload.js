@@ -32,8 +32,8 @@
           try {
             const r = await fetch(`${url}?offset=${off}&final=${final ? 1 : 0}&name=${encodeURIComponent(file.name)}`,
               { method: 'POST', body: part, headers: { 'Content-Type': 'application/octet-stream' } });
-            last = await r.json();
-            if (!r.ok) throw new Error(last.error || r.status);
+            try { last = await r.json(); } catch (_) { throw new Error('HTTP ' + r.status); }   // e.g. an error page of a web server in front
+            if (!r.ok) throw new Error(last.error || 'HTTP ' + r.status);
             break;
           } catch (e) {
             if (tries >= 3 || /sync|large|only|invalid|expired/i.test(String(e.message))) throw e;
