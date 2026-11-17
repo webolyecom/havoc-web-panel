@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Havoc\Controllers;
 
-use Havoc\Core\{Auth, Config, DB, RateLimiter, Response, Totp};
+use Havoc\Core\{Auth, Config, DB, RateLimiter, Response, Session, Totp};
 
 final class AuthController extends Controller
 {
@@ -15,6 +15,12 @@ final class AuthController extends Controller
     public function login(): Response
     {
         [$status] = Auth::attempt($this->req->str('username'), (string)$this->req->post('password', ''), $this->req->ip());
+        $remember = (bool)$this->req->post('remember');
+        if ($status === 'ok') {
+            Session::remember($remember);
+        } elseif ($status === '2fa') {
+            $_SESSION['pending_remember'] = $remember;      // applied after the code
+        }
         return match ($status) {
             'ok'     => $this->to(self::next()),
             '2fa'    => $this->to('/login/2fa'),
@@ -57,13 +63,22 @@ final class AuthController extends Controller
             return $this->fail(t('auth.locked', ['min' => Config::get('security.lockout_minutes')]));
         }
         if (Totp::verify((string)$u['totp_secret'], $this->req->str('code'))) {
+            $remember = !empty($_SESSION['pending_remember']);
+            unset($_SESSION['pending_remember']);
             Auth::login($u, $ip);
+            Session::remember($remember);
             return $this->to(self::next());
         }
         RateLimiter::hit($ip, $u['username']);
         Auth::logFailure($ip, (string)$u['username']);
         $this->flash('error', t('auth.invalid_code'));
         return $this->to('/login/2fa');
+    }
+
+    /** Heartbeat of an open panel tab (app.js): keeps the session alive while a tab is open. */
+    public function ping(): Response
+    {
+        return Response::json(['ok' => true, 'until' => !empty($_SESSION['remember']) ? (int)$_SESSION['remember_until'] : time() + Session::IDLE]);
     }
 
     public function logout(): Response

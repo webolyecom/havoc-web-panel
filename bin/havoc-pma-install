@@ -50,7 +50,8 @@ declare(strict_types=1);
 \$cfg['Servers'][1]['AllowNoPassword'] = false;
 \$cfg['Servers'][1]['AllowRoot'] = false;
 \$cfg['AllowArbitraryServer'] = false;
-\$cfg['LoginCookieValidity'] = 3600;
+\$cfg['LoginCookieValidity'] = 86400;          // 24 h; see Pma::sessionSetup()
+\$cfg['LoginCookieValidityDisableWarning'] = true;
 \$cfg['TempDir'] = '$STATE/tmp';
 \$cfg['UploadDir'] = '';
 \$cfg['SaveDir'] = '';
@@ -94,6 +95,8 @@ php_admin_value[disable_functions] = exec,passthru,shell_exec,system,proc_open,p
 php_admin_flag[expose_php] = off
 php_admin_flag[display_errors] = off
 php_admin_value[session.cookie_secure] = 1
+php_admin_value[session.gc_maxlifetime] = 1800
+php_admin_value[session.gc_probability] = 0
 FPM
 
 cat > /etc/systemd/system/havoc-pma-fpm.service <<UNIT
@@ -131,6 +134,8 @@ location = /phpmyadmin { return 301 /phpmyadmin/; }
 location ^~ /phpmyadmin/ {
     auth_request /_havoc_auth;
     error_page 401 = @havoc_login;
+    auth_request_set $havoc_cookie $upstream_http_set_cookie;   # the panel's renewed session cookie
+    add_header Set-Cookie $havoc_cookie;
     alias /opt/havoc-pma/;
     index index.php;
     client_max_body_size 260m;

@@ -10,7 +10,9 @@ namespace Havoc\Ctl;
  * - Isolation: own PHP-FPM master running as system user "havoc-pma" (no access to the panel database or keys).
  * - Files: /opt/havoc-pma (root-owned, read-only for PHP), state in /var/lib/havoc-pma.
  * - One-click login (server 2, "signon"): the panel asks for a ticket for one database; root creates a temporary MySQL
- *   user that can only reach that database (dropped after 2 hours) and a single-use ticket file valid for one minute.
+ *   user that can only reach that database and a single-use ticket file valid for one minute. The user is dropped
+ *   24 hours after phpMyAdmin last used it (its session files show that; an open tab keeps them fresh) and at most
+ *   30 days after it was made.
  *   havoc-signon.php redeems the ticket into phpMyAdmin's signon session. No database password is stored anywhere.
  */
 final class Pma
@@ -54,7 +56,12 @@ final class Pma
     private const TICKETS = '/var/lib/havoc-pma/tickets';
     private const USERS = '/var/lib/havoc-pma/sso-users.json';           // root only: temporary users and expiry
     private const MARK = '// havoc: one-click login (server 2)';
-    private const USER_TTL = 7200;
+    private const IDLE = 86400;                 // phpMyAdmin sessions and temporary users: 24 h after the last request
+    private const MAX_AGE = 30 * 86400;         // a temporary user never lives longer (the panel's "remember me")
+    private const UNUSED = 600;                 // a ticket that was never redeemed
+    private const SESSIONS = '/var/lib/havoc-pma/sessions';
+    private const FPM = '/etc/havoc/pma-fpm.conf';
+    private const MARK_SESS = '// havoc: sessions';
 
     /** Idempotent: the signon server in config.inc.php, the redeem script and the ticket folder. */
     public static function ssoSetup(): array
@@ -77,6 +84,7 @@ final class Pma
                 . "\$cfg['Servers'][2]['verbose'] = 'Havoc';\n";
             Sys::write($cfg, $c, 0640, 'root', 'havoc-pma');
         }
+        self::sessionSetup();
         $script = <<<'PHP'
 <?php
 // Havoc WEB Panel: redeems a one-time ticket from the panel into phpMyAdmin's signon session (server 2).
@@ -111,6 +119,50 @@ PHP;
         return [];
     }
 
+    /**
+     * Logins stay while a phpMyAdmin tab is open and end 24 hours after the last request:
+     * - phpMyAdmin's inactivity limit (cookie login) is 24 hours;
+     * - PHP's session GC is off (cleanup() removes session files after 24 hours) and session.gc_maxlifetime is 30 minutes
+     *   only so that phpMyAdmin's own keep-alive request runs every ~30 minutes; that request also passes the panel's
+     *   session check and so keeps the panel session alive;
+     * - the panel's renewed session cookie from that check is passed on to the browser.
+     * Idempotent; called on every ticket and on install/upgrade.
+     */
+    private static function sessionSetup(): void
+    {
+        $cfg = self::DIR . '/config.inc.php';
+        $c = (string)file_get_contents($cfg);
+        if (!str_contains($c, self::MARK_SESS)) {
+            $c = rtrim($c) . "\n\n" . self::MARK_SESS . "\n\$cfg['LoginCookieValidity'] = " . self::IDLE . ";\n\$cfg['LoginCookieValidityDisableWarning'] = true;\n";
+            Sys::write($cfg, $c, 0640, 'root', 'havoc-pma');
+        }
+        if (is_file(self::FPM)) {
+            $f = (string)file_get_contents(self::FPM);
+            $n = preg_replace('/^php_admin_value\[session\.gc_(maxlifetime|probability)\].*\R?/m', '', $f);
+            $n = rtrim($n) . "\nphp_admin_value[session.gc_maxlifetime] = 1800\nphp_admin_value[session.gc_probability] = 0\n";
+            if ($n !== $f) {
+                Sys::write(self::FPM, $n, 0644);
+                Sys::run(['systemctl', 'reload-or-restart', 'havoc-pma-fpm']);
+            }
+        }
+        if (is_file(self::NGINX)) {
+            $g = (string)file_get_contents(self::NGINX);
+            if (!str_contains($g, 'auth_request_set')) {
+                $n = str_replace("    error_page 401 = @havoc_login;\n",
+                    "    error_page 401 = @havoc_login;\n    auth_request_set \$havoc_cookie \$upstream_http_set_cookie;   # the panel's renewed session cookie\n    add_header Set-Cookie \$havoc_cookie;\n", $g);
+                if ($n !== $g) {
+                    Sys::write(self::NGINX, $n, 0644);
+                    [$code] = Sys::run(['/usr/sbin/nginx', '-t', '-c', '/etc/havoc/nginx/nginx.conf']);
+                    if ($code === 0) {
+                        Sys::run(['systemctl', 'reload', 'havoc-panel-nginx']);
+                    } else {
+                        Sys::write(self::NGINX, $g, 0644);
+                    }
+                }
+            }
+        }
+    }
+
     private static function sql(string $sql): string
     {
         return Sys::ok([is_file('/usr/bin/mariadb') ? '/usr/bin/mariadb' : '/usr/bin/mysql', '--batch', '-N'], $sql);
@@ -133,20 +185,45 @@ PHP;
         $g = str_replace('_', '\\_', $db);
         self::sql("CREATE USER '$user'@'localhost' IDENTIFIED BY '$pass';\nGRANT ALL PRIVILEGES ON `$g`.* TO '$user'@'localhost';\nFLUSH PRIVILEGES;\n");
         $list = json_decode((string)@file_get_contents(self::USERS), true) ?: [];
-        $list[$user] = time() + self::USER_TTL;
+        $list[$user] = ['created' => time()];
         Sys::write(self::USERS, json_encode($list), 0600);
         $t = bin2hex(random_bytes(24));
         Sys::write(self::TICKETS . "/$t.json", json_encode(['user' => $user, 'pass' => $pass, 'db' => $db, 'exp' => time() + 60]), 0600, 'havoc-pma', 'havoc-pma');
         return ['ticket' => $t, 'user' => $user];
     }
 
-    /** Drops expired temporary users and stale tickets (hourly and before every new ticket). */
+    /**
+     * Drops temporary users phpMyAdmin has not used for 24 hours (or never, or made more than 30 days ago), removes
+     * phpMyAdmin session files untouched for 24 hours and stale tickets. Hourly and before every new ticket.
+     */
     public static function cleanup(bool $all = false): array
     {
+        $now = time();
+        // last use of each temporary user = newest session file that names it (phpMyAdmin rewrites them on every request)
+        $seen = [];
+        foreach (glob(self::SESSIONS . '/sess_*') ?: [] as $f) {
+            if (is_link($f) || !is_file($f)) {
+                continue;
+            }
+            $m = (int)filemtime($f);
+            if ($now - $m > self::IDLE) {
+                @unlink($f);
+                continue;
+            }
+            if (preg_match_all('/hvpma_[a-f0-9]{10}/', (string)file_get_contents($f, false, null, 0, 1 << 20), $mm)) {
+                foreach (array_unique($mm[0]) as $u) {
+                    $seen[$u] = max($seen[$u] ?? 0, $m);
+                }
+            }
+        }
         $list = json_decode((string)@file_get_contents(self::USERS), true) ?: [];
         $n = 0;
-        foreach ($list as $u => $exp) {
-            if (($all || $exp < time()) && preg_match('/^hvpma_[a-f0-9]{10}$/D', (string)$u)) {
+        foreach ($list as $u => $info) {
+            $created = is_array($info) ? (int)($info['created'] ?? 0) : (int)$info - 7200;   // before 0.9.4: expiry time
+            $last = $seen[$u] ?? 0;
+            $gone = $all || $now - $created > self::MAX_AGE
+                || ($last ? $now - $last > self::IDLE : $now - $created > self::UNUSED);
+            if ($gone && preg_match('/^hvpma_[a-f0-9]{10}$/D', (string)$u)) {
                 try {
                     self::sql("DROP USER IF EXISTS '$u'@'localhost';");
                 } catch (\Throwable) {
@@ -159,7 +236,7 @@ PHP;
             Sys::write(self::USERS, json_encode($list), 0600);
         }
         foreach (glob(self::TICKETS . '/*.json') ?: [] as $f) {
-            if (filemtime($f) < time() - 120) {
+            if (filemtime($f) < $now - 120) {
                 @unlink($f);
             }
         }

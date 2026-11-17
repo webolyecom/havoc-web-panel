@@ -663,4 +663,5 @@ return [
     'dsec.delete_hint' => 'Siteyi alt alan adları, alias\'ları, yönlendirmeleri, FTP hesapları, DNS bölgesi, arama anahtarları ve web sunucusu ile PHP ayarlarıyla birlikte kaldırır. Veritabanları kalır (yalnızca siteden ayrılır). Kutuyu işaretlemezseniz dosyalar ve arama index\'leri de kalır. Bu işlem geri alınamaz.',
     'dsec.delete_confirm' => ':domain gerçekten silinsin mi?',
     'dsec.aliases_hint' => 'Alias bu siteyi başka bir alan adıyla gösterir (aynı dosyalar, aynı ayarlar).',
+    'auth.remember' => 'Beni 30 gün hatırla',
 ];

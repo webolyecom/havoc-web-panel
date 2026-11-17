@@ -9,7 +9,7 @@ return [
         'version' => '0.1.0',
     ],
     'db' => ['path' => '/var/lib/havoc/panel.sqlite'],
-    'session' => ['path' => '/var/lib/havoc/sessions', 'lifetime' => 3600],
+    'session' => ['path' => '/var/lib/havoc/sessions'],   // ends 24 h after the last open tab, or 30 days after a "remember me" login
     'ctl' => ['bin' => '/opt/havoc/ctl/havocctl', 'sudo' => '/usr/bin/sudo'],
     'php_versions' => ['8.1', '8.2', '8.3', '8.4'],
     'security' => ['max_login_attempts' => 5, 'lockout_minutes' => 15],
