@@ -2,6 +2,12 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.9.5] – 2026-11-18
+### Added
+- Upload link page: a **Copy** button next to the "Uploaded to …" message, so it can be pasted to Claude in one step (shown only after a successful upload).
+### Fixed
+- PHP error logs of the sites filled with `Zend OPcache can't be temporary enabled (it may be only disabled till the end of request)` for every new PHP worker. The OPcache settings of a site (on/off, memory) were written as `php_admin_value` into its PHP-FPM pool; FPM applies those again in every worker at runtime, where OPcache may only be switched off. They are now in a startup file in the site's own PHP configuration folder (`/etc/havoc/php/<id>/conf.d/99-havoc-opcache.ini`), which has the same effect without the warning. Existing sites are rewritten by the update.
+
 ## [0.9.4] – 2026-11-17
 ### Changed
 - **Panel sessions no longer end while a panel tab is open.** An open tab sends a small heartbeat every 5 minutes. A session now ends 24 hours after the last request (it was 1 hour), and the browser cookie has the same expiry, so it is deleted 24 hours after the last tab was closed.

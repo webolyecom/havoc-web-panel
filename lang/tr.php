@@ -664,4 +664,5 @@ return [
     'dsec.delete_confirm' => ':domain gerçekten silinsin mi?',
     'dsec.aliases_hint' => 'Alias bu siteyi başka bir alan adıyla gösterir (aynı dosyalar, aynı ayarlar).',
     'auth.remember' => 'Beni 30 gün hatırla',
+    'upload.copy' => 'Kopyala', 'upload.copied' => 'Kopyalandı ✓',
 ];
