@@ -664,4 +664,5 @@ return [
     'dsec.delete_confirm' => 'Really delete :domain?',
     'dsec.aliases_hint' => 'An alias shows this site under another domain name (same files, same settings).',
     'auth.remember' => 'Remember me for 30 days',
+    'upload.copy' => 'Copy', 'upload.copied' => 'Copied ✓',
 ];

@@ -5,12 +5,28 @@
   const url = root.dataset.url, CHUNK = +root.dataset.chunk, MAX = +root.dataset.max;
   const input = root.querySelector('input[type=file]'), drop = root.querySelector('[data-drop]');
   const prog = root.querySelector('[data-progress]'), bar = root.querySelector('[data-bar]'), status = root.querySelector('[data-status]');
-  const result = root.querySelector('[data-result]');
+  const result = root.querySelector('[data-result]'), resultText = root.querySelector('[data-result-text]'), copyBtn = root.querySelector('[data-upload-copy]');
+  const copyLabel = copyBtn.textContent;
   const fmt = (n) => (n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GB' : (n / 1048576).toFixed(1) + ' MB');
   const show = (ok, text) => {
-    result.textContent = text;
-    result.className = 'rounded-lg p-3 text-sm ' + (ok ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200' : 'bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200');
+    resultText.textContent = text;
+    result.className = 'flex items-start gap-3 rounded-lg p-3 text-sm ' + (ok ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200' : 'bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200');
+    copyBtn.classList.toggle('hidden', !ok);           // the success message is what Claude needs to hear
+    copyBtn.textContent = copyLabel;
   };
+  // copy the message (Clipboard API on HTTPS; selection + execCommand as a fallback)
+  copyBtn.addEventListener('click', async () => {
+    const text = resultText.textContent;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (_) {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.className = 'fixed -left-[9999px] top-0';
+      document.body.appendChild(ta); ta.select();
+      try { ok = document.execCommand('copy'); } catch (_) {}
+      ta.remove();
+    }
+    if (ok) { copyBtn.textContent = root.dataset.msgCopied; setTimeout(() => { copyBtn.textContent = copyLabel; }, 2000); }
+  });
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let busy = false;
 
