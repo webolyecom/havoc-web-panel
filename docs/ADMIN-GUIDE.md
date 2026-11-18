@@ -118,6 +118,10 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 * The copied certificate is marked `ssl_transferred`; Let's Encrypt replaces it as soon as DNS points to the new server (no attempt limit).
 * A panel reached under an address other panels cannot use can set `'transfer' => ['base_url' => 'https://panel.example.com']` in config.php.
 
+## MySQL queries
+* Databases & backups → MySQL queries reads `information_schema.PROCESSLIST` as root (helper action `db.processlist`, query text up to 8000 characters) and stops statements with `KILL QUERY <id>` or connections with `KILL CONNECTION <id>` (`db.kill`). Rules are evaluated by the helper at the moment of the click: "long" = `Query` threads running at least N seconds (optionally in one database), "sleep" = idle connections at least N seconds.
+* Threads of `system user`, `event_scheduler` and the commands Daemon, Binlog Dump, Slave_* and Connect are never stopped. Each stop is in the audit log (`mysql.kill_query` / `mysql.kill_connection`) with the first 200 characters of each query.
+
 ## Panel sessions
 * A session ends 24 hours after its last request. Open panel tabs send a heartbeat (`GET /session/ping`) every 5 minutes, so a session does not end while a tab is open. The `havoc_sid` cookie carries the same expiry (renewed at most every 5 minutes), so the browser deletes it 24 hours after the last tab was closed.
 * "Remember me for 30 days" (login page, also with 2FA): the session and cookie are valid for 30 days from the login.

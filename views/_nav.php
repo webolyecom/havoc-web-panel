@@ -18,6 +18,7 @@ $navGroups = [
         ['/databases', 'nav.databases', 'db', 'user'],
         ['/phpmyadmin/', 'nav.phpmyadmin', 'table', 'user', true],
         ['/databases/tuning', 'nav.db_tuning', 'sliders', 'admin'],
+        ['/server/mysql', 'nav.mysql_procs', 'list', 'admin'],
         ['/backups', 'nav.backups', 'archive', 'user'],
     ]],
     ['access', 'nav.g_access', [

@@ -11,7 +11,7 @@ final class Actions
         'account.ensure', 'account.delete', 'domain.apply', 'domain.delete',
         'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'pma.ticket', 'pma.cleanup', 'pma.sso_setup', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply', 'proc.list', 'proc.signal', 'transfer.sizes', 'transfer.export', 'transfer.export_delete', 'transfer.stage', 'transfer.import_files', 'transfer.import_db', 'transfer.patch', 'transfer.wp_replace', 'transfer.check',
         'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'redis.install', 'redis.uninstall', 'redis.key', 'addon.overview', 'addon.status', 'addon.install', 'addon.uninstall', 'memcached.set', 'memcached.flush', 'fail2ban.apply', 'fail2ban.ban', 'node.globals', 'meili.site_enable', 'meili.site_info', 'meili.site_rotate', 'meili.site_disable', 'meili.site_sizes', 'meili.site_import', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
-        'fw.status', 'fw.enable', 'fw.disable', 'fw.allow', 'fw.ban', 'fw.whitelist', 'fw.preset', 'fw.delete', 'dns.apply', 'dns.delete', 'ftp.create', 'ftp.update', 'ftp.password', 'ftp.delete', 'backup.create', 'backup.restore', 'backup.delete', 'backup.test', 'backup.about', 'fs.exec', 'db.create', 'db.drop', 'db.password', 'db.remote', 'db.bind', 'db.info',
+        'fw.status', 'fw.enable', 'fw.disable', 'fw.allow', 'fw.ban', 'fw.whitelist', 'fw.preset', 'fw.delete', 'dns.apply', 'dns.delete', 'ftp.create', 'ftp.update', 'ftp.password', 'ftp.delete', 'backup.create', 'backup.restore', 'backup.delete', 'backup.test', 'backup.about', 'fs.exec', 'db.create', 'db.drop', 'db.password', 'db.remote', 'db.bind', 'db.info', 'db.processlist', 'db.kill',
     ];
 
     public function webserver_detect(array $a): array
@@ -707,6 +707,92 @@ final class Actions
     {
         $bin = is_file('/usr/bin/mariadb') ? '/usr/bin/mariadb' : '/usr/bin/mysql';
         return Sys::ok([$bin, '--batch', '--skip-column-names'], $sql);   // root via unix_socket, SQL on stdin
+    }
+
+    /** MariaDB threads that must never be killed from the panel. */
+    private const DB_SYSTEM_USERS = ['system user', 'event_scheduler', 'unauthenticated user'];
+    private const DB_SYSTEM_COMMANDS = ['Daemon', 'Binlog Dump', 'Binlog Dump GTID', 'Slave_IO', 'Slave_SQL', 'Slave_worker', 'Connect'];
+
+    /** One JSON object per line (no escaping in --raw; JSON_OBJECT escapes newlines inside values). */
+    private function sqlJson(string $sql): array
+    {
+        $bin = is_file('/usr/bin/mariadb') ? '/usr/bin/mariadb' : '/usr/bin/mysql';
+        $out = [];
+        foreach (explode("\n", Sys::ok([$bin, '--batch', '--raw', '--skip-column-names'], $sql, 20)) as $line) {
+            if ($line !== '' && is_array($r = json_decode($line, true))) {
+                $out[] = $r;
+            }
+        }
+        return $out;
+    }
+
+    /** Connections and running statements (information_schema.PROCESSLIST) and a few server counters. */
+    public function db_processlist(array $a): array
+    {
+        $rows = $this->sqlJson("SELECT JSON_OBJECT('id', ID, 'user', USER, 'host', HOST, 'db', DB, 'command', COMMAND, 'time', TIME, 'time_ms', TIME_MS,
+            'state', STATE, 'info', LEFT(INFO, 8000), 'info_len', CHAR_LENGTH(INFO), 'rows_examined', EXAMINED_ROWS, 'memory', MEMORY_USED)
+            FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() ORDER BY (COMMAND = 'Sleep'), TIME_MS DESC LIMIT 2000;\n");
+        foreach ($rows as &$r) {
+            $r['system'] = in_array($r['user'], self::DB_SYSTEM_USERS, true) || in_array($r['command'], self::DB_SYSTEM_COMMANDS, true);
+            $r['host'] = (string)preg_replace('/:\d+$/', '', (string)$r['host']);     // client port is noise
+        }
+        unset($r);
+        $st = [];
+        foreach ($this->sqlJson("SELECT JSON_OBJECT('k', VARIABLE_NAME, 'v', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS
+            WHERE VARIABLE_NAME IN ('THREADS_CONNECTED','THREADS_RUNNING','MAX_USED_CONNECTIONS','SLOW_QUERIES','UPTIME','QUESTIONS','ABORTED_CONNECTS');\n") as $v) {
+            $st[strtolower((string)$v['k'])] = (int)$v['v'];
+        }
+        $vars = $this->sqlJson("SELECT JSON_OBJECT('max_connections', @@max_connections, 'long_query_time', @@long_query_time, 'slow_log', IF(@@slow_query_log, 1, 0));\n")[0] ?? [];
+        return ['threads' => $rows, 'status' => $st, 'vars' => $vars, 'at' => time()];
+    }
+
+    /**
+     * Stops statements (KILL QUERY: the connection stays) or closes connections (KILL CONNECTION).
+     * Either given ids, or a rule: {"rule": "long", "seconds": N} = statements running N+ seconds,
+     * {"rule": "sleep", "seconds": N} = connections idle N+ seconds; optionally only in one database ("db").
+     * System threads and the helper's own connection are never touched.
+     */
+    public function db_kill(array $a): array
+    {
+        $mode = ($a['mode'] ?? 'query') === 'connection' ? 'CONNECTION' : 'QUERY';
+        $list = $this->db_processlist([])['threads'];
+        $byId = array_column($list, null, 'id');
+        $targets = [];
+        if (isset($a['rule'])) {
+            $sec = max(1, min(86400, (int)($a['seconds'] ?? 60)));
+            $db = isset($a['db']) && $a['db'] !== '' ? (string)$a['db'] : null;
+            foreach ($list as $t) {
+                if ($t['system'] || ($db !== null && $t['db'] !== $db) || (int)$t['time'] < $sec) {
+                    continue;
+                }
+                if (($a['rule'] === 'long' && $t['command'] === 'Query') || ($a['rule'] === 'sleep' && $t['command'] === 'Sleep')) {
+                    $targets[] = (int)$t['id'];
+                }
+            }
+            $mode = $a['rule'] === 'sleep' ? 'CONNECTION' : 'QUERY';
+        } else {
+            foreach (array_slice((array)($a['ids'] ?? []), 0, 500) as $id) {
+                $id = (int)$id;
+                if (!isset($byId[$id])) {
+                    continue;                                         // ended in the meantime
+                }
+                if ($byId[$id]['system']) {
+                    throw new \RuntimeException("Thread $id is a MariaDB system thread and cannot be stopped here");
+                }
+                $targets[] = $id;
+            }
+        }
+        $done = [];
+        foreach ($targets as $id) {
+            try {
+                $this->sql("KILL $mode $id;\n");
+                $done[] = ['id' => $id, 'user' => $byId[$id]['user'] ?? '', 'db' => $byId[$id]['db'] ?? null, 'time' => (int)($byId[$id]['time'] ?? 0),
+                    'info' => mb_substr((string)($byId[$id]['info'] ?? ''), 0, 200)];
+            } catch (\Throwable) {
+                // it ended between listing and killing
+            }
+        }
+        return ['mode' => strtolower($mode), 'killed' => $done];
     }
 
     private function dbName(mixed $n): string
