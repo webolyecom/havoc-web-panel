@@ -68,6 +68,12 @@ final class Fpm
             }
         }
 
+        // OPcache at startup (read once by this site's own FPM master). Not as php_admin_value in the pool: FPM applies those
+        // again in every worker at runtime, and OPcache may only be switched off at runtime, so "enable = 1" there logged
+        // "Zend OPcache can't be temporary enabled" for every new worker.
+        Sys::write("$scan/99-havoc-opcache.ini", sprintf("; written by Havoc WEB Panel\nopcache.enable = %d\nopcache.memory_consumption = %d\nopcache.validate_timestamps = 1\nopcache.revalidate_freq = 2\n",
+            (int)$op['enable'], (int)$op['memory']), 0644);
+
         $disabled = self::DISABLED;
         $pool = <<<INI
 [global]
@@ -93,10 +99,6 @@ php_admin_value[sys_temp_dir] = $home/tmp
 php_admin_value[session.save_path] = $home/tmp
 php_admin_value[disable_functions] = $disabled
 php_admin_value[expose_php] = off
-php_admin_value[opcache.enable] = {$op['enable']}
-php_admin_value[opcache.memory_consumption] = {$op['memory']}
-php_admin_value[opcache.validate_timestamps] = 1
-php_admin_value[opcache.revalidate_freq] = 2
 
 INI;
         $pool .= PhpIni::poolLines((array)($vh['php_ini'] ?? []), PhpIni::adminLines((string)($vh['php_ini_admin'] ?? '')));
