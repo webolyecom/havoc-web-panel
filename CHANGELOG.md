@@ -2,6 +2,15 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.9.6] – 2026-11-19
+### Added
+- **MySQL queries** (Databases & backups → MySQL queries, admins): live list of MariaDB connections and the statements they run, refreshed every 3 seconds.
+  - Each row shows the user, the site and panel user it belongs to, database, time, state and the full query.
+  - Summary: connections / max_connections, running queries, longest query, slow queries.
+  - Long queries are marked (10+ s yellow, 60+ s red).
+  - **Stop** a query (`KILL QUERY`, the connection stays) or **close** a connection (`KILL`): one, selected, or by rule ("queries running longer than N seconds", optionally in one database; "connections idle for more than N seconds").
+  - MariaDB's own system threads cannot be stopped. Every stop is written to the audit log with the queries.
+
 ## [0.9.5] – 2026-11-18
 ### Added
 - Upload link page: a **Copy** button next to the "Uploaded to …" message, so it can be pasted to Claude in one step (shown only after a successful upload).
