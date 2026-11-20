@@ -7,7 +7,7 @@ namespace Havoc\Ctl;
 final class Actions
 {
     public const ALLOWED = [
-        'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'php.list', 'php.extensions', 'service.list', 'service.control',
+        'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'webserver.tuning', 'webserver.tune', 'webserver.cache_purge', 'php.list', 'php.extensions', 'service.list', 'service.control',
         'account.ensure', 'account.delete', 'domain.apply', 'domain.delete',
         'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'pma.ticket', 'pma.cleanup', 'pma.sso_setup', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply', 'proc.list', 'proc.signal', 'transfer.sizes', 'transfer.export', 'transfer.export_delete', 'transfer.stage', 'transfer.import_files', 'transfer.import_db', 'transfer.patch', 'transfer.wp_replace', 'transfer.check',
         'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'redis.install', 'redis.uninstall', 'redis.key', 'addon.overview', 'addon.status', 'addon.install', 'addon.uninstall', 'memcached.set', 'memcached.flush', 'fail2ban.apply', 'fail2ban.ban', 'node.globals', 'meili.site_enable', 'meili.site_info', 'meili.site_rotate', 'meili.site_disable', 'meili.site_sizes', 'meili.site_import', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
@@ -25,6 +25,61 @@ final class Actions
     }
 
     /** Background install (bin/havoc-ws-install). LiteSpeed Enterprise takes a serial number or "TRIAL". */
+    /** Server → Web server → Settings: the active server's values, their limits and the page cache. */
+    public function webserver_tuning(array $a): array
+    {
+        $type = WebServerFactory::active();
+        $ws = WebServerFactory::make($type);
+        $dir = $type === 'nginx' ? WebTuning::NGINX_CACHE_DIR : ($type === 'ols' ? WebTuning::LS_CACHE_DIR : null);
+        $spec = [];
+        foreach (WebTuning::SPEC[$type] as $k => [$def, $min, $max]) {
+            $spec[$k] = ['default' => $def, 'min' => $min, 'max' => $max];
+        }
+        return ['type' => $type, 'version' => $ws->installed() ? $ws->version() : '', 'values' => WebTuning::get($type), 'spec' => $spec,
+            'sites' => WebTuning::all()['sites'], 'saved' => is_file(WebTuning::FILE), 'cache_dir' => $dir, 'cache_size' => $dir ? WebTuning::dirSize($dir) : null];
+    }
+
+    /** Saves and applies the active server's values and the sites' page cache times; nothing changes when the test fails. */
+    public function webserver_tune(array $a): array
+    {
+        $type = WebServerFactory::active();
+        $all = WebTuning::all();
+        $old = is_file(WebTuning::FILE) ? (string)file_get_contents(WebTuning::FILE) : null;
+        $all[$type] = WebTuning::validate($type, (array)($a['values'] ?? []));
+        if (isset($a['sites'])) {
+            $all['sites'] = WebTuning::validateSites((array)$a['sites']);
+        }
+        WebTuning::save($all);
+        $ws = WebServerFactory::make($type);
+        try {
+            $ws->tune($all[$type]);
+        } catch (\Throwable $e) {
+            $old === null ? @unlink(WebTuning::FILE) : Sys::write(WebTuning::FILE, $old, 0644);
+            throw $e;
+        }
+        if (!empty($ws->needsRestart)) {
+            Sys::ok(['systemctl', 'restart', $ws->service()], null, 120);
+        } else {
+            $ws->reload();
+        }
+        return ['type' => $type, 'restarted' => !empty($ws->needsRestart)];
+    }
+
+    /** Empties the page cache of the active server. */
+    public function webserver_cache_purge(array $a): array
+    {
+        $type = WebServerFactory::active();
+        $dir = $type === 'nginx' ? WebTuning::NGINX_CACHE_DIR : ($type === 'ols' ? WebTuning::LS_CACHE_DIR : null);
+        if ($dir === null) {
+            throw new \RuntimeException('LiteSpeed Enterprise keeps its cache where WebAdmin says (Server > Cache); purge it there or with the LiteSpeed Cache plugin of the site.');
+        }
+        $before = WebTuning::dirSize($dir);
+        WebTuning::purge($dir);
+        // new workers: Nginx's open file cache would otherwise keep serving deleted entries for a while
+        WebServerFactory::make($type)->reload();
+        return ['freed' => $before - WebTuning::dirSize($dir)];
+    }
+
     public function webserver_install(array $a): array
     {
         $t = WebServerFactory::type($a['type'] ?? '');

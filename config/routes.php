@@ -192,6 +192,9 @@ return static function (Router $r): void {
     $r->post('/server/update/auto', [ServerController::class, 'updateAuto'], ['admin']);
     $r->get('/server/settings', [ServerController::class, 'settings'], ['admin']);
     $r->get('/server/webserver', [WebServerController::class, 'index'], ['admin']);
+    $r->get('/server/webserver/settings', [WebServerController::class, 'settings'], ['admin']);
+    $r->post('/server/webserver/settings', [WebServerController::class, 'settingsSave'], ['admin']);
+    $r->post('/server/webserver/cache-purge', [WebServerController::class, 'purge'], ['admin']);
     $r->post('/server/webserver/{type}/install', [WebServerController::class, 'install'], ['admin']);
     $r->post('/server/webserver/{type}/activate', [WebServerController::class, 'activate'], ['admin']);
     $r->post('/server/port', [ServerController::class, 'portChange'], ['admin']);

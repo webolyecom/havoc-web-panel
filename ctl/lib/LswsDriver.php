@@ -52,7 +52,7 @@ final class LswsDriver implements WebServer
         $id   = (int)$vh['id'];
         $ssl  = !empty($vh['ssl']['cert']);
         $logs = '/var/log/havoc/domains';
-        $rules = self::rewriteRules($vh, $ssl);
+        $rules = array_merge(self::rewriteRules($vh, $ssl), self::cacheRules($vh, 'lsws'));
         $logging = ['log' => ['useServer' => 0, 'fileName' => "$logs/$d.error.log", 'logLevel' => 'WARN', 'rollingSize' => 0]];
         $logging['accessLog'] = !empty($vh['logs'])
             ? ['useServer' => 0, 'fileName' => "$logs/$d.access.log", 'rollingSize' => 0, 'logFormat' => '%h %l %u %t "%r" %>s %b "%{Referer}i" "%{User-agent}i"']
@@ -63,7 +63,7 @@ final class LswsDriver implements WebServer
             'logging' => $logging,
             'index' => ['useServer' => 0, 'indexFiles' => 'index.php, index.html, index.htm'],
             'extProcessorList' => ['extProcessor' => ['type' => 'fcgi', 'name' => "havoc-fpm-$id", 'address' => "uds://run/havoc-fpm/$id.sock",
-                'maxConns' => 64, 'initTimeout' => 60, 'retryTimeout' => 0, 'persistConn' => 1, 'respBuffer' => 0, 'autoStart' => 0]],
+                'maxConns' => WebTuning::get('lsws')['php_conns'], 'initTimeout' => 60, 'retryTimeout' => 0, 'persistConn' => 1, 'respBuffer' => 0, 'autoStart' => 0]],
             'scriptHandlerList' => ['scriptHandler' => ['suffix' => 'php', 'type' => 'fcgi', 'handler' => "havoc-fpm-$id"]],
             'contextList' => ['context' => ['type' => 'NULL', 'uri' => '/.well-known/acme-challenge/',
                 'location' => '/var/www/havoc-acme/.well-known/acme-challenge/', 'allowBrowse' => 1]],
@@ -178,6 +178,40 @@ final class LswsDriver implements WebServer
             self::build($doc, $l, $tree);
             $ll->appendChild($l);
         }
+        self::tuneXml($doc, $cfg);
         Sys::write($file, (string)$doc->saveXML(), 0640, 'lsadm', 'lsadm');
+    }
+
+    /** Server → Web server → Settings: rewrites the server configuration with the current values (sites follow on re-apply). */
+    public function tune(array $t): void
+    {
+        if (!$this->installed()) {
+            throw new \RuntimeException('LiteSpeed Enterprise is not installed');
+        }
+        self::writeServer();
+    }
+
+    /**
+     * Only the values the panel offers are set (<tuning> and <expires>); every other element stays as LiteSpeed wrote it.
+     * The cache engine itself (CacheEngine, storage) is LiteSpeed's own setting (WebAdmin > Server > Cache).
+     */
+    private static function tuneXml(\DOMDocument $doc, \DOMElement $cfg): void
+    {
+        if (!is_file(WebTuning::FILE)) {
+            return;                       // never saved: LiteSpeed's own values stay
+        }
+        $t = WebTuning::get('lsws');
+        $tu = self::child($doc, $cfg, 'tuning');
+        foreach (['maxConnections' => $t['max_connections'], 'maxSSLConnections' => $t['max_ssl_connections'], 'connTimeout' => $t['conn_timeout'],
+            'maxKeepAliveReq' => $t['max_keepalive_req'], 'keepAliveTimeout' => $t['keepalive_timeout'], 'maxReqBodySize' => $t['max_req_body'] . 'M',
+            'enableGzipCompress' => $t['gzip'] ? 1 : 0, 'enableDynGzipCompress' => $t['gzip'] && $t['dyn_gzip'] ? 1 : 0,
+            'gzipCompressLevel' => $t['gzip_level']] as $k => $v) {
+            self::setText($doc, $tu, $k, (string)$v);
+        }
+        $ex = self::child($doc, $cfg, 'expires');
+        self::setText($doc, $ex, 'enableExpires', (int)$t['static_expires'] > 0 ? '1' : '0');
+        if ((int)$t['static_expires'] > 0) {
+            self::setText($doc, $ex, 'expiresByType', self::expiresByType((int)$t['static_expires']));
+        }
     }
 }

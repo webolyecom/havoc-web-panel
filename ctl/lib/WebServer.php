@@ -15,6 +15,8 @@ interface WebServer
     /** Create/replace the virtual host for a domain. Must roll back on invalid config where a test is available. */
     public function apply(array $vh): void;
     public function remove(string $domain): void;
+    /** Server-level performance/cache settings (WebTuning); must leave the old configuration in place when it fails. */
+    public function tune(array $t): void;
     public function reload(): void;
     public function start(): void;
     public function stop(): void;

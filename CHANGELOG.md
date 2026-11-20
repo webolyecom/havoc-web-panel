@@ -2,6 +2,23 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.9.7] – 2026-11-20
+### Added
+- **Web server settings** (Server → Web server settings): performance, compression, browser cache and page cache of the active web server. Nginx, OpenLiteSpeed and LiteSpeed Enterprise each have their own values; only the active server's are shown. Every field shows its allowed range and default.
+  - **Nginx:**
+    - performance: worker processes, connections per worker (open-files limit raised to match), keep-alive, client and PHP response timeouts, max upload size, open file cache;
+    - compression: gzip and its level;
+    - browser cache for static files (days);
+    - **page cache (FastCGI cache)** per site with its own time: key memory, disk size and cleanup of unused entries, "Empty cache" button, `X-Havoc-Cache` header (HIT / MISS / BYPASS / STALE).
+    - Saving: tested with `nginx -t` first; on failure nothing changes. The values replace the same directives in nginx.conf instead of duplicating them. When the cache size changes Nginx is restarted (a reload would keep the old cache zone).
+  - **OpenLiteSpeed:** connections, HTTPS connections, timeouts, keep-alive, request size, PHP connections per site, HTTP/3, gzip (also for PHP output), browser cache, the **LSCache module** (also needed by the LiteSpeed Cache plugins) and page cache per site.
+  - **LiteSpeed Enterprise:** the same tuning values in httpd_config.xml (only these elements; LiteSpeed's other settings stay) and page cache rules per site. The cache engine itself stays a WebAdmin setting. Nothing is changed until the page is saved once.
+  - **Page cache rules:** only GET/HEAD; never for visitors with login or session cookies (WordPress, WooCommerce, PHP sessions, Laravel…), admin, login, cart, checkout and account pages, or answers that set a cookie.
+- After saving, every site's web server configuration is rewritten; PHP keeps running.
+### Fixed
+- Since 0.9.4 the panel logged `session_set_cookie_params(): ... unrecognized key "expires"` on every request, and the session cookie PHP sends before login lacked HttpOnly / SameSite / Secure (after login the panel re-sent it with the flags).
+- A button inside a form now asks its own confirmation question (e.g. "Empty cache" inside the settings form).
+
 ## [0.9.6] – 2026-11-19
 ### Added
 - **MySQL queries** (Databases & backups → MySQL queries, admins): live list of MariaDB connections and the statements they run, refreshed every 3 seconds.

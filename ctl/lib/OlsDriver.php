@@ -42,7 +42,8 @@ final class OlsDriver implements WebServer
         $acc  = !empty($vh['logs'])
             ? "accesslog $logs/$d.access.log {\n  useServer               0\n  logFormat               \"%h %l %u %t \\\"%r\\\" %>s %b \\\"%{Referer}i\\\" \\\"%{User-agent}i\\\"\"\n  rollingSize             0\n}\n"
             : '';
-        $rules = self::rewriteRules($vh, $ssl);
+        $rules = array_merge(self::rewriteRules($vh, $ssl), self::cacheRules($vh, 'ols'));
+        $t = WebTuning::get('ols');
         $conf = "# Managed by Havoc WEB Panel - do not edit\n"
             . "docRoot                   {$vh['docroot']}/\n"
             . "vhDomain                  $d\n"
@@ -52,7 +53,7 @@ final class OlsDriver implements WebServer
             . $acc
             . "index  {\n  useServer               0\n  indexFiles              index.php, index.html, index.htm\n}\n"
             . "extprocessor havoc-fpm-$id {\n  type                    fcgi\n  address                 uds://run/havoc-fpm/$id.sock\n"
-            . "  maxConns                64\n  initTimeout             60\n  retryTimeout            0\n  persistConn             1\n"
+            . "  maxConns                {$t['php_conns']}\n  initTimeout             60\n  retryTimeout            0\n  persistConn             1\n"
             . "  respBuffer              0\n  autoStart               0\n}\n"
             . "scripthandler  {\n  add                     fcgi:havoc-fpm-$id php\n}\n"
             . "context /.well-known/acme-challenge/ {\n  location                /var/www/havoc-acme/.well-known/acme-challenge/\n  allowBrowse             1\n"
@@ -82,6 +83,15 @@ final class OlsDriver implements WebServer
         }
     }
 
+    /** Server → Web server → Settings: rewrites the server configuration with the current values (sites follow on re-apply). */
+    public function tune(array $t): void
+    {
+        if (!$this->installed()) {
+            throw new \RuntimeException('OpenLiteSpeed is not installed');
+        }
+        self::writeServer();
+    }
+
     /** Full httpd_config.conf: server settings, one virtualhost per managed site, listeners 80/443 mapping all names. */
     private static function writeServer(): void
     {
@@ -94,6 +104,17 @@ final class OlsDriver implements WebServer
                 . "  allowSymbolLink         2\n  enableScript            1\n  restrained              0\n  setUIDMode              0\n}\n\n";
             $maps .= "  map                     $name " . implode(', ', $names) . "\n";
         }
+        $t = WebTuning::get('ols');
+        $b = static fn($v) => $v ? 1 : 0;
+        $gz = $b($t['gzip']);
+        $dgz = $b($t['gzip'] && $t['dyn_gzip']);
+        $quic = $b($t['quic']);
+        $lsc = $b($t['cache']);
+        $objSize = $t['cache_max_obj'] * 1048576;
+        $cacheDir = WebTuning::LS_CACHE_DIR;
+        $expires = (int)$t['static_expires'] > 0
+            ? "expires  {\n  enableExpires           1\n  expiresByType           " . self::expiresByType((int)$t['static_expires']) . "\n}\n"
+            : '';
         $conf = <<<CONF
 # Managed by Havoc WEB Panel - regenerated on every site change. The package default is kept in httpd_config.conf.orig.
 serverName                Havoc
@@ -126,22 +147,42 @@ accesslog /var/log/havoc/ols-access.log {
 }
 
 tuning  {
-  maxConnections          10000
-  maxSSLConnections       10000
-  connTimeout             300
-  maxKeepAliveReq         10000
-  keepAliveTimeout        5
+  maxConnections          {$t['max_connections']}
+  maxSSLConnections       {$t['max_ssl_connections']}
+  connTimeout             {$t['conn_timeout']}
+  maxKeepAliveReq         {$t['max_keepalive_req']}
+  keepAliveTimeout        {$t['keepalive_timeout']}
   maxReqURLLen            32768
   maxReqHeaderSize        65536
-  maxReqBodySize          2047M
+  maxReqBodySize          {$t['max_req_body']}M
   maxDynRespHeaderSize    32768
   maxDynRespSize          2047M
-  enableGzipCompress      1
-  enableDynGzipCompress   1
-  gzipCompressLevel       6
+  enableGzipCompress      $gz
+  enableDynGzipCompress   $dgz
+  gzipCompressLevel       {$t['gzip_level']}
   compressibleTypes       text/*, application/x-javascript, application/xml, application/javascript, application/json, image/svg+xml
   gzipAutoUpdateStatic    1
-  quicEnable              1
+  quicEnable              $quic
+}
+
+$expires
+module cache {
+  internal                1
+  ls_enabled              $lsc
+  storagePath             $cacheDir
+  checkPrivateCache       1
+  checkPublicCache        1
+  maxCacheObjSize         $objSize
+  maxStaleAge             200
+  qsCache                 1
+  reqCookieCache          1
+  respCookieCache         0
+  ignoreReqCacheCtrl      1
+  ignoreRespCacheCtrl     0
+  enableCache             0
+  expireInSeconds         3600
+  enablePrivateCache      0
+  privateExpireInSeconds  3600
 }
 
 fileAccessControl  {
@@ -179,6 +220,10 @@ $maps}
 
 CONF;
         Sys::write(self::$root . '/conf/httpd_config.conf', $conf, 0640, 'lsadm', 'lsadm');
+        if ($t['cache'] && self::$root === '/usr/local/lsws') {
+            is_dir(WebTuning::LS_CACHE_DIR) || @mkdir(WebTuning::LS_CACHE_DIR, 0750, true);
+            @chown(WebTuning::LS_CACHE_DIR, 'www-data');          // LSCache entries are written by the workers
+        }
         is_dir('/tmp/lshttpd/swap') || @mkdir('/tmp/lshttpd/swap', 0750, true);
         @chown('/tmp/lshttpd/swap', 'www-data');                // workers run as www-data
     }

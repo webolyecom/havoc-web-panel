@@ -134,7 +134,7 @@
   }));
   // confirm dialogs
   document.addEventListener('submit', (e) => {
-    const m = e.target.dataset?.confirm;
+    const m = e.submitter?.dataset?.confirm || e.target.dataset?.confirm;   // a button can ask its own question (formaction)
     if (m && !confirm(m)) e.preventDefault();
   });
 
