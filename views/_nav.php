@@ -45,6 +45,7 @@ $navGroups = [
     ]],
     ['server', 'nav.g_server', [
         ['/server', 'nav.monitor', 'pulse', 'admin'],
+        ['/server/resources', 'nav.resources', 'cpu', 'admin'],
         ['/server/processes', 'nav.processes', 'list', 'admin'],
         ['/server/webserver', 'nav.webserver', 'web', 'admin'],
         ['/server/webserver/settings', 'nav.ws_settings', 'sliders', 'admin'],
@@ -75,6 +76,7 @@ $navIcon = static function (string $name): string {
         'wall' => 'M3 5h14v10H3zM3 10h14M7 5v5M13 5v5M10 10v5',
         'gauge' => 'M4 14a6 6 0 1 1 12 0M10 14l3-4',
         'pulse' => 'M3 10h3l2-5 4 10 2-5h3',
+        'cpu' => 'M6 6h8v8H6zM8.5 8.5h3v3h-3zM8 3v3M12 3v3M8 14v3M12 14v3M3 8h3M3 12h3M14 8h3M14 12h3',
         'server' => 'M4 4h12v5H4zM4 11h12v5H4zM7 6.5h.01M7 13.5h.01',
         'grid' => 'M3.5 3.5h5v5h-5zM11.5 3.5h5v5h-5zM3.5 11.5h5v5h-5zM11.5 11.5h5v5h-5z',
         'bolt' => 'M11 2.5 4.5 11H10l-1 6.5L15.5 9H10z',

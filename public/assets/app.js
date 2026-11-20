@@ -132,6 +132,13 @@
   document.querySelectorAll('[data-assign-form]').forEach((f) => f.addEventListener('submit', () => {
     f.action = '/databases/' + f.querySelector('[data-assign-select]').value + '/site';
   }));
+  // PHP-FPM pool: show the fields of the selected process manager mode only
+  document.querySelectorAll('[data-pm-select]').forEach((sel) => {
+    const form = sel.form;
+    const sync = () => form.querySelectorAll('[data-pm-when]').forEach((el) => el.classList.toggle('hidden', el.dataset.pmWhen !== sel.value));
+    sel.addEventListener('change', sync);
+    sync();
+  });
   // confirm dialogs
   document.addEventListener('submit', (e) => {
     const m = e.submitter?.dataset?.confirm || e.target.dataset?.confirm;   // a button can ask its own question (formaction)

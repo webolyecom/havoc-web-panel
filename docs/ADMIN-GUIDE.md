@@ -186,6 +186,13 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 * Log: JSON audit log `/var/log/havoc/waf/audit.log`, filtered per tenant by Host header. Debian packages used: `libnginx-mod-http-modsecurity`, `modsecurity-crs` (CRS paths are auto-detected; Debian 12 ships CRS 3.x, Debian 13 CRS 4.x, so rule IDs/exclusions may differ).
 * OpenLiteSpeed/LiteSpeed WAF is not wired yet.
 
+## PHP workers and resource limits
+* Each site runs its own PHP-FPM master as the systemd service `havoc-fpm-<id>` (pool `/etc/havoc/fpm/<id>.conf`). Its unit carries `MemoryMax` and `CPUQuota`; when the memory limit is reached the kernel stops a process of that site only.
+* Per-site values are stored in `domains.php_pool` (JSON). `ram_mb` / `cpu_percent`: missing = package value (no package: 1024 MB / 100 %), `0` = unlimited (`MemoryMax=infinity`, no `CPUQuota`). `pm` defaults to `ondemand`; `max_children` missing = RAM limit ÷ 64 MB within 2–50 (unlimited: server RAM ÷ 64, max 100). For `dynamic`, missing start / spare values are derived from max_children (min = max/8, max = max/4, start between).
+* Only admins can change them (domain → PHP → "PHP workers and limits", or Server → Resource usage). Saving rewrites the pool and unit and restarts only that site's PHP.
+* Server → Resource usage (helper action `server.resources`) reads `/proc/meminfo` and, for every service under `/sys/fs/cgroup/system.slice`, `memory.stat` (memory = anon + kernel + shmem; cache = file − shmem), `memory.max`, `memory.swap.current`, `pids.current` and `cpu.stat` (two samples 1 s apart). "Used by programs" is MemTotal − MemAvailable, the same number the dashboard shows. Without cgroup v2 it falls back to `ps` grouped by program name.
+* Big memory users are usually MariaDB (`innodb_buffer_pool_size`, Databases → MariaDB settings) and Meilisearch (its index is memory-mapped; most of it shows as cache and is reclaimable).
+
 ## Limits / traffic notes
 * `havoc-usage.timer` (every 30 min) runs `havoc usage:scan`: `du` per account (bytes + inodes, symlinks never followed), database sizes, then an incremental parse of `/var/log/havoc/domains/*.access.log` (byte offset per domain, rotation-aware). Enforcement is off by default (Limits page, admin).
 * Disk quota = files + databases of the account; backups are not counted. Bandwidth = response body bytes in the access logs for the current UTC month (no FTP/mail traffic, no headers). Domains with logs turned off collect no statistics.

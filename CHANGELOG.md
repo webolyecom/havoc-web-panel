@@ -2,6 +2,17 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.9.8] – 2026-11-20
+### Added
+- **Resource usage** (Server → Resource usage, admins): where the server's memory and CPU go.
+  - Memory bar: used by programs, file cache (given back automatically when a program needs memory), completely free, swap. A note explains why "free" is small on a healthy server; a hint appears when there is no swap.
+  - **Services**: every systemd service with its real memory (anon + kernel + shmem from cgroup v2), its file cache, CPU % over 1 second and process count, with a link to its settings page (MariaDB tuning, Meilisearch, Redis, web server).
+  - **Sites**: memory and CPU of each site's PHP against its limits, running workers against max workers; RAM limit, CPU limit, max workers and pm can be changed on the row and are applied at once (only that site's PHP restarts). A warning appears when a site uses 85 % of its memory limit.
+  - Without cgroup v2 the biggest programs are listed instead.
+- **PHP workers and limits** on the domain's PHP page (admins change, others see): RAM and CPU limit (empty = package value, own value, or unlimited), process manager (ondemand / dynamic / static), max workers (pm.max_children), idle time, requests per worker, and for dynamic the start / min / max idle workers. Values are checked before saving; a warning shows when max workers × memory_limit is more than the RAM limit.
+### Changed
+- Sites without a package keep their defaults (1024 MB RAM, 100 % CPU, ondemand, max workers = RAM ÷ 64 MB within 2–50); nothing changes for existing sites until a value is saved.
+
 ## [0.9.7] – 2026-11-20
 ### Added
 - **Web server settings** (Server → Web server settings): performance, compression, browser cache and page cache of the active web server. Nginx, OpenLiteSpeed and LiteSpeed Enterprise each have their own values; only the active server's are shown. Every field shows its allowed range and default.
