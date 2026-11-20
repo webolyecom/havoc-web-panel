@@ -50,9 +50,11 @@ final class Fpm
             throw new \RuntimeException("PHP $ver is not installed");
         }
         $home = "/home/$acct";
-        $ram  = max(128, (int)($vh['limits']['ram_mb'] ?? 1024));
-        $cpu  = max(10, (int)($vh['limits']['cpu_percent'] ?? 100));
-        $children = max(2, min(50, intdiv($ram, 64)));
+        $ramIn = (int)($vh['limits']['ram_mb'] ?? 1024);
+        $cpuIn = (int)($vh['limits']['cpu_percent'] ?? 100);
+        $ram  = $ramIn === 0 ? 0 : max(128, min(1048576, $ramIn));        // 0 = unlimited
+        $cpu  = $cpuIn === 0 ? 0 : max(10, min(12800, $cpuIn));
+        $pm   = self::poolLines((array)($vh['pool'] ?? []), $ram);
         $op   = $vh['opcache'] ?? ['enable' => 1, 'memory' => 128];
 
         // extension set: symlink only the enabled ones into a private scan dir
@@ -88,11 +90,7 @@ listen = /run/havoc-fpm/$id.sock
 listen.owner = www-data
 listen.group = www-data
 listen.mode = 0660
-pm = ondemand
-pm.max_children = $children
-pm.process_idle_timeout = 10s
-pm.max_requests = 500
-catch_workers_output = yes
+{$pm}catch_workers_output = yes
 php_admin_value[open_basedir] = $home/:/tmp/:/usr/share/php/
 php_admin_value[upload_tmp_dir] = $home/tmp
 php_admin_value[sys_temp_dir] = $home/tmp
@@ -110,7 +108,8 @@ INI;
             $oldPool === null ? @unlink($poolFile) : Sys::write($poolFile, $oldPool);
             throw new \RuntimeException('PHP-FPM configuration test failed: ' . trim(preg_replace('/\[\d{2}-\w{3}-\d{4} [\d:]+\] /', '', $te ?: $to)));
         }
-        $mem = $ram . 'M';
+        $mem = $ram > 0 ? $ram . 'M' : 'infinity';
+        $cpuLine = $cpu > 0 ? "CPUQuota={$cpu}%\n" : '';
         $unit = <<<UNIT
 [Unit]
 Description=Havoc PHP-FPM $ver for $dom
@@ -122,8 +121,7 @@ Environment=PHP_INI_SCAN_DIR=$scan
 ExecStart=/usr/sbin/php-fpm$ver --nodaemonize --fpm-config /etc/havoc/fpm/$id.conf
 ExecReload=/bin/kill -USR2 \$MAINPID
 MemoryMax=$mem
-CPUQuota={$cpu}%
-Restart=on-failure
+{$cpuLine}Restart=on-failure
 RestartSec=2
 
 [Install]
@@ -143,5 +141,43 @@ UNIT;
         @unlink("/etc/havoc/fpm/$id.conf");
         Sys::run(['rm', '-rf', "/etc/havoc/php/$id"]);
         Sys::run(['systemctl', 'daemon-reload']);
+    }
+    /** max_children when it is automatic: RAM / 64 (2..50); without a RAM limit server RAM / 64 (at most 100). */
+    public static function autoChildren(int $ramMb): int
+    {
+        if ($ramMb <= 0) {
+            $total = preg_match('/MemTotal:\s+(\d+)/', (string)@file_get_contents('/proc/meminfo'), $m) ? intdiv((int)$m[1], 1024) : 4096;
+            return max(2, min(100, intdiv($total, 64)));
+        }
+        return max(2, min(50, intdiv($ramMb, 64)));
+    }
+
+    /** pm.* lines of a pool (values checked again here; null = derived). */
+    public static function poolLines(array $p, int $ramMb): string
+    {
+        $int = static function ($v, int $min, int $max, ?int $def): ?int {
+            if ($v === null || $v === '') {
+                return $def;
+            }
+            if (!is_numeric($v) || (int)$v < $min || (int)$v > $max) {
+                throw new \InvalidArgumentException("PHP-FPM value $v is out of range ($min-$max)");
+            }
+            return (int)$v;
+        };
+        $mode = in_array($p['pm'] ?? 'ondemand', ['ondemand', 'dynamic', 'static'], true) ? ($p['pm'] ?? 'ondemand') : 'ondemand';
+        $max = $int($p['max_children'] ?? null, 1, 1000, self::autoChildren($ramMb));
+        $out = "pm = $mode\npm.max_children = $max\n";
+        if ($mode === 'dynamic') {
+            $min = $int($p['min_spare'] ?? null, 1, 1000, max(1, intdiv($max, 8)));
+            $maxS = $int($p['max_spare'] ?? null, 1, 1000, max($min, intdiv($max, 4)));
+            $start = $int($p['start'] ?? null, 1, 1000, $min + intdiv($maxS - $min, 2));
+            if ($min > $maxS || $start < $min || $start > $maxS || $maxS > $max) {
+                throw new \InvalidArgumentException("PHP-FPM: min spare <= start <= max spare <= max children is required ($min/$start/$maxS/$max)");
+            }
+            $out .= "pm.start_servers = $start\npm.min_spare_servers = $min\npm.max_spare_servers = $maxS\n";
+        } elseif ($mode === 'ondemand') {
+            $out .= 'pm.process_idle_timeout = ' . $int($p['idle_timeout'] ?? null, 1, 3600, 10) . "s\n";
+        }
+        return $out . 'pm.max_requests = ' . $int($p['max_requests'] ?? null, 0, 100000, 500) . "\n";
     }
 }

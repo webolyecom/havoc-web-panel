@@ -6,6 +6,7 @@ use Havoc\Controllers\McpController;
 use Havoc\Controllers\OAuthController;
 use Havoc\Controllers\ProcessController;
 use Havoc\Controllers\DbProcessController;
+use Havoc\Controllers\ResourceController;
 use Havoc\Controllers\AddonController;
 use Havoc\Controllers\NotificationController;
 use Havoc\Controllers\TransferController;
@@ -35,6 +36,7 @@ return static function (Router $r): void {
         $r->get('/domains/{id}/' . $sec, [DomainController::class, 'section'], ['auth']);
     }
     $r->post('/domains/{id}/php', [DomainController::class, 'php'], ['auth']);
+    $r->post('/domains/{id}/php-pool', [DomainController::class, 'pool'], ['admin']);
     $r->post('/domains/{id}/security', [DomainController::class, 'security'], ['auth']);
     $r->post('/domains/{id}/php-ini', [DomainController::class, 'phpIni'], ['auth']);
     $r->post('/domains/{id}/nginx', [DomainController::class, 'nginxRules'], ['auth']);
@@ -182,6 +184,8 @@ return static function (Router $r): void {
     $r->get('/server/processes', [ProcessController::class, 'index'], ['admin']);
     $r->get('/server/processes.json', [ProcessController::class, 'list'], ['admin']);
     $r->post('/server/processes/signal', [ProcessController::class, 'signal'], ['admin']);
+    $r->get('/server/resources', [ResourceController::class, 'index'], ['admin']);
+    $r->post('/server/resources/{id}', [ResourceController::class, 'save'], ['admin']);
     $r->get('/server/mysql', [DbProcessController::class, 'index'], ['admin']);
     $r->get('/server/mysql.json', [DbProcessController::class, 'list'], ['admin']);
     $r->post('/server/mysql/kill', [DbProcessController::class, 'kill'], ['admin']);

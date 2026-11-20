@@ -7,7 +7,7 @@ namespace Havoc\Ctl;
 final class Actions
 {
     public const ALLOWED = [
-        'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'webserver.tuning', 'webserver.tune', 'webserver.cache_purge', 'php.list', 'php.extensions', 'service.list', 'service.control',
+        'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'webserver.tuning', 'webserver.tune', 'webserver.cache_purge', 'server.resources', 'php.list', 'php.extensions', 'service.list', 'service.control',
         'account.ensure', 'account.delete', 'domain.apply', 'domain.delete',
         'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'pma.ticket', 'pma.cleanup', 'pma.sso_setup', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply', 'proc.list', 'proc.signal', 'transfer.sizes', 'transfer.export', 'transfer.export_delete', 'transfer.stage', 'transfer.import_files', 'transfer.import_db', 'transfer.patch', 'transfer.wp_replace', 'transfer.check',
         'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'redis.install', 'redis.uninstall', 'redis.key', 'addon.overview', 'addon.status', 'addon.install', 'addon.uninstall', 'memcached.set', 'memcached.flush', 'fail2ban.apply', 'fail2ban.ban', 'node.globals', 'meili.site_enable', 'meili.site_info', 'meili.site_rotate', 'meili.site_disable', 'meili.site_sizes', 'meili.site_import', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
@@ -78,6 +78,12 @@ final class Actions
         // new workers: Nginx's open file cache would otherwise keep serving deleted entries for a while
         WebServerFactory::make($type)->reload();
         return ['freed' => $before - WebTuning::dirSize($dir)];
+    }
+
+    /** Server → Resources: memory and CPU per service (each site's PHP is one), page cache vs. real use, swap. */
+    public function server_resources(array $a): array
+    {
+        return Resources::snapshot();
     }
 
     public function webserver_install(array $a): array

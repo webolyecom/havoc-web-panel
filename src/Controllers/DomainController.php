@@ -6,6 +6,7 @@ namespace Havoc\Controllers;
 use Havoc\Core\{Audit, Ctl, DB, Response, Scope, Settings};
 use Havoc\Ctl\Validator;
 use Havoc\Services\MeiliService;
+use Havoc\Services\PoolService;
 use Havoc\Services\{DomainService, SslService};
 
 final class DomainController extends Controller
@@ -96,6 +97,10 @@ final class DomainController extends Controller
                 $data += ['app' => \Havoc\Services\AppService::forDomain((int)$d['id']), 'newApp' => $this->pullNewApp((int)$d['id'])];
                 break;
             case 'php':
+                $owner = DB::one('SELECT * FROM users WHERE id = ?', [$d['user_id']]);
+                $eff = PoolService::effective($d, $owner);
+                $data += ['pool' => PoolService::stored($d), 'pkg' => PoolService::packageLimits($owner), 'eff' => $eff,
+                    'autoChildren' => PoolService::autoChildren((int)$eff['limits']['ram_mb']), 'canPool' => $this->user()['role'] === 'admin'];
                 $ext = ['available' => [], 'default' => []];
                 try {
                     $ext = Ctl::call('php.extensions', ['version' => $d['php_version']]);
@@ -204,6 +209,24 @@ final class DomainController extends Controller
             $fields['php_extensions'] = json_encode($sel);
         }
         return $this->apply($d, $fields, '/domains/' . $d['id'] . '/php');
+    }
+
+    /** PHP-FPM workers and RAM/CPU limits of a site (admins). */
+    public function pool(): Response
+    {
+        $d = $this->domain();
+        $this->user()['role'] === 'admin' || $this->abort(403);
+        try {
+            $in = [];
+            foreach ([...PoolService::KEYS, 'ram_unlimited', 'cpu_unlimited'] as $k) {
+                $in[$k] = $this->req->post($k);
+            }
+            $stored = PoolService::validate($in);
+        } catch (\InvalidArgumentException $e) {
+            $this->flash('error', $e->getMessage());
+            return $this->to('/domains/' . $d['id'] . '/php#pool');
+        }
+        return $this->apply($d, ['php_pool' => PoolService::encode($stored)], '/domains/' . $d['id'] . '/php#pool');
     }
 
     public function security(): Response

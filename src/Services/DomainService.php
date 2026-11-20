@@ -20,7 +20,7 @@ final class DomainService
 
     public static function ctlArgs(array $d, array $owner, array $extra = []): array
     {
-        $pkg = $owner['package_id'] ? DB::one('SELECT * FROM packages WHERE id = ?', [$owner['package_id']]) : null;
+        $res = PoolService::effective($d, $owner);                     // RAM/CPU limits and the PHP-FPM pool
         return $extra + [
             'id' => (int)$d['id'], 'domain' => $d['name'], 'account' => 'hv' . $owner['id'],
             'php' => $d['php_version'], 'extensions' => $d['php_extensions'] ? json_decode($d['php_extensions'], true) : null,
@@ -29,7 +29,7 @@ final class DomainService
             'waf' => (bool)$d['waf'], 'logs' => (bool)$d['logs_enabled'], 'suspended' => !empty($d['quota_suspended']),
             'aliases' => array_values(array_diff(self::serverNames($d), [$d['name']])),
             'redirects' => DB::all('SELECT source, target, code FROM redirects WHERE domain_id = ? ORDER BY id', [$d['id']]),
-            'limits' => ['ram_mb' => $pkg['ram_mb'] ?? 1024, 'cpu_percent' => $pkg['cpu_percent'] ?? 100],
+            'limits' => $res['limits'], 'pool' => $res['pool'],
             'php_ini' => json_decode((string)($d['php_ini'] ?? ''), true) ?: [],
             'php_ini_admin' => (string)($d['php_ini_admin'] ?? ''),
             'nginx_custom' => (string)($d['nginx_custom'] ?? ''),
