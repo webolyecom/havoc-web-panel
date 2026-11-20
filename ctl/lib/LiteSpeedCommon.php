@@ -96,6 +96,39 @@ trait LiteSpeedCommon
         return $rules;
     }
 
+    /**
+     * Page cache of a site through LSCache (documented "LSCache without a plugin" rewrite method): GET/HEAD requests without
+     * session or login cookies and outside admin/cart pages are cached for the site's time; everything else is marked
+     * no-cache, so it is neither stored nor served from the cache. Empty when the site has no page cache.
+     */
+    protected static function cacheRules(array $vh, string $type): array
+    {
+        $ttl = !empty($vh['suspended']) || empty(WebTuning::get($type)['cache']) ? 0 : WebTuning::siteTtl((int)$vh['id']);
+        if ($ttl <= 0) {
+            return [];
+        }
+        $ck = '(' . WebTuning::NOCACHE_COOKIES . ')';
+        $uri = '(' . WebTuning::NOCACHE_URIS . ')';
+        return [
+            'RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$',
+            "RewriteCond %{HTTP_COOKIE} !$ck [NC]",
+            "RewriteCond %{THE_REQUEST} !$uri [NC]",
+            "RewriteRule .* - [E=cache-control:max-age=$ttl]",
+            'RewriteCond %{REQUEST_METHOD} !^(GET|HEAD)$ [OR]',
+            "RewriteCond %{HTTP_COOKIE} $ck [NC,OR]",
+            "RewriteCond %{THE_REQUEST} $uri [NC]",
+            'RewriteRule .* - [E=Cache-Control:no-cache]',
+        ];
+    }
+
+    /** "expiresByType" value: browsers keep static files for N days. */
+    protected static function expiresByType(int $days): string
+    {
+        $a = 'A' . ($days * 86400);
+        return implode(', ', array_map(static fn($m) => "$m=$a", ['image/*', 'text/css', 'application/javascript', 'application/x-javascript',
+            'text/javascript', 'font/*', 'application/font-woff', 'application/vnd.ms-fontobject', 'video/*', 'audio/*', 'application/pdf']));
+    }
+
     /** Domains of the vhosts this panel manages (each vhost dir keeps its server names in "names"). */
     protected static function managed(): array
     {

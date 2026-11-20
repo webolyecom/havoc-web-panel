@@ -118,6 +118,27 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 * The copied certificate is marked `ssl_transferred`; Let's Encrypt replaces it as soon as DNS points to the new server (no attempt limit).
 * A panel reached under an address other panels cannot use can set `'transfer' => ['base_url' => 'https://panel.example.com']` in config.php.
 
+## Web server settings
+* Values are stored in `/etc/havoc/webserver-tuning.json` (one section per server type + `sites`: domain id → page cache seconds). The drivers read it whenever they write a configuration, so the values survive site changes and server switches.
+* Nginx:
+  * `worker_processes`, `worker_rlimit_nofile` (2 × connections, at least 8192) and `events { worker_connections }` are set in `/etc/nginx/nginx.conf`.
+  * Everything else goes into `/etc/nginx/conf.d/havoc-00-tuning.conf`. The same directives left active in nginx.conf are commented out (`# [moved to conf.d/havoc-00-tuning.conf]`).
+  * Saving is checked with `nginx -t` and rolled back on failure.
+  * The cache zone `havoc` (`/var/cache/havoc-nginx`, owner www-data) is always defined; sites use it only when their page cache is on.
+  * A change of the zone line restarts Nginx, because a reload keeps the old zone.
+  * "Empty cache" deletes the files and reloads Nginx: the open file cache would otherwise keep serving deleted entries for a while.
+* OpenLiteSpeed: the tuning values are written into the generated `httpd_config.conf`, together with `module cache { ... }` (storage `/usr/local/lsws/cachedata`, `respCookieCache 0`) and, when browser caching is on, `expires { ... }`.
+* LiteSpeed Enterprise:
+  * only `<tuning>` (connections, timeouts, keep-alive, request size, gzip) and `<expires>` are set in `httpd_config.xml`, and only after the page has been saved once;
+  * the cache engine and its storage stay LiteSpeed's own settings (WebAdmin > Server > Cache);
+  * "Empty cache" is not offered.
+* Page cache on LiteSpeed uses the documented "LSCache without a plugin" rewrite rules in the vhost: `[E=cache-control:max-age=N]` for cacheable requests and `[E=Cache-Control:no-cache]` for the excluded ones. For WordPress the LiteSpeed Cache plugin is the better choice.
+* Excluded from the page cache:
+  * requests other than GET/HEAD;
+  * cookies matching `wordpress_logged_in|wp-postpass|comment_author|woocommerce_*|wp_woocommerce_session|PHPSESSID|laravel_session|XSRF-TOKEN|joomla_user_state|SESS`;
+  * URIs containing `/wp-admin/`, `/wp-login.php`, `/xmlrpc.php`, `/wp-json/`, `/wp-cron.php`, `/cart`, `/checkout`, `/my-account`, `/admin`, `/login`, `/logout`, `/register`, `ajax.php`, `preview=true`, `/feed`;
+  * responses with `Set-Cookie`.
+
 ## MySQL queries
 * Databases & backups → MySQL queries reads `information_schema.PROCESSLIST` as root (helper action `db.processlist`, query text up to 8000 characters) and stops statements with `KILL QUERY <id>` or connections with `KILL CONNECTION <id>` (`db.kill`). Rules are evaluated by the helper at the moment of the click: "long" = `Query` threads running at least N seconds (optionally in one database), "sleep" = idle connections at least N seconds.
 * Threads of `system user`, `event_scheduler` and the commands Daemon, Binlog Dump, Slave_* and Connect are never stopped. Each stop is in the audit log (`mysql.kill_query` / `mysql.kill_connection`) with the first 200 characters of each query.

@@ -32,7 +32,8 @@ final class Session
         ini_set('session.use_only_cookies', '1');
         ini_set('session.sid_length', '48');
         ini_set('session.gc_maxlifetime', (string)self::REMEMBER);   // PHP's own GC must never remove a remembered session
-        session_set_cookie_params(self::cookie(0));
+        // the cookie PHP itself sends (new session, regenerate): a browser-session cookie with the same flags
+        session_set_cookie_params(['lifetime' => 0] + array_diff_key(self::cookie(0), ['expires' => 0]));
         session_start();
         $now = time();
         $expired = !empty($_SESSION['remember'])

@@ -8,6 +8,10 @@ final class NginxDriver implements WebServer
     private const DIR = '/etc/nginx/conf.d';
     private const CUSTOM = '/etc/nginx/havoc-custom';
     private const DEFAULT = '/etc/nginx/conf.d/havoc-000-default.conf';
+    private const TUNING = '/etc/nginx/conf.d/havoc-00-tuning.conf';
+    private const MAIN = '/etc/nginx/nginx.conf';
+    /** http-level directives the panel sets in TUNING; active copies in nginx.conf are commented out (duplicates fail) */
+    private const MOVED = 'gzip|gzip_comp_level|gzip_min_length|gzip_vary|gzip_proxied|gzip_types|gzip_buffers|gzip_http_version|keepalive_timeout|keepalive_requests|server_tokens|client_body_timeout|send_timeout|client_max_body_size|open_file_cache|open_file_cache_valid|open_file_cache_min_uses|open_file_cache_errors|fastcgi_read_timeout';
 
     public function type(): string { return 'nginx'; }
     public function service(): string { return 'nginx'; }
@@ -77,6 +81,77 @@ NGX;
         }
     }
 
+    /**
+     * Server → Web server → Settings. Worker settings go into nginx.conf (main/events context), everything else into
+     * conf.d/havoc-00-tuning.conf (http context, read before the sites). Rolled back when `nginx -t` fails.
+     */
+    /** Set by tune(): the cache zone changed, which Nginx only takes over on a restart (a reload keeps the old zone). */
+    public bool $needsRestart = false;
+
+    public function tune(array $t): void
+    {
+        $oldMain = (string)file_get_contents(self::MAIN);
+        $oldTune = is_file(self::TUNING) ? (string)file_get_contents(self::TUNING) : null;
+        $m = $oldMain;
+        $set = static function (string $re, string $line, string $insertAfter) use (&$m): void {
+            $n = 0;
+            $m = (string)preg_replace($re, $line, $m, 1, $n);
+            if ($n === 0) {
+                $m = (string)preg_replace($insertAfter, '$0' . "\n" . $line, $m, 1);
+            }
+        };
+        $wc = (int)$t['worker_connections'];
+        $set('/^[ \t]*worker_processes[ \t]+[^;]*;/m', "worker_processes {$t['worker_processes']};", '/^[ \t]*user[ \t]+[^;]*;/m');
+        $set('/^[ \t]*worker_rlimit_nofile[ \t]+[^;]*;/m', 'worker_rlimit_nofile ' . max(8192, $wc * 2) . ';', '/^[ \t]*worker_processes[ \t]+[^;]*;/m');
+        $set('/^([ \t]*)worker_connections[ \t]+[^;]*;/m', "\tworker_connections $wc;", '/^[ \t]*events[ \t]*\{/m');
+        // the panel's http-level directives replace active ones in nginx.conf (each line of a multi-line one is commented)
+        $m = (string)preg_replace_callback('/^[ \t]*(?:' . self::MOVED . ')[ \t][^;]*;/m',
+            static fn($x) => (string)preg_replace('/^/m', '# [moved to conf.d/havoc-00-tuning.conf] ', $x[0]), $m);
+        // the cache zone always exists (see tuningConf), so its folder too
+        is_dir(WebTuning::NGINX_CACHE_DIR) || mkdir(WebTuning::NGINX_CACHE_DIR, 0700);
+        @chown(WebTuning::NGINX_CACHE_DIR, 'www-data');               // the workers write it
+        @chgrp(WebTuning::NGINX_CACHE_DIR, 'www-data');
+        $new = self::tuningConf($t);
+        $zone = static fn(?string $c) => preg_match('/^fastcgi_cache_path .*$/m', (string)$c, $x) ? $x[0] : '';
+        $this->needsRestart = $zone($oldTune) !== $zone($new);
+        Sys::write(self::MAIN, $m, 0644);
+        Sys::write(self::TUNING, $new, 0644);
+        [$c, , $e] = Sys::run(['/usr/sbin/nginx', '-t']);
+        if ($c !== 0) {
+            Sys::write(self::MAIN, $oldMain, 0644);
+            $oldTune === null ? @unlink(self::TUNING) : Sys::write(self::TUNING, $oldTune, 0644);
+            throw new \RuntimeException('nginx config test failed, nothing was changed: '
+                . trim((string)preg_replace(['/^nginx: (the configuration file .* syntax is ok|configuration file .* test failed)$/m',
+                    '#^(nginx: )?(\d{4}/\d\d/\d\d \d\d:\d\d:\d\d )?\[emerg\] (\d+\#\d+: )?#m'], '', $e)));
+        }
+    }
+
+    private static function tuningConf(array $t): string
+    {
+        $o = "# Managed by Havoc WEB Panel (Server > Web server > Settings) - do not edit\n"
+            . "server_tokens off;\n"
+            . "keepalive_timeout {$t['keepalive_timeout']}s;\nkeepalive_requests {$t['keepalive_requests']};\n"
+            . "client_body_timeout {$t['timeout']}s;\nsend_timeout {$t['timeout']}s;\n"
+            . "client_max_body_size {$t['client_max_body_size']}m;\nfastcgi_read_timeout {$t['fastcgi_read_timeout']}s;\n\n";
+        $o .= $t['gzip']
+            ? "gzip on;\ngzip_comp_level {$t['gzip_level']};\ngzip_min_length 1024;\ngzip_vary on;\ngzip_proxied any;\n"
+              . "gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml application/rss+xml "
+              . "application/atom+xml application/ld+json image/svg+xml font/ttf font/otf application/vnd.ms-fontobject;\n\n"
+            : "gzip off;\n\n";
+        $o .= $t['open_file_cache']
+            ? "open_file_cache max=10000 inactive=60s;\nopen_file_cache_valid 120s;\nopen_file_cache_min_uses 2;\nopen_file_cache_errors off;\n\n"
+            : "open_file_cache off;\n\n";
+        // page cache (FastCGI cache). The zone is always defined: turning the cache off must not break sites whose vhost still
+        // uses it until they are re-rendered; its shared memory is only touched when entries are stored.
+        $o .= 'fastcgi_cache_path ' . WebTuning::NGINX_CACHE_DIR . " levels=1:2 keys_zone=havoc:{$t['cache_zone_mb']}m max_size={$t['cache_max_mb']}m"
+            . " inactive={$t['cache_inactive']}m use_temp_path=off;\n";
+        // never cached and never served from the cache: other methods than GET/HEAD, logged-in/session cookies, admin and cart pages
+        $o .= "map \$request_method \$havoc_nc_method { default 1; GET 0; HEAD 0; }\n"
+            . "map \$http_cookie \$havoc_nc_cookie { default 0; \"~*(" . WebTuning::NOCACHE_COOKIES . ")\" 1; }\n"
+            . "map \$request_uri \$havoc_nc_uri { default 0; \"~*(" . WebTuning::NOCACHE_URIS . ")\" 1; }\n";
+        return $o;
+    }
+
     public function start(): void
     {
         Sys::ok(['systemctl', 'enable', 'nginx']);
@@ -137,6 +212,19 @@ NGX;
         $logDir = '/var/log/havoc/domains';
         $access = $vh['logs'] ? "access_log $logDir/$d.access.log;" : 'access_log off;';
         $waf    = !empty($vh['waf']) ? "modsecurity on;\n    modsecurity_rules_file /etc/nginx/modsec/main.conf;" : '';
+        $t      = WebTuning::get('nginx');
+        $ttl    = $t['cache'] && is_file(self::TUNING) ? WebTuning::siteTtl((int)$vh['id']) : 0;
+        $cache  = $ttl > 0
+            ? "        fastcgi_cache havoc;\n        fastcgi_cache_key \"\$scheme\$request_method\$host\$request_uri\";\n"
+              . "        fastcgi_cache_valid 200 301 302 {$ttl}s;\n"
+              . "        fastcgi_cache_bypass \$havoc_nc_method \$havoc_nc_cookie \$havoc_nc_uri;\n        fastcgi_no_cache \$havoc_nc_method \$havoc_nc_cookie \$havoc_nc_uri;\n"
+              . "        fastcgi_cache_use_stale error timeout updating http_500 http_503;\n        fastcgi_cache_background_update on;\n        fastcgi_cache_lock on;\n"
+            : '';
+        $cacheHdr = $ttl > 0 ? "add_header X-Havoc-Cache \$upstream_cache_status;   # HIT / MISS / BYPASS / EXPIRED\n    " : '';
+        $static = (int)$t['static_expires'] > 0
+            ? "    location ~* \\.(?:css|js|mjs|jpe?g|png|gif|webp|avif|ico|svg|woff2?|ttf|otf|eot|mp4|webm|mp3|ogg|pdf)\$ {\n"
+              . "        expires {$t['static_expires']}d;\n        access_log off;\n        try_files \$uri \$uri/ /index.php?\$args;\n    }\n"
+            : '';
 
         $redir = '';
         $whole = null;
@@ -155,7 +243,7 @@ NGX;
         $custom = trim((string)($vh['nginx_custom'] ?? ''));
         $useCustom = $custom !== '' && empty($vh['suspended']);
         $rootLoc = $useCustom && NginxCustom::definesRoot($custom) ? '' : "    location / { try_files \$uri \$uri/ /index.php?\$args; }\n";
-        $locs = $whole ?? $rootLoc . "    location ~ \.php\$ {\n        include snippets/fastcgi-php.conf;\n        fastcgi_pass unix:$sock;\n    }\n";
+        $locs = $whole ?? $rootLoc . $static . "    location ~ \.php\$ {\n        include snippets/fastcgi-php.conf;\n        fastcgi_pass unix:$sock;\n$cache    }\n";
         if ($useCustom && $whole === null) {
             $locs = "    include " . self::CUSTOM . "/$d.conf;\n" . $locs;
         }
@@ -172,8 +260,8 @@ NGX;
     index index.php index.html index.htm;
     $access
     error_log $logDir/$d.error.log warn;
-    client_max_body_size 128m;
-    $waf
+    client_max_body_size {$t['client_max_body_size']}m;
+    $cacheHdr$waf
 
     location ^~ /.well-known/acme-challenge/ { root /var/www/havoc-acme; default_type text/plain; try_files \$uri =404; }
     location ~ /\.(?!well-known) { deny all; }

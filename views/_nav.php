@@ -47,6 +47,7 @@ $navGroups = [
         ['/server', 'nav.monitor', 'pulse', 'admin'],
         ['/server/processes', 'nav.processes', 'list', 'admin'],
         ['/server/webserver', 'nav.webserver', 'web', 'admin'],
+        ['/server/webserver/settings', 'nav.ws_settings', 'sliders', 'admin'],
         ['/services', 'nav.services', 'server', 'admin'],
         ['/transfers', 'nav.transfers', 'transfer', 'admin'],
         ['/server/notifications', 'nav.notifications', 'bell', 'admin'],
