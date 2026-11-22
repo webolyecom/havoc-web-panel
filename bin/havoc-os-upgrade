@@ -3,6 +3,11 @@
 # havoc-os-update, so it keeps running when the panel's PHP is restarted).
 #   havoc-os-upgrade security   only packages from a Debian security suite and PHP packages
 #   havoc-os-upgrade all        apt-get upgrade (never removes packages or installs new ones it does not need)
+#   havoc-os-upgrade packages NAME...   only these packages (one piece of software: Nginx, PHP 8.x, MariaDB, Redis …)
+#   havoc-os-upgrade lsws        LiteSpeed Enterprise to the latest release (its own lsup.sh)
+#   havoc-os-upgrade meilisearch latest Meilisearch release; data and binary are copied first and put back if the new
+#                                version does not start (database upgraded in place: MEILI_EXPERIMENTAL_DUMPLESS_UPGRADE)
+#   havoc-os-upgrade phpmyadmin  latest phpMyAdmin (bin/havoc-pma-install replaces it in place)
 # After PHP updates every PHP-FPM is restarted (each site's own master, stock pools, the panel). Finally the list of
 # available updates is refreshed. Output is the log shown in the panel.
 set -uo pipefail
@@ -16,16 +21,74 @@ echo "running $(date -u +%FT%TZ)" > "$STATUS"
 RESULT=failed
 trap 'echo "$RESULT $(date -u +%FT%TZ)" > "$STATUS"' EXIT
 MODE="${1:-security}"
-[[ "$MODE" == security || "$MODE" == all ]] || { echo "Invalid mode: $MODE"; exit 64; }
+shift || true
 APT=(apt-get -y -q -o DPkg::Lock::Timeout=300 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+refresh() { echo '{}' | /usr/bin/php /opt/havoc/ctl/havocctl os.check > /dev/null || true; }
 
-echo "System updates ($MODE) started $(date -u '+%F %T') UTC"
+echo "Update ($MODE${*:+: $*}) started $(date -u '+%F %T') UTC"
+case "$MODE" in
+  security|all|packages) ;;
+  lsws)
+    [ -x /usr/local/lsws/admin/misc/lsup.sh ] && [ ! -f /usr/local/lsws/bin/openlitespeed ] || { echo "LiteSpeed Enterprise is not installed."; exit 1; }
+    echo "Installed: LiteSpeed Enterprise $(cat /usr/local/lsws/VERSION 2>/dev/null)"
+    /usr/local/lsws/admin/misc/lsup.sh -f || { echo "lsup.sh failed"; exit 1; }
+    if systemctl is-active -q lsws || systemctl is-active -q lshttpd; then /usr/local/lsws/bin/lswsctrl restart || true; fi
+    echo "Now: LiteSpeed Enterprise $(cat /usr/local/lsws/VERSION 2>/dev/null)"
+    refresh; echo "Done $(date -u '+%F %T') UTC"; RESULT=done; exit 0 ;;
+  phpmyadmin)
+    [ -f /opt/havoc-pma/index.php ] || { echo "phpMyAdmin is not installed."; exit 1; }
+    /opt/havoc/bin/havoc-pma-install || { echo "phpMyAdmin update failed (the previous version stays in place)."; exit 1; }
+    refresh; echo "Done $(date -u '+%F %T') UTC"; RESULT=done; exit 0 ;;
+  meilisearch)
+    B=/usr/local/bin/meilisearch; D=/var/lib/meilisearch/data; DROP=/etc/systemd/system/meilisearch.service.d
+    [ -x $B ] || { echo "Meilisearch is not installed."; exit 1; }
+    OLD=$($B --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    NEW=$(curl -fsSL --proto '=https' --tlsv1.2 --max-time 30 https://api.github.com/repos/meilisearch/meilisearch/releases/latest | php -r 'echo ltrim((string)(json_decode(stream_get_contents(STDIN), true)["tag_name"] ?? ""), "v");')
+    [[ "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Could not find the latest Meilisearch release."; exit 1; }
+    echo "Installed: Meilisearch $OLD, latest: $NEW"
+    if ! php -r 'exit(version_compare($argv[2], $argv[1], ">") ? 0 : 1);' "$OLD" "$NEW"; then echo "Already the latest version."; refresh; RESULT=done; exit 0; fi
+    need=$(du -sb $D | awk '{print $1}'); free=$(df -B1 --output=avail /var/lib/meilisearch | tail -1)
+    [ "$free" -gt $((need + need / 10 + 104857600)) ] || { echo "Not enough free disk space for a copy of the data ($((need/1048576)) MB)."; exit 1; }
+    echo "Stopping Meilisearch and copying its data ($((need/1048576)) MB) and the current binary..."
+    systemctl stop meilisearch
+    rm -rf $D.pre-update; cp -a $D $D.pre-update; cp -a $B $B.pre-update
+    restore() {
+      echo "Putting Meilisearch $OLD back..."
+      systemctl stop meilisearch || true
+      rm -f $DROP/havoc-upgrade.conf; systemctl daemon-reload
+      cp -a $B.pre-update $B; rm -rf $D; mv $D.pre-update $D
+      systemctl start meilisearch || true
+    }
+    # first start of the new version upgrades the database files in place
+    install -d $DROP; printf '[Service]\nEnvironment=MEILI_EXPERIMENTAL_DUMPLESS_UPGRADE=true\n' > $DROP/havoc-upgrade.conf
+    /opt/havoc/bin/havoc-meili-install || true
+    KEY=$(sed -n 's/^master_key *= *"\(.*\)"/\1/p' /etc/meilisearch/config.toml)
+    ok=0
+    for i in $(seq 1 600); do
+      if curl -fsS -m 2 http://127.0.0.1:7700/health 2>/dev/null | grep -q available; then
+        st=$(curl -fsS -m 5 -H "Authorization: Bearer $KEY" 'http://127.0.0.1:7700/tasks?types=upgradeDatabase&limit=1' 2>/dev/null | php -r 'echo (string)(json_decode(stream_get_contents(STDIN), true)["results"][0]["status"] ?? "none");')
+        case "$st" in succeeded|none) ok=1; break ;; failed|canceled) echo "Database upgrade task: $st"; break ;; esac
+      fi
+      sleep 1
+    done
+    if [ $ok -ne 1 ]; then echo "The new version did not start correctly (versions before 1.12 cannot be upgraded in place: create a dump, then import it)."; restore; exit 1; fi
+    rm -f $DROP/havoc-upgrade.conf; systemctl daemon-reload
+    echo "Meilisearch $($B --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) is running. The previous data stays in $D.pre-update until the next update."
+    rm -f $B.pre-update
+    refresh; echo "Done $(date -u '+%F %T') UTC"; RESULT=done; exit 0 ;;
+  *) echo "Invalid mode: $MODE"; exit 64 ;;
+esac
 apt-get update -q -o DPkg::Lock::Timeout=300 || { echo "apt-get update failed"; exit 1; }
 
 # the same selection as the panel's list: security suites and PHP packages
 mapfile -t ALL < <(apt list --upgradable 2>/dev/null | sed -n 's#^\([a-z0-9][a-z0-9+.-]*\)/\([^ ]*\) .*#\1 \2#p')
 PKGS=()
+if [[ "$MODE" == packages ]]; then
+  for n in "$@"; do [[ "$n" =~ ^[a-z0-9][a-z0-9+.-]*$ ]] || { echo "Invalid package: $n"; exit 64; }; done
+  for l in "${ALL[@]}"; do n=${l%% *}; for w in "$@"; do [[ "$n" == "$w" ]] && PKGS+=("$n"); done; done
+fi
 for l in "${ALL[@]}"; do
+  [[ "$MODE" == packages ]] && break
   n=${l%% *}; s=${l#* }
   if [[ "$MODE" == all || "$s" =~ (^|,)[a-z]+-security(,|$) || "$n" =~ ^(php[0-9]|php-|libapache2-mod-php) ]]; then PKGS+=("$n"); fi
 done
@@ -40,6 +103,9 @@ else
   fi
 fi
 
+if printf '%s\n' "${PKGS[@]}" | grep -qx 'openlitespeed' && { systemctl is-active -q lsws || systemctl is-active -q lshttpd; }; then
+  echo "Restarting OpenLiteSpeed"; /usr/local/lsws/bin/lswsctrl restart || true
+fi
 if printf '%s\n' "${PKGS[@]}" | grep -Eq '^(php[0-9]|php-|libapache2-mod-php)'; then
   echo "Restarting PHP (every site's PHP-FPM, stock pools, panel)"
   for u in $(systemctl list-units --type=service --state=active --plain --no-legend 'havoc-fpm-*' 'php*-fpm.service' | awk '{print $1}'); do
@@ -49,7 +115,7 @@ if printf '%s\n' "${PKGS[@]}" | grep -Eq '^(php[0-9]|php-|libapache2-mod-php)'; 
   systemctl restart havoc-panel-fpm || true
 fi
 
-echo '{}' | /usr/bin/php /opt/havoc/ctl/havocctl os.check > /dev/null || true
+refresh
 [ -f /var/run/reboot-required ] && echo "A restart of the server is needed to use the new kernel/system libraries."
 echo "Done $(date -u '+%F %T') UTC"
 RESULT=done

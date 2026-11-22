@@ -48,6 +48,33 @@ $when = static fn(int $ts) => $ts ? date('Y-m-d H:i', $ts) : '–';
   </section>
 <?php endif; ?>
 
+<?php if ($c['software']): ?>
+<section class="card mb-6 p-0" id="software">
+  <div class="p-4 pb-2"><h2 class="h2 mb-1"><?= e(t('osu.software')) ?></h2><p class="text-xs text-slate-500"><?= e(t('osu.software_hint')) ?></p></div>
+  <div class="overflow-x-auto"><table class="table text-sm">
+    <thead><tr><th><?= e(t('osu.sw_name')) ?></th><th><?= e(t('osu.installed')) ?></th><th><?= e(t('osu.new')) ?></th><th><?= e(t('osu.sw_source')) ?></th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($c['software'] as $k => $sw):
+      $has = $sw['source'] === 'apt' ? (bool)$sw['packages'] : $sw['available'] !== '';
+      $unknown = $sw['source'] !== 'apt' && ($sw['latest'] ?? '') === '';     // the latest version could not be looked up ?>
+      <tr>
+        <td class="font-medium"><?= e($sw['label']) ?><?php if ($sw['security']): ?> <span class="badge badge-err"><?= e(t('osu.t_security')) ?></span><?php endif; ?>
+          <?php if ($sw['source'] === 'apt' && count($sw['packages']) > 1): ?><div class="text-xs font-normal text-slate-500"><?= e(t('osu.sw_pkgs', ['n' => count($sw['packages'])])) ?></div><?php endif; ?></td>
+        <td class="break-all font-mono text-xs text-slate-500"><?= e($sw['installed'] ?: '?') ?></td>
+        <td class="break-all font-mono text-xs"><?= $has ? e($sw['available'] ?: t('osu.sw_newer')) : ($unknown ? '<span class="font-sans text-slate-500" title="' . e(t('osu.sw_unknown_hint')) . '">' . e(t('osu.sw_unknown')) . '</span>' : '<span class="font-sans text-emerald-600 dark:text-emerald-400">' . e(t('osu.sw_current')) . '</span>') ?></td>
+        <td class="text-xs text-slate-500"><?= e(t('osu.src_' . str_replace('.', '_', $sw['source']))) ?></td>
+        <td class="text-right"><?php if ($has || $unknown): ?>
+          <form method="post" action="/server/updates" data-confirm="<?= e(t('osu.sw_confirm_' . ($k === 'meilisearch' ? 'meili' : ($k === 'lsws' || $k === 'nginx' || $k === 'ols' ? 'web' : 'default')), ['name' => $sw['label']])) ?>"><?= csrf_field() ?>
+            <input type="hidden" name="mode" value="component"><input type="hidden" name="component" value="<?= e($k) ?>">
+            <button class="<?= $has ? 'btn' : 'btn-ghost border border-slate-300 dark:border-slate-700' ?> px-3 py-1 text-xs"<?= $running ? ' disabled' : '' ?>><?= e(t($has ? 'osu.sw_update' : 'osu.sw_check_update')) ?></button></form>
+        <?php endif; ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+</section>
+<?php endif; ?>
+
 <section class="card p-0">
   <div class="flex flex-wrap items-center justify-between gap-3 p-4">
     <h2 class="h2 mb-0"><?= e(t('osu.packages')) ?></h2>

@@ -2,6 +2,15 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.10.2] – 2026-11-22
+### Added
+- **Software updates** on Monitoring → System updates: a *Software* table with installed and available version of Nginx, OpenLiteSpeed, LiteSpeed Enterprise, MariaDB, every installed PHP version, Redis, Memcached, Fail2ban, Node.js, Meilisearch and phpMyAdmin, each with its own *Update* button.
+  - Debian packages: only that software's packages are updated (e.g. `nginx` + `nginx-common`, all `php8.x-*`); OpenLiteSpeed is restarted gracefully afterwards, PHP-FPM of every site after PHP updates.
+  - LiteSpeed Enterprise: its own `lsup.sh` installs the latest release, then a graceful restart.
+  - Meilisearch: stopped, its data and binary copied, the latest GitHub release installed and started with `MEILI_EXPERIMENTAL_DUMPLESS_UPGRADE` (database upgraded in place, 1.12 and later); if it does not come up or the upgrade task fails, the previous version and data are put back. The copy of the data stays until the next update; the update refuses to start without enough free disk space.
+  - phpMyAdmin: the latest release from phpmyadmin.net replaces the installed one in place (configuration kept).
+  - When the latest version of Meilisearch, phpMyAdmin or LiteSpeed Enterprise cannot be looked up, the table says so instead of "up to date", and the update can still be started (it looks the version up again).
+
 ## [0.10.1] – 2026-11-22
 ### Added
 - **System updates** (Monitoring → System updates, admins): the server's upgradable packages, marked *Security* (Debian security suites) or *PHP* (sury.org PHP releases carry PHP's security fixes, so every PHP update counts as important).

@@ -877,4 +877,11 @@ return [
     'osu.hardening' => 'Extra PHP protection', 'osu.hardening_text' => 'PHP\'s upload progress tracking (session.upload_progress) is switched off for every site and the panel. It stores visitor-shaped data in the session files and is used by CVE-2026-126714 ("phpAfterShell") and CVE-2026-115560. This reduces the risk but does not replace the PHP update. A site that really needs it can switch it on in its .user.ini.',
     'osu.banner' => ':n security / PHP update(s) are waiting.', 'osu.banner_reboot' => 'A restart of the server is needed after the updates.', 'osu.banner_hint' => 'System updates',
     'osu.notify_subject' => ':n security / PHP update(s) on :host', 'osu.notify_body' => ':n security or PHP update(s) are available. Install them in the panel under Monitoring → System updates.',
+    'osu.software' => 'Software', 'osu.software_hint' => 'Web servers, MariaDB, PHP and add-ons installed by the panel. Each one can be updated on its own; its service is restarted when needed.',
+    'osu.sw_name' => 'Software', 'osu.sw_source' => 'Source', 'osu.sw_pkgs' => ':n packages updated together', 'osu.sw_current' => 'up to date', 'osu.sw_newer' => 'newer version',
+    'osu.sw_update' => 'Update', 'osu.sw_unknown' => 'could not be checked', 'osu.sw_unknown_hint' => 'The latest version could not be looked up now; the update itself looks it up again and installs the latest release.', 'osu.sw_check_update' => 'Check & update',
+    'osu.src_apt' => 'Debian package', 'osu.src_lsup' => 'LiteSpeed (lsup.sh)', 'osu.src_github' => 'GitHub release', 'osu.src_phpmyadmin_net' => 'phpmyadmin.net',
+    'osu.sw_confirm_default' => 'Update :name? Its service is restarted (a few seconds).',
+    'osu.sw_confirm_web' => 'Update :name? The web server is restarted gracefully; running requests finish first.',
+    'osu.sw_confirm_meili' => 'Update :name? It is stopped for the update; its data and the current version are copied first and put back automatically if the new version does not start. Searches do not work during the update.',
 ];
