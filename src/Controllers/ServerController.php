@@ -117,7 +117,7 @@ final class ServerController extends Controller
     public function osUpgrade(): Response
     {
         try {
-            SystemUpdateService::start($this->user(), (string)$this->req->post('mode', 'security'));
+            SystemUpdateService::start($this->user(), (string)$this->req->post('mode', 'security'), (string)$this->req->post('component', ''));
             $this->flash('success', t('osu.started'));
         } catch (\Throwable $e) {
             $this->flash('error', $e->getMessage());

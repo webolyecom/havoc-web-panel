@@ -22,7 +22,7 @@ final class SystemUpdateService
     public static function cached(): array
     {
         $c = json_decode(Settings::get('os.updates'), true);
-        $def = ['checked' => 0, 'error' => '', 'packages' => [], 'important' => 0, 'reboot' => ['needed' => false, 'packages' => []]];
+        $def = ['checked' => 0, 'error' => '', 'packages' => [], 'important' => 0, 'reboot' => ['needed' => false, 'packages' => []], 'software' => []];
         return is_array($c) ? $c + $def : $def;
     }
 
@@ -56,11 +56,12 @@ final class SystemUpdateService
         return $s + ['error' => ''];
     }
 
-    public static function start(array $actor, string $mode): void
+    /** @param string $mode security | all | component (with $component = key of the software list) */
+    public static function start(array $actor, string $mode, string $component = ''): void
     {
-        $mode = $mode === 'all' ? 'all' : 'security';
-        Ctl::call('os.upgrade', ['mode' => $mode]);
-        Audit::log('server.os_update', $mode, ['packages' => count(self::cached()['packages'])], $actor);
+        $mode = in_array($mode, ['all', 'component'], true) ? $mode : 'security';
+        Ctl::call('os.upgrade', ['mode' => $mode] + ($mode === 'component' ? ['component' => $component] : []));
+        Audit::log('server.os_update', $mode === 'component' ? $component : $mode, ['packages' => count(self::cached()['packages'])], $actor);
     }
 
     /** Periodic: check twice a day; tell the admins once about each new set of security / PHP updates. */

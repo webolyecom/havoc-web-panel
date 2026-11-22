@@ -877,4 +877,11 @@ return [
     'osu.hardening' => 'Ek PHP koruması', 'osu.hardening_text' => 'PHP\'nin yükleme ilerlemesi takibi (session.upload_progress) tüm sitelerde ve panelde kapalı. Bu özellik ziyaretçinin belirlediği verileri oturum dosyalarına yazar ve CVE-2026-126714 ("phpAfterShell") ile CVE-2026-115560 açıklarında kullanılır. Riski azaltır ama PHP güncellemesinin yerini tutmaz. Gerçekten ihtiyacı olan bir site .user.ini dosyasında açabilir.',
     'osu.banner' => ':n güvenlik / PHP güncellemesi bekliyor.', 'osu.banner_reboot' => 'Güncellemelerden sonra sunucunun yeniden başlatılması gerekiyor.', 'osu.banner_hint' => 'Sistem güncellemeleri',
     'osu.notify_subject' => ':host üzerinde :n güvenlik / PHP güncellemesi', 'osu.notify_body' => ':n güvenlik veya PHP güncellemesi mevcut. Panelde İzleme → Sistem güncellemeleri sayfasından kurabilirsiniz.',
+    'osu.software' => 'Yazılımlar', 'osu.software_hint' => 'Panelin kurduğu web sunucuları, MariaDB, PHP ve eklentiler. Her biri ayrı ayrı güncellenebilir; gerekirse servisi yeniden başlatılır.',
+    'osu.sw_name' => 'Yazılım', 'osu.sw_source' => 'Kaynak', 'osu.sw_pkgs' => ':n paket birlikte güncellenir', 'osu.sw_current' => 'güncel', 'osu.sw_newer' => 'yeni sürüm',
+    'osu.sw_update' => 'Güncelle', 'osu.sw_unknown' => 'kontrol edilemedi', 'osu.sw_unknown_hint' => 'Son sürüm şu an öğrenilemedi; güncelleme sırasında tekrar bakılır ve en son sürüm kurulur.', 'osu.sw_check_update' => 'Kontrol et ve güncelle',
+    'osu.src_apt' => 'Debian paketi', 'osu.src_lsup' => 'LiteSpeed (lsup.sh)', 'osu.src_github' => 'GitHub sürümü', 'osu.src_phpmyadmin_net' => 'phpmyadmin.net',
+    'osu.sw_confirm_default' => ':name güncellensin mi? Servisi yeniden başlatılır (birkaç saniye).',
+    'osu.sw_confirm_web' => ':name güncellensin mi? Web sunucusu nazikçe yeniden başlatılır; süren istekler önce tamamlanır.',
+    'osu.sw_confirm_meili' => ':name güncellensin mi? Güncelleme sırasında durdurulur; verisi ve mevcut sürümü önce kopyalanır, yeni sürüm açılmazsa otomatik olarak geri alınır. Güncelleme sırasında aramalar çalışmaz.',
 ];
