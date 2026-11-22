@@ -17,7 +17,7 @@ log "Code"
 rm -rf /opt/havoc.old && cp -a /opt/havoc /opt/havoc.old
 rsync -a --delete --exclude node_modules --exclude .git "$SRC/" /opt/havoc/
 chown -R root:root /opt/havoc
-chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-redis-job /opt/havoc/bin/havoc-addon-job /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
+chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-os-upgrade /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-redis-job /opt/havoc/bin/havoc-addon-job /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
 chmod 755 /opt/havoc/bin/havoc /opt/havoc/bin/havoc-cronwrap /opt/havoc/ctl/fsworker
 rm -f /opt/havoc/bin/havoc-es-install
 
@@ -26,6 +26,7 @@ F=/etc/havoc/php-fpm.conf
 grep -q '^catch_workers_output' $F || sed -i '/^pm.max_children/a catch_workers_output = yes' $F
 grep -q 'log_errors\]' $F || echo 'php_admin_flag[log_errors] = on' >> $F
 grep -q 'max_execution_time\]' $F || echo 'php_admin_value[max_execution_time] = 660' >> $F
+grep -q 'upload_progress.enabled\]' $F || echo 'php_admin_flag[session.upload_progress.enabled] = off' >> $F   # CVE-2026-126714
 
 log "Panel web server settings (include dir, timeouts, compression)"
 N=/etc/havoc/nginx/nginx.conf

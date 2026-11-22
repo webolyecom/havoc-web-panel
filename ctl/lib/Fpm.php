@@ -76,6 +76,11 @@ final class Fpm
         Sys::write("$scan/99-havoc-opcache.ini", sprintf("; written by Havoc WEB Panel\nopcache.enable = %d\nopcache.memory_consumption = %d\nopcache.validate_timestamps = 1\nopcache.revalidate_freq = 2\n",
             (int)$op['enable'], (int)$op['memory']), 0644);
 
+        // security defaults read at startup; a site may still change them in its .user.ini or PHP settings.
+        // Upload progress stores attacker-shaped data in the session file (used by CVE-2026-126714 "phpAfterShell" and
+        // CVE-2026-115560); almost no site uses it.
+        Sys::write("$scan/98-havoc-security.ini", "; written by Havoc WEB Panel\nsession.upload_progress.enabled = 0\n", 0644);
+
         $disabled = self::DISABLED;
         $pool = <<<INI
 [global]

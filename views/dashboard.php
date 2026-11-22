@@ -4,6 +4,11 @@
   <span><span class="font-semibold"><?= e(t('update.banner', ['v' => $newRel['version']])) ?></span> <span class="text-slate-500"><?= e(t('update.banner_hint')) ?></span></span>
   <span class="text-brand">&rarr;</span></a>
 <?php endif; ?>
+<?php if (Havoc\Core\Auth::user()['role'] === 'admin' && ($osu = Havoc\Services\SystemUpdateService::cached()) && ($osu['important'] > 0 || !empty($osu['reboot']['needed']))): ?>
+<a href="/server/updates" class="mb-6 flex items-center justify-between gap-3 rounded-xl border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:hover:bg-rose-500/15">
+  <span><span class="font-semibold text-rose-800 dark:text-rose-200"><?= e($osu['important'] > 0 ? t('osu.banner', ['n' => $osu['important']]) : t('osu.banner_reboot')) ?></span> <span class="text-slate-600 dark:text-slate-400"><?= e(t('osu.banner_hint')) ?></span></span>
+  <span class="text-rose-700 dark:text-rose-300">&rarr;</span></a>
+<?php endif; ?>
 <?php if ($info):
   $gb = static fn(int|float $b) => $b >= 1099511627776 ? round($b / 1099511627776, 2) . ' TB' : ($b >= 1073741824 ? round($b / 1073741824, 1) . ' GB' : round($b / 1048576) . ' MB');
   $up = (int)$info['uptime']; $upText = ($up >= 86400 ? intdiv($up, 86400) . t('dash.d') . ' ' : '') . intdiv($up % 86400, 3600) . t('dash.h') . ' ' . intdiv($up % 3600, 60) . t('dash.m');

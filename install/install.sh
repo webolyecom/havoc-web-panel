@@ -62,7 +62,7 @@ else
   tar -xzf /tmp/havoc.tgz -C /opt/havoc --strip-components=1
 fi
 chown -R root:root /opt/havoc
-chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-redis-job /opt/havoc/bin/havoc-addon-job /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
+chmod 750 /opt/havoc/ctl/havocctl /opt/havoc/bin/havoc-update /opt/havoc/bin/havoc-os-upgrade /opt/havoc/bin/havoc-meili-install /opt/havoc/bin/havoc-redis-job /opt/havoc/bin/havoc-addon-job /opt/havoc/bin/havoc-pma-install /opt/havoc/bin/havoc-ws-install
 chmod 755 /opt/havoc/bin/havoc-cronwrap /opt/havoc/ctl/fsworker
 chmod 755 /opt/havoc/bin/havoc
 
@@ -102,6 +102,7 @@ php_admin_flag[log_errors] = on
 php_admin_value[max_execution_time] = 660
 php_admin_value[expose_php] = off
 php_admin_value[session.cookie_httponly] = 1
+php_admin_flag[session.upload_progress.enabled] = off
 php_admin_flag[display_errors] = off
 php_admin_value[post_max_size] = 48M
 php_admin_value[upload_max_filesize] = 8M
