@@ -2,6 +2,11 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.10.3] – 2026-11-22
+### Fixed
+- **Meilisearch update** (Monitoring → System updates): the in-place database upgrade option is named `MEILI_UPGRADE_DB` since Meilisearch 1.51 (`MEILI_EXPERIMENTAL_DUMPLESS_UPGRADE` before); only the old name was set, so the new version refused the existing data and the update waited 10 minutes before putting the previous version back. Both names are set now.
+- The update no longer waits silently: it gives up as soon as the new version keeps stopping (3 restarts), shows Meilisearch's last log lines (without the master key), puts the previous version and data back and says whether it answers again; while waiting it prints its progress every 15 seconds.
+
 ## [0.10.2] – 2026-11-22
 ### Added
 - **Software updates** on Monitoring → System updates: a *Software* table with installed and available version of Nginx, OpenLiteSpeed, LiteSpeed Enterprise, MariaDB, every installed PHP version, Redis, Memcached, Fail2ban, Node.js, Meilisearch and phpMyAdmin, each with its own *Update* button.
