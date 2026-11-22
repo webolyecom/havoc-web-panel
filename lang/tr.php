@@ -4,7 +4,7 @@ return [
     'nav.services' => 'Servisler', 'nav.settings' => 'Ayarlar', 'nav.soon' => 'Yakında',
     'nav.files' => 'Dosya Yöneticisi', 'nav.databases' => 'Veritabanları', 'nav.ftp' => 'FTP / SFTP', 'nav.dns' => 'DNS', 'nav.backups' => 'Yedekleme',
     'nav.cron' => 'Cron Görevleri', 'nav.redis' => 'Redis & Meilisearch', 'nav.firewall' => 'Güvenlik Duvarı', 'nav.waf' => 'ModSecurity / WAF',
-    'nav.limits' => 'Kaynak Limitleri', 'nav.traffic' => 'Trafik İstatistikleri',
+    'nav.limits' => 'Kullanım ve limitler', 'nav.traffic' => 'Trafik İstatistikleri',
     'auth.username' => 'Kullanıcı adı', 'auth.password' => 'Parola', 'auth.login' => 'Giriş yap', 'auth.logout' => 'Çıkış',
     'auth.invalid' => 'Kullanıcı adı veya parola hatalı.', 'auth.locked' => 'Çok fazla deneme. :min dakika sonra tekrar deneyin.',
     'auth.2fa_hint' => 'Doğrulama uygulamanızdaki 6 haneli kodu girin.', 'auth.verify' => 'Doğrula', 'auth.invalid_code' => 'Geçersiz kod.',
@@ -857,4 +857,6 @@ return [
     'ren.e_type' => 'Yalnızca ana veya ek alan adının adı değiştirilebilir (alt alan adları ana alan adıyla birlikte değişir).', 'ren.e_status' => 'Site etkin değil.',
     'ren.e_invalid' => 'Bu geçerli bir alan adı değil.', 'ren.e_same' => 'Yeni ad şu anki adla aynı.',
     'ren.e_exists' => ':name bu sunucuda zaten bir site ya da alias.', 'ren.e_backup' => 'Veritabanı yedeği alınamadı: :msg',
+    'nav.g_stats' => 'İstatistik ve loglar', 'nav.s_server' => 'Sunucu yönetimi', 'nav.g_monitor' => 'İzleme', 'nav.g_config' => 'Yapılandırma', 'nav.g_panel' => 'Panel',
+    'nav.mariadb' => 'MariaDB', 'nav.t_ws_server' => 'Sunucu', 'nav.t_ws_perf' => 'Performans ve önbellek', 'nav.t_db_settings' => 'Ayarlar', 'nav.t_db_live' => 'Canlı sorgular',
 ];

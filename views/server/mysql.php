@@ -1,5 +1,7 @@
+<h1 class="h1">MariaDB</h1>
+<?php $tabSet = 'mariadb'; $tabCur = '/server/mysql'; include __DIR__ . '/../_subtabs.php'; ?>
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <div><h1 class="h1 mb-0"><?= e(t('dbproc.title')) ?></h1><p class="mt-1 text-sm text-slate-500"><?= e(t('dbproc.intro')) ?></p></div>
+  <div><h2 class="h2 mb-0"><?= e(t('dbproc.title')) ?></h2><p class="mt-1 text-sm text-slate-500"><?= e(t('dbproc.intro')) ?></p></div>
   <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="checkbox" id="dbp-auto" checked> <?= e(t('dbproc.auto')) ?></label>
 </div>
 <div id="dbp" data-url="/server/mysql.json" data-kill="/server/mysql/kill"

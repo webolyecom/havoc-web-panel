@@ -2,6 +2,22 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.10.0] – 2026-11-22
+### Changed
+- **Sidebar regrouped.** Site work on top, server administration (admins only) below a "Server administration" divider:
+  - *Websites*: Domains, File manager, FTP / SFTP, DNS, Cron jobs
+  - *Databases & backups*: Databases, phpMyAdmin, Backups
+  - *Statistics & logs*: Traffic, Logs, Usage & limits (was "Resource limits")
+  - *Security*: WAF, Firewall, Fail2ban
+  - *Accounts*: Users, Packages, Branding
+  - *Monitoring*: Server monitor, Resource usage, Processes, Services, Notifications
+  - *Configuration*: Web server, MariaDB
+  - *Add-ons*: All add-ons, plus an entry for each installed one (Redis, Meilisearch, Memcached, Node.js)
+  - *Panel*: Site transfer, Panel settings
+- **Pages sharing one menu entry get tabs:** Web server = *Server* + *Performance & cache* (was "Web server settings"); MariaDB = *Settings* + *Live queries* (was "MariaDB settings" and "MySQL queries"). Addresses are unchanged, and the menu search still finds the old names.
+- Menu entries of add-ons that are not installed are hidden; they are installed from Add-ons → All.
+- The most specific matching menu entry is highlighted across all groups (e.g. only "Web server" on its settings tab, not "Server monitor" too).
+
 ## [0.9.9] – 2026-11-22
 ### Added
 - **Change domain name** (domain → Change domain name, admins; main and addon domains): the site keeps its id, files, databases, FTP accounts, PHP settings, cron jobs and backups, and moves to the new name.

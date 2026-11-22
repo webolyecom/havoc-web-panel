@@ -10,7 +10,7 @@ Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, fi
 from one clean interface, or simply ask Claude to do it. No license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.9.9-0b7fa0.svg)
+![Version](https://img.shields.io/badge/version-0.10.0-0b7fa0.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg)
 ![Debian](https://img.shields.io/badge/Debian-12%20%7C%2013-a81d33.svg)
 ![Status](https://img.shields.io/badge/status-beta-f59e0b.svg)
@@ -314,7 +314,7 @@ After logging in for the first time:
 3. **Add a website**: *Domains → Add domain*. Point the domain's DNS to the server; a Let's Encrypt certificate is requested automatically. On the domain page choose the PHP version or click **Install WordPress**.
 4. **Upload your files**: with the *File Manager*, FTP/SFTP accounts or a one-time *Upload link*.
 5. **Protect the server**: *Add-ons → Fail2ban → Install*, then add your own IP address to the whitelist.
-6. **Get alerts**: *Server → Notifications*: enter an SMTP account and/or a Telegram bot, click *Send test*, choose what to report.
+6. **Get alerts**: *Monitoring → Notifications*: enter an SMTP account and/or a Telegram bot, click *Send test*, choose what to report.
 7. **Set up backups**: *Backups*: connect Google Drive, OneDrive or Dropbox (or S3 / FTP / SFTP), then schedule daily backups and choose how many to keep.
 8. **Moving from another Havoc server?** On the old server: *Site transfer → Create transfer key*. On the new one: *Site transfer*, paste the key, pick the sites.
 9. **Optional**: install Redis or Memcached for caching, Meilisearch for search, Node.js for build tools, and connect Claude (see above).

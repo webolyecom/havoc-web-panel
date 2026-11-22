@@ -4,7 +4,7 @@ return [
     'nav.services' => 'Services', 'nav.settings' => 'Settings', 'nav.soon' => 'Coming soon',
     'nav.files' => 'File Manager', 'nav.databases' => 'Databases', 'nav.ftp' => 'FTP / SFTP', 'nav.dns' => 'DNS', 'nav.backups' => 'Backups',
     'nav.cron' => 'Cron Jobs', 'nav.redis' => 'Redis & Meilisearch', 'nav.firewall' => 'Firewall', 'nav.waf' => 'ModSecurity / WAF',
-    'nav.limits' => 'Resource Limits', 'nav.traffic' => 'Traffic Stats',
+    'nav.limits' => 'Usage & limits', 'nav.traffic' => 'Traffic Stats',
     'auth.username' => 'Username', 'auth.password' => 'Password', 'auth.login' => 'Sign in', 'auth.logout' => 'Sign out',
     'auth.invalid' => 'Invalid username or password.', 'auth.locked' => 'Too many attempts. Try again in :min minutes.',
     'auth.2fa_hint' => 'Enter the 6-digit code from your authenticator app.', 'auth.verify' => 'Verify', 'auth.invalid_code' => 'Invalid code.',
@@ -857,4 +857,6 @@ return [
     'ren.e_type' => 'Only a main or addon domain can be renamed (subdomains follow their main domain).', 'ren.e_status' => 'The site is not active.',
     'ren.e_invalid' => 'This is not a valid domain name.', 'ren.e_same' => 'The new name is the same as the current one.',
     'ren.e_exists' => ':name is already a site or alias on this server.', 'ren.e_backup' => 'The database backup failed: :msg',
+    'nav.g_stats' => 'Statistics & logs', 'nav.s_server' => 'Server administration', 'nav.g_monitor' => 'Monitoring', 'nav.g_config' => 'Configuration', 'nav.g_panel' => 'Panel',
+    'nav.mariadb' => 'MariaDB', 'nav.t_ws_server' => 'Server', 'nav.t_ws_perf' => 'Performance & cache', 'nav.t_db_settings' => 'Settings', 'nav.t_db_live' => 'Live queries',
 ];
