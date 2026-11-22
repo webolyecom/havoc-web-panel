@@ -28,6 +28,7 @@ final class DomainService
             'ssl_mode' => $d['ssl_mode'], 'force_https' => (bool)$d['force_https'], 'hsts' => (bool)$d['hsts'],
             'waf' => (bool)$d['waf'], 'logs' => (bool)$d['logs_enabled'], 'suspended' => !empty($d['quota_suspended']),
             'aliases' => array_values(array_diff(self::serverNames($d), [$d['name']])),
+            'redirect_hosts' => array_column(DB::all("SELECT name FROM domains WHERE parent_id = ? AND type = 'alias' AND alias_redirect = 1 ORDER BY name", [$d['id']]), 'name'),
             'redirects' => DB::all('SELECT source, target, code FROM redirects WHERE domain_id = ? ORDER BY id', [$d['id']]),
             'limits' => $res['limits'], 'pool' => $res['pool'],
             'php_ini' => json_decode((string)($d['php_ini'] ?? ''), true) ?: [],

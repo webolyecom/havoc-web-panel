@@ -10,7 +10,7 @@ Manage websites, PHP versions, SSL, databases, files, backups, DNS, FTP/SFTP, fi
 from one clean interface, or simply ask Claude to do it. No license fees, ever.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0b7fa0.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.9.8-0b7fa0.svg)
+![Version](https://img.shields.io/badge/version-0.9.9-0b7fa0.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777bb4.svg)
 ![Debian](https://img.shields.io/badge/Debian-12%20%7C%2013-a81d33.svg)
 ![Status](https://img.shields.io/badge/status-beta-f59e0b.svg)
@@ -107,6 +107,7 @@ Contributions back to the project are very welcome, but never required.
 - **MySQL queries**: live list of running queries and connections; stop long queries one by one, selected or by rule
 - **Resource usage**: memory and CPU per service (MariaDB, Meilisearch, Redis, web server…) and per site, with reclaimable file cache shown apart; change a site's RAM / CPU limits and PHP workers right there
 - **PHP workers per site**: pm mode (ondemand / dynamic / static), max_children, idle time, max requests, and RAM / CPU limits (package value, own value or unlimited)
+- **Change domain name**: move a site to a new name in one step: folder, web server and PHP configuration, logs, subdomains, FTP, cron, DNS zone and SSL follow; the old name can stay as a 301 redirect; WordPress addresses are replaced in the database after an automatic backup
 - **One-click phpMyAdmin**: opens a site's database without a password, with a temporary login for that database only
 - **MariaDB performance tuning** with RAM-based profiles and automatic rollback
 - Authoritative **DNS** (BIND9) with record validation

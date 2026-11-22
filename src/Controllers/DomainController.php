@@ -59,7 +59,7 @@ final class DomainController extends Controller
     }
 
     /** The site pages under /domains/{id}/<section> (GET; the forms post to the same addresses where they exist). */
-    public const SECTIONS = ['wordpress', 'php', 'php-ini', 'ssl', 'security', 'nginx', 'aliases', 'redirects', 'databases', 'search', 'delete'];
+    public const SECTIONS = ['wordpress', 'php', 'php-ini', 'ssl', 'security', 'nginx', 'aliases', 'redirects', 'databases', 'search', 'rename', 'delete'];
 
     /** Site overview: a short summary and one tile per settings page (cheap: no helper calls). */
     public function show(): Response
@@ -120,13 +120,17 @@ final class DomainController extends Controller
                 $data['rules'] = $formRules ?? (string)($d['nginx_custom'] ?? '');
                 break;
             case 'aliases':
-                $data['aliases'] = DB::all("SELECT id, name FROM domains WHERE parent_id = ? AND type = 'alias' ORDER BY name", [$d['id']]);
+                $data['aliases'] = DB::all("SELECT id, name, alias_redirect FROM domains WHERE parent_id = ? AND type = 'alias' ORDER BY name", [$d['id']]);
                 break;
             case 'redirects':
                 $data['redirects'] = DB::all('SELECT * FROM redirects WHERE domain_id = ? ORDER BY id', [$d['id']]);
                 break;
             case 'databases':
                 $data += $this->dbCard($d);
+                break;
+            case 'rename':
+                $this->user()['role'] === 'admin' || $this->abort(403);
+                $data += $this->renameCard($d);
                 break;
             case 'search':
                 $data += $this->searchCard($d);
@@ -269,6 +273,49 @@ final class DomainController extends Controller
             $this->flash('error', t('common.failed') . ': ' . $e->getMessage());
         }
         return $this->to('/domains/' . $d['id'] . '/ssl');
+    }
+
+    /** Change domain name, step 1: the new name; step 2 (?name=): what will change, whether its DNS points here, confirm. */
+    private function renameCard(array $d): array
+    {
+        $name = strtolower(trim((string)($_GET['name'] ?? '')));
+        $out = ['newName' => $name, 'plan' => null, 'planError' => null, 'dnsCheck' => null,
+            'renameResult' => $_SESSION['rename_result'] ?? null];
+        unset($_SESSION['rename_result']);
+        if ($name === '' || !in_array($d['type'], ['main', 'addon'], true)) {
+            return $out;
+        }
+        try {
+            $out['plan'] = \Havoc\Services\RenameService::plan($d, $name);
+            $names = array_merge([$out['plan']['new'], 'www.' . $out['plan']['new']], array_column($out['plan']['subs'], 'new'));
+            try {
+                $out['dnsCheck'] = Ctl::call('ssl.precheck', ['names' => $names], 120)['results'] ?? [];
+            } catch (\Throwable) {
+                $out['dnsCheck'] = null;
+            }
+        } catch (\DomainException $e) {
+            $out['planError'] = $e->getMessage();
+        }
+        return $out;
+    }
+
+    public function rename(): Response
+    {
+        $d = $this->domain();
+        $new = strtolower(trim($this->req->str('name')));
+        try {
+            $r = \Havoc\Services\RenameService::rename($this->user(), $d, $new, $this->req->post('keep_old') === '1', $this->req->post('wordpress') === '1');
+            $_SESSION['rename_result'] = ['old' => $d['name'], 'new' => $new] + $r;
+            $this->flash('success', t('ren.done', ['old' => $d['name'], 'new' => $new]));
+        } catch (\DomainException $e) {
+            $this->flash('error', $e->getMessage());
+            return $this->to('/domains/' . (int)$d['id'] . '/rename?name=' . rawurlencode($new));
+        } catch (\Throwable $e) {
+            error_log('rename: ' . $e->getMessage());
+            $this->flash('error', t('ren.failed', ['msg' => $e->getMessage()]));
+            return $this->to('/domains/' . (int)$d['id'] . '/rename?name=' . rawurlencode($new));
+        }
+        return $this->to('/domains/' . (int)$d['id'] . '/rename');
     }
 
     /** Forms on a site page send from_domain: go back to that page of the site (if the user may see it). */

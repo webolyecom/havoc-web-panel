@@ -17,7 +17,7 @@ final class Transfer
 {
     private const OUT = '/var/backups/havoc/transfer';
     private const IN  = '/var/backups/havoc/incoming';
-    private const CONFIG_FILES = ['wp-config.php', '.env', 'config.php', 'configuration.php', 'app/etc/env.php', 'includes/config.php',
+    public const CONFIG_FILES = ['wp-config.php', '.env', 'config.php', 'configuration.php', 'app/etc/env.php', 'includes/config.php',
         'config/database.php', 'sites/default/settings.php', '.user.ini', '.htaccess', 'wp-content/wp-cache-config.php'];
 
     private static function id(mixed $id): string
