@@ -884,4 +884,5 @@ return [
     'osu.sw_confirm_default' => 'Update :name? Its service is restarted (a few seconds).',
     'osu.sw_confirm_web' => 'Update :name? The web server is restarted gracefully; running requests finish first.',
     'osu.sw_confirm_meili' => 'Update :name? It is stopped for the update; its data and the current version are copied first and put back automatically if the new version does not start. Searches do not work during the update.',
+    'pv.open' => 'Preview', 'pv.hint' => 'Opens the site as it runs on this server, also before its DNS points here (log in to its admin, make changes). Address: panel port + 1.',
 ];

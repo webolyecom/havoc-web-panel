@@ -99,6 +99,10 @@ if [ -f /opt/havoc-pma/index.php ]; then   # phpMyAdmin: one-click login and ses
   /opt/havoc/ctl/havocctl pma.sso_setup <<< '{}' >/dev/null 2>&1 || echo "Note: phpMyAdmin session settings could not be applied."
 fi
 
+log "Site preview (https://<panel>:<panel port + 1>/preview/<domain>/)"
+/opt/havoc/ctl/havocctl preview.ensure <<< '{}' >/dev/null 2>&1 && echo "Site preview on port $(cat /etc/havoc/preview-port)" \
+  || echo "Note: the site preview could not be set up."
+
 log "Re-applying site configurations (adds www.<domain>, new PHP/Nginx options)"
 runuser -u havoc -- php /opt/havoc/bin/havoc domains:reapply || true
 

@@ -41,6 +41,7 @@ $groups = ['site' => 'dsec.g_site', 'php' => 'dsec.g_php', 'security' => 'dsec.g
   </div>
   <div class="flex flex-wrap gap-2">
     <a class="btn-ghost inline-flex items-center gap-1.5 border border-slate-300 dark:border-slate-700" href="<?= e($url) ?>" target="_blank" rel="noopener"><?= $navIcon('external') ?> <?= e(t('dsec.visit')) ?></a>
+    <?php if ($d['status'] === 'active'): ?><a class="btn-ghost inline-flex items-center gap-1.5 border border-slate-300 dark:border-slate-700" href="<?= e(Havoc\Services\PreviewService::url($d)) ?>" target="_blank" rel="noopener" title="<?= e(t('pv.hint')) ?>"><?= $navIcon('eye') ?> <?= e(t('pv.open')) ?></a><?php endif; ?>
     <form method="post" action="/domains/<?= $id ?>/upload-link"><?= csrf_field() ?><button class="btn-ghost inline-flex items-center gap-1.5 border border-slate-300 dark:border-slate-700"><?= $navIcon('upload') ?> <?= e(t('upload.make_link')) ?></button></form>
     <a class="btn inline-flex items-center gap-1.5" href="/domains/<?= $id ?>/files"><?= $navIcon('folder') ?> <?= e(t('files.title')) ?></a>
   </div>

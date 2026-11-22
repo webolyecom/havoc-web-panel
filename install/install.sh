@@ -311,6 +311,7 @@ CREDS=$(runuser -u havoc -- php /opt/havoc/bin/havoc admin:create admin "admin@$
 
 systemctl daemon-reload
 systemctl enable --now havoc-panel-fpm havoc-panel-nginx havoc-backup.timer havoc-usage.timer havoc-alerts.timer
+/opt/havoc/ctl/havocctl preview.ensure <<< '{}' >/dev/null 2>&1 || echo "Note: the site preview could not be set up."   # site preview port
 
 echo nginx > /etc/havoc/webserver
 if [ "$WEBSERVER" != nginx ]; then

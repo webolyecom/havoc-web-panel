@@ -41,6 +41,16 @@ final class NginxDriver implements WebServer
      */
     private function ensureDefault(): void
     {
+        // site preview from the panel (Preview.php): a request carrying the secret header counts as HTTPS for PHP, so a
+        // site without a certificate yet does not redirect to https:// in a loop; it is never served from the page cache
+        $secret = Preview::secret();
+        $pv = "# Managed by Havoc WEB Panel - site preview (secret: keep 0640)\n"
+            . "map \$http_x_havoc_preview \$havoc_https { default \$https; \"~^$secret\$\" on; }\n"
+            . "map \$http_x_havoc_preview \$havoc_scheme { default \$scheme; \"~^$secret\$\" https; }\n"
+            . "map \$http_x_havoc_preview \$havoc_preview { default \"\"; \"~^$secret\$\" 1; }\n";
+        if (@file_get_contents('/etc/nginx/conf.d/havoc-00-preview.conf') !== $pv) {
+            Sys::write('/etc/nginx/conf.d/havoc-00-preview.conf', $pv, 0640);
+        }
         $page = '/var/www/havoc-default';
         is_dir($page) || mkdir($page, 0755, true);
         if (!is_file("$page/index.html")) {
@@ -218,7 +228,7 @@ NGX;
         $cache  = $ttl > 0
             ? "        fastcgi_cache havoc;\n        fastcgi_cache_key \"\$scheme\$request_method\$host\$request_uri\";\n"
               . "        fastcgi_cache_valid 200 301 302 {$ttl}s;\n"
-              . "        fastcgi_cache_bypass \$havoc_nc_method \$havoc_nc_cookie \$havoc_nc_uri;\n        fastcgi_no_cache \$havoc_nc_method \$havoc_nc_cookie \$havoc_nc_uri;\n"
+              . "        fastcgi_cache_bypass \$havoc_nc_method \$havoc_nc_cookie \$havoc_nc_uri \$havoc_preview;\n        fastcgi_no_cache \$havoc_nc_method \$havoc_nc_cookie \$havoc_nc_uri \$havoc_preview;\n"
               . "        fastcgi_cache_use_stale error timeout updating http_500 http_503;\n        fastcgi_cache_background_update on;\n        fastcgi_cache_lock on;\n"
             : '';
         $cacheHdr = $ttl > 0 ? "add_header X-Havoc-Cache \$upstream_cache_status;   # HIT / MISS / BYPASS / EXPIRED\n    " : '';
@@ -244,7 +254,8 @@ NGX;
         $custom = trim((string)($vh['nginx_custom'] ?? ''));
         $useCustom = $custom !== '' && empty($vh['suspended']);
         $rootLoc = $useCustom && NginxCustom::definesRoot($custom) ? '' : "    location / { try_files \$uri \$uri/ /index.php?\$args; }\n";
-        $locs = $whole ?? $rootLoc . $static . "    location ~ \.php\$ {\n        include snippets/fastcgi-php.conf;\n        fastcgi_pass unix:$sock;\n$cache    }\n";
+        $pvParams = "        fastcgi_param HTTPS \$havoc_https if_not_empty;\n        fastcgi_param REQUEST_SCHEME \$havoc_scheme;\n        fastcgi_param HTTP_X_HAVOC_PREVIEW \"\";\n";
+        $locs = $whole ?? $rootLoc . $static . "    location ~ \.php\$ {\n        include snippets/fastcgi-php.conf;\n$pvParams        fastcgi_pass unix:$sock;\n$cache    }\n";
         if ($useCustom && $whole === null) {
             $locs = "    include " . self::CUSTOM . "/$d.conf;\n" . $locs;
         }
