@@ -11,8 +11,8 @@ $cards = [
 ?>
 <?php if ($busy): ?><div data-autorefresh></div><?php endif; ?>
 <h1 class="h1"><?= e(t('nav.webserver')) ?></h1>
+<?php $tabSet = 'web'; $tabCur = '/server/webserver'; include __DIR__ . '/../_subtabs.php'; ?>
 <p class="mb-3 max-w-3xl text-sm text-slate-500"><?= e(t('ws.intro')) ?></p>
-<p class="mb-6"><a class="btn-ghost inline-flex items-center gap-1.5 border border-slate-300 dark:border-slate-700" href="/server/webserver/settings"><?= e(t('ws.settings_link')) ?> →</a></p>
 
 <?php if (!empty($sw['log'])): ?>
 <div class="card mb-6 space-y-2">

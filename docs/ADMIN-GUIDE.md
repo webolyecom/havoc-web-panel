@@ -140,7 +140,7 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
   * responses with `Set-Cookie`.
 
 ## MySQL queries
-* Databases & backups → MySQL queries reads `information_schema.PROCESSLIST` as root (helper action `db.processlist`, query text up to 8000 characters) and stops statements with `KILL QUERY <id>` or connections with `KILL CONNECTION <id>` (`db.kill`). Rules are evaluated by the helper at the moment of the click: "long" = `Query` threads running at least N seconds (optionally in one database), "sleep" = idle connections at least N seconds.
+* Configuration → MariaDB → Live queries reads `information_schema.PROCESSLIST` as root (helper action `db.processlist`, query text up to 8000 characters) and stops statements with `KILL QUERY <id>` or connections with `KILL CONNECTION <id>` (`db.kill`). Rules are evaluated by the helper at the moment of the click: "long" = `Query` threads running at least N seconds (optionally in one database), "sleep" = idle connections at least N seconds.
 * Threads of `system user`, `event_scheduler` and the commands Daemon, Binlog Dump, Slave_* and Connect are never stopped. Each stop is in the audit log (`mysql.kill_query` / `mysql.kill_connection`) with the first 200 characters of each query.
 
 ## Panel sessions
@@ -196,8 +196,8 @@ browser ──HTTPS──> havoc-panel-nginx ──> havoc-panel-fpm (user: havo
 ## PHP workers and resource limits
 * Each site runs its own PHP-FPM master as the systemd service `havoc-fpm-<id>` (pool `/etc/havoc/fpm/<id>.conf`). Its unit carries `MemoryMax` and `CPUQuota`; when the memory limit is reached the kernel stops a process of that site only.
 * Per-site values are stored in `domains.php_pool` (JSON). `ram_mb` / `cpu_percent`: missing = package value (no package: 1024 MB / 100 %), `0` = unlimited (`MemoryMax=infinity`, no `CPUQuota`). `pm` defaults to `ondemand`; `max_children` missing = RAM limit ÷ 64 MB within 2–50 (unlimited: server RAM ÷ 64, max 100). For `dynamic`, missing start / spare values are derived from max_children (min = max/8, max = max/4, start between).
-* Only admins can change them (domain → PHP → "PHP workers and limits", or Server → Resource usage). Saving rewrites the pool and unit and restarts only that site's PHP.
-* Server → Resource usage (helper action `server.resources`) reads `/proc/meminfo` and, for every service under `/sys/fs/cgroup/system.slice`, `memory.stat` (memory = anon + kernel + shmem; cache = file − shmem), `memory.max`, `memory.swap.current`, `pids.current` and `cpu.stat` (two samples 1 s apart). "Used by programs" is MemTotal − MemAvailable, the same number the dashboard shows. Without cgroup v2 it falls back to `ps` grouped by program name.
+* Only admins can change them (domain → PHP → "PHP workers and limits", or Monitoring → Resource usage). Saving rewrites the pool and unit and restarts only that site's PHP.
+* Monitoring → Resource usage (helper action `server.resources`) reads `/proc/meminfo` and, for every service under `/sys/fs/cgroup/system.slice`, `memory.stat` (memory = anon + kernel + shmem; cache = file − shmem), `memory.max`, `memory.swap.current`, `pids.current` and `cpu.stat` (two samples 1 s apart). "Used by programs" is MemTotal − MemAvailable, the same number the dashboard shows. Without cgroup v2 it falls back to `ps` grouped by program name.
 * Big memory users are usually MariaDB (`innodb_buffer_pool_size`, Databases → MariaDB settings) and Meilisearch (its index is memory-mapped; most of it shows as cache and is reclaimable).
 
 ## Limits / traffic notes

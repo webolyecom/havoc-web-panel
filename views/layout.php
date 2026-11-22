@@ -7,7 +7,6 @@ $theme = $u['theme'] ?? 'system';
 require __DIR__ . '/_nav.php';
 // pages that live under a domain belong to their own menu item
 $navPath = preg_replace(['#^/domains/\d+/files(/.*)?$#', '#^/domains/\d+/logs(/.*)?$#'], ['/files', '/logs'], $path);
-$pmaInstalled = is_file('/opt/havoc-pma/index.php');
 $rank = ['user' => 0, 'reseller' => 1, 'admin' => 2];
 ?>
 <!doctype html>
@@ -45,17 +44,34 @@ $rank = ['user' => 0, 'reseller' => 1, 'admin' => 2];
       </label>
     </div>
     <nav class="nav-scroll flex-1 overflow-y-auto px-3 pb-3" id="side-nav">
+      <?php
+      // the most specific matching entry of the whole menu is active (e.g. /server/webserver over /server);
+      // "also active" prefixes count as the entry itself
+      $isOn = fn($href) => $href === '/' ? $navPath === '/' : ($navPath === rtrim($href, '/') || str_starts_with($navPath, rtrim($href, '/') . '/'));
+      $navBest = null;
+      $bestLen = 0;
+      foreach ($navGroups as [, , $items]) {
+          foreach ($items as $i) {
+              foreach (array_merge([$i[0]], $i[5] ?? []) as $h) {
+                  if ($isOn($h) && strlen($h) > $bestLen) { $navBest = $i[0]; $bestLen = strlen($h); }
+              }
+          }
+      }
+      ?>
       <?php foreach ($navGroups as [$gid, $glabel, $items]):
-        $vis = array_values(array_filter($items, fn($i) => $u && $rank[$u['role']] >= $rank[$i[3]] && ($i[0] !== '/phpmyadmin/' || $pmaInstalled)));
+        if ($gid === '-') {                                        // divider before the server administration groups
+            if ($u && $u['role'] === 'admin') echo '<p class="nav-divider nav-label" data-nav-divider>' . e(t($glabel)) . '</p>';
+            continue;
+        }
+        $vis = array_values(array_filter($items, fn($i) => $u && $rank[$u['role']] >= $rank[$i[3]] && (empty($i[7]) || $navInstalled($i[7]))));
         if (!$vis) continue;
-        $isOn = fn($href) => $href === '/' ? $navPath === '/' : ($navPath === rtrim($href, '/') || str_starts_with($navPath, rtrim($href, '/') . '/'));
-        // the most specific matching item wins (e.g. /databases/tuning over /databases)
-        $best = null;
-        foreach ($vis as $i) { if ($isOn($i[0]) && ($best === null || strlen($i[0]) > strlen($best))) $best = $i[0]; }
+        $best = in_array($navBest, array_column($vis, 0), true) ? $navBest : null;
         $links = '';
         foreach ($vis as $i) {
             $label = t($i[1]);
-            $links .= '<a href="' . e($i[0]) . '" class="nav-link' . ($i[0] === $best ? ' nav-active" aria-current="page' : '') . '" title="' . e($label) . '"' . (!empty($i[4]) ? ' target="_blank" rel="noopener"' : '') . '>'
+            $words = implode(' ', array_map('t', $i[6] ?? []));
+            $links .= '<a href="' . e($i[0]) . '" class="nav-link' . ($i[0] === $best ? ' nav-active" aria-current="page' : '') . '" title="' . e($label) . '"'
+                . ($words !== '' ? ' data-k="' . e($words) . '"' : '') . (!empty($i[4]) ? ' target="_blank" rel="noopener"' : '') . '>'
                 . '<span class="nav-ico">' . $navIcon($i[2]) . '</span><span class="nav-label truncate">' . e($label) . '</span>'
                 . (!empty($i[4]) ? '<svg viewBox="0 0 20 20" class="nav-label ml-auto h-3.5 w-3.5 text-ink-500" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 5h7v7M15 5l-9 9"/></svg>' : '') . '</a>';
         }

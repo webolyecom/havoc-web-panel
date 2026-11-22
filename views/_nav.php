@@ -1,7 +1,8 @@
 <?php
 /**
  * Sidebar definition. Groups are collapsible (<details>), items are filtered by role.
- * [href, label key, icon, minimum role, external]
+ * [href, label key, icon, minimum role, external, also active under (prefixes), search words (label keys), shown only when installed]
+ * The groups after the 'server' divider are the server administration (admins only).
  */
 $navGroups = [
     ['', null, [
@@ -10,51 +11,68 @@ $navGroups = [
     ['sites', 'nav.g_sites', [
         ['/domains', 'nav.domains', 'globe', 'user'],
         ['/files', 'nav.files', 'folder', 'user'],
-        ['/logs', 'nav.logs', 'list', 'user'],
-        ['/traffic', 'nav.traffic', 'chart', 'user'],
+        ['/ftp', 'nav.ftp', 'upload', 'user'],
+        ['/dns', 'nav.dns', 'dns', 'user'],
         ['/cron', 'nav.cron', 'clock', 'user'],
     ]],
     ['data', 'nav.g_data', [
         ['/databases', 'nav.databases', 'db', 'user'],
-        ['/phpmyadmin/', 'nav.phpmyadmin', 'table', 'user', true],
-        ['/databases/tuning', 'nav.db_tuning', 'sliders', 'admin'],
-        ['/server/mysql', 'nav.mysql_procs', 'list', 'admin'],
+        ['/phpmyadmin/', 'nav.phpmyadmin', 'table', 'user', true, [], [], 'pma'],
         ['/backups', 'nav.backups', 'archive', 'user'],
     ]],
-    ['access', 'nav.g_access', [
-        ['/ftp', 'nav.ftp', 'upload', 'user'],
-        ['/dns', 'nav.dns', 'dns', 'user'],
+    ['stats', 'nav.g_stats', [
+        ['/traffic', 'nav.traffic', 'chart', 'user'],
+        ['/logs', 'nav.logs', 'list', 'user'],
+        ['/limits', 'nav.limits', 'gauge', 'user'],
     ]],
     ['security', 'nav.g_security', [
         ['/waf', 'nav.waf', 'shield', 'user'],
         ['/firewall', 'nav.firewall', 'wall', 'admin'],
-        ['/limits', 'nav.limits', 'gauge', 'user'],
+        ['/addons/fail2ban', 'Fail2ban', 'ban', 'admin', false, [], [], 'fail2ban'],
     ]],
     ['accounts', 'nav.g_accounts', [
         ['/users', 'nav.users', 'users', 'reseller'],
         ['/packages', 'nav.packages', 'box', 'reseller'],
         ['/branding', 'nav.branding', 'brush', 'reseller'],
     ]],
-    ['addons', 'nav.g_addons', [
-        ['/addons', 'nav.addons_all', 'grid', 'admin'],
-        ['/addons/redis', 'Redis', 'bolt', 'admin'],
-        ['/addons/meilisearch', 'Meilisearch', 'search', 'admin'],
-        ['/addons/memcached', 'Memcached', 'stack', 'admin'],
-        ['/addons/fail2ban', 'Fail2ban', 'ban', 'admin'],
-        ['/addons/nodejs', 'Node.js', 'hexagon', 'admin'],
-    ]],
-    ['server', 'nav.g_server', [
+    ['-', 'nav.s_server', []],
+    ['monitor', 'nav.g_monitor', [
         ['/server', 'nav.monitor', 'pulse', 'admin'],
         ['/server/resources', 'nav.resources', 'cpu', 'admin'],
         ['/server/processes', 'nav.processes', 'list', 'admin'],
-        ['/server/webserver', 'nav.webserver', 'web', 'admin'],
-        ['/server/webserver/settings', 'nav.ws_settings', 'sliders', 'admin'],
         ['/services', 'nav.services', 'server', 'admin'],
-        ['/transfers', 'nav.transfers', 'transfer', 'admin'],
         ['/server/notifications', 'nav.notifications', 'bell', 'admin'],
+    ]],
+    ['config', 'nav.g_config', [
+        ['/server/webserver', 'nav.webserver', 'web', 'admin', false, [], ['nav.ws_settings', 'nav.t_ws_perf']],
+        ['/databases/tuning', 'nav.mariadb', 'sliders', 'admin', false, ['/server/mysql'], ['nav.db_tuning', 'nav.mysql_procs']],
+    ]],
+    ['addons', 'nav.g_addons', [
+        ['/addons', 'nav.addons_all', 'grid', 'admin'],
+        ['/addons/redis', 'Redis', 'bolt', 'admin', false, [], [], 'redis'],
+        ['/addons/meilisearch', 'Meilisearch', 'search', 'admin', false, [], [], 'meilisearch'],
+        ['/addons/memcached', 'Memcached', 'stack', 'admin', false, [], [], 'memcached'],
+        ['/addons/nodejs', 'Node.js', 'hexagon', 'admin', false, [], [], 'nodejs'],
+    ]],
+    ['panel', 'nav.g_panel', [
+        ['/transfers', 'nav.transfers', 'transfer', 'admin'],
         ['/server/settings', 'nav.panel_settings', 'cog', 'admin'],
     ]],
 ];
+
+/** Cheap checks (file exists) for menu entries of optional software. */
+$navInstalled = static function (string $what): bool {
+    static $cache = [];
+    return $cache[$what] ??= match ($what) {
+        'pma' => is_file('/opt/havoc-pma/index.php'),
+        'redis' => is_file('/usr/bin/redis-server'),
+        'meilisearch' => is_file('/usr/local/bin/meilisearch'),
+        'memcached' => is_file('/usr/bin/memcached'),
+        'fail2ban' => is_file('/usr/bin/fail2ban-server'),
+        'nodejs' => is_file('/usr/bin/node'),
+        default => true,
+    };
+};
 
 /** 20x20 outline icons (own drawings, stroke = currentColor). */
 $navIcon = static function (string $name): string {

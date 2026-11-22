@@ -19,7 +19,8 @@ $fileVal = function (string $k) use ($file, $keys) {
     return $keys[$k][0] === 'mb' ? (string)(int)$v : $v;
 };
 ?>
-<h1 class="h1"><?= e(t('nav.db_tuning')) ?></h1>
+<h1 class="h1">MariaDB</h1>
+<?php $tabSet = 'mariadb'; $tabCur = '/databases/tuning'; include __DIR__ . '/../_subtabs.php'; ?>
 <div class="card mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
   <span><?= e(t('tune.ram')) ?>: <b><?= e(bytes((int)($st['ram_mb'] ?? 0) * 1048576)) ?></b></span>
   <?php if (!empty($st['version'])): ?><span>MariaDB <b><?= e($st['version']) ?></b></span><span><?= e(t('mon.uptime')) ?>: <b><?= e(gmdate('z\d H\h i\m', (int)$st['uptime'])) ?></b></span><?php endif; ?>

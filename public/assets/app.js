@@ -47,12 +47,13 @@
       let any = false;
       groups.forEach((g) => {
         let hit = false;
-        g.querySelectorAll('.nav-link').forEach((a) => { const ok = !q || fold(a.textContent).includes(q); a.hidden = !ok; hit = hit || ok; });
+        g.querySelectorAll('.nav-link').forEach((a) => { const ok = !q || fold(a.textContent + ' ' + (a.dataset.k || '')).includes(q); a.hidden = !ok; hit = hit || ok; });
         g.hidden = !hit;
         if (q && hit && g.tagName === 'DETAILS') g.open = true;
         any = any || hit;
       });
       $('#nav-empty')?.classList.toggle('hidden', any);
+      document.querySelectorAll('[data-nav-divider]').forEach((d) => { d.hidden = !!q; });
     });
     filter.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { const a = [...document.querySelectorAll('#side-nav .nav-link')].find((x) => !x.hidden && !x.closest('[hidden]')); if (a) a.click(); }

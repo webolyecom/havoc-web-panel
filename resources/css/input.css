@@ -19,6 +19,8 @@
     box-shadow: 0 6px 18px -6px rgb(var(--brand) / .7), inset 0 1px 0 rgb(255 255 255 / .25); }
   .nav-search { @apply flex items-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.04] px-2.5 py-1.5 text-ink-400 transition focus-within:border-white/20 focus-within:bg-white/[0.07]; }
   .nav-summary { @apply flex cursor-pointer select-none list-none items-center justify-between rounded-md px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[.12em] text-ink-500 transition hover:text-ink-300; }
+  /* divider between the site groups and the server administration (admins) */
+  .nav-divider { @apply mx-3 mt-7 flex items-center gap-2 border-t border-white/[0.08] pt-4 text-[10px] font-bold uppercase tracking-[.16em] text-brand; }
   .nav-items { @apply space-y-0.5; }
   .nav-link { @apply relative flex items-center gap-3 rounded-lg px-3 py-[7px] text-[13.5px] text-ink-300 transition-colors hover:bg-white/[0.05] hover:text-white; }
   .nav-ico { @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-400 transition-colors; }

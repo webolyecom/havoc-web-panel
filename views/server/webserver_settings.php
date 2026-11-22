@@ -53,10 +53,11 @@ $field = static function (string $k, array $def) use ($v, $spec): string {
 };
 $ttlDefault = $type === 'nginx' ? 60 : 120;
 ?>
+<h1 class="h1"><?= e(t('nav.webserver')) ?></h1>
+<?php $tabSet = 'web'; $tabCur = '/server/webserver/settings'; include __DIR__ . '/../_subtabs.php'; ?>
 <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
   <div>
-    <a href="/server/webserver" class="text-sm text-slate-500 hover:text-brand">← <?= e(t('nav.webserver')) ?></a>
-    <h1 class="h1 mb-0 mt-1"><?= e(t('wst.title', ['name' => $name])) ?></h1>
+    <h2 class="h2 mb-0"><?= e(t('wst.title', ['name' => $name])) ?></h2>
     <p class="mt-1 max-w-3xl text-sm text-slate-500"><?= e(t('wst.intro', ['name' => $name])) ?><?= $tu['version'] !== '' ? ' ' . e(t('ws.version', ['v' => $tu['version']])) . '.' : '' ?></p>
   </div>
   <?php if (!$tu['saved']): ?><span class="badge badge-warn"><?= e(t('wst.not_saved')) ?></span><?php endif; ?>
