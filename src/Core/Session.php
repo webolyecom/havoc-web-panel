@@ -49,6 +49,35 @@ final class Session
         }
     }
 
+    /**
+     * The logged-in user of the request's session without starting, locking or renewing it (site preview: many parallel
+     * requests per page). Same expiry rules as start().
+     */
+    public static function peekUser(): ?array
+    {
+        $id = (string)($_COOKIE['havoc_sid'] ?? '');
+        if (!preg_match('/^[a-zA-Z0-9,-]{22,256}$/', $id)) {
+            return null;
+        }
+        if (!is_file(rtrim((string)Config::get('session.path'), '/') . '/sess_' . $id)) {
+            return null;
+        }
+        // read-only: no cookie is sent, the file is closed right after reading (not kept locked) and never written
+        ini_set('session.use_cookies', '0');
+        ini_set('session.use_strict_mode', '0');
+        session_name('havoc_sid');
+        session_save_path((string)Config::get('session.path'));
+        session_id($id);
+        $ok = @session_start(['read_and_close' => true]);
+        $s = $_SESSION ?? [];
+        if (!$ok || empty($s['uid'])) {
+            return null;
+        }
+        $now = time();
+        $expired = !empty($s['remember']) ? $now > (int)($s['remember_until'] ?? 0) : $now - (int)($s['last'] ?? 0) > self::IDLE;
+        return $expired ? null : DB::one('SELECT * FROM users WHERE id = ? AND status = ?', [(int)$s['uid'], 'active']);
+    }
+
     /** After a login: remember for 30 days or not. */
     public static function remember(bool $on): void
     {

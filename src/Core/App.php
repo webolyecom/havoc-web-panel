@@ -9,6 +9,10 @@ final class App
     {
         self::trustPanelProxy();
         $req = new Request();
+        if (!empty($_SERVER['HAVOC_PREVIEW'])) {
+            \Havoc\Services\PreviewService::handle((string)$_SERVER['HAVOC_PREVIEW']);   // site preview port (nginx)
+            return;
+        }
         if (!empty($_SERVER['HAVOC_AUTH_CHECK'])) {
             self::authCheck($req);                            // nginx auth_request subrequest (phpMyAdmin gate)
             return;

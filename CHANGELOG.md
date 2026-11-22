@@ -2,6 +2,16 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.11.0] – 2026-11-22
+### Added
+- **Live site preview**: `https://<panel>:<panel port>/preview/<domain>/<path>` opens a site as it runs on this server, also while its domain still points to another server (moving a site): pages, logging in to its admin and working in it. "Preview" buttons on the domain page and in the sites list.
+  - Runs on its own port (panel port + 1, default 2088), never on the panel's origin, so a site's JavaScript cannot read panel pages; the panel port forwards `/preview/…` there. The port is opened in the firewall when it is on (also in a cloud provider's firewall if one is used).
+  - Only logged-in panel users who manage the site; the panel login is checked on every request (answer cached for 20 s) and the panel's cookies are never passed to the site.
+  - The site runs with its own paths (the chosen site is kept in a cookie). Its address in pages, CSS, JS, JSON (also `https:\/\/` and URL-encoded) and redirects becomes the preview address; Origin / Referer reach the site as its own address.
+  - Requests that send data (forms, editors, AJAX/REST) go through a relay that turns the preview address back into `https://<domain>`, so saving a setting or a post never stores the preview address in the site.
+  - HTTPS: sites with a certificate are reached over HTTPS; a site without one (DNS not pointed yet) gets a secret header that makes its Nginx report HTTPS to PHP, so WordPress and similar do not redirect in a loop (OpenLiteSpeed / LiteSpeed answer every site on 443 anyway).
+  - Limits: files uploaded through the preview are limited by the panel's PHP (8 MB per file); addresses saved through it are stored as `https://<domain>` (an `http://` or `www.` address the page showed is saved in that form).
+
 ## [0.10.3] – 2026-11-22
 ### Fixed
 - **Meilisearch update** (Monitoring → System updates): the in-place database upgrade option is named `MEILI_UPGRADE_DB` since Meilisearch 1.51 (`MEILI_EXPERIMENTAL_DUMPLESS_UPGRADE` before); only the old name was set, so the new version refused the existing data and the update waited 10 minutes before putting the previous version back. Both names are set now.

@@ -28,6 +28,9 @@ final class Firewall
         if (is_file($nginx) && preg_match('/listen\s+(\d{1,5})\s+ssl/', (string)file_get_contents($nginx), $m)) {
             $p[] = (int)$m[1];
         }
+        if (is_file(Preview::PORT_FILE)) {
+            $p[] = Preview::port();                                 // site preview port (panel port + 1)
+        }
         return array_values(array_unique($p));
     }
 
