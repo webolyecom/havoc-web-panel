@@ -3,7 +3,7 @@
   <div class="card space-y-3">
     <?php foreach ($aliases as $a): ?>
       <form method="post" action="/domains/<?= (int)$a['id'] ?>/delete" class="flex items-center justify-between text-sm" data-confirm="<?= e(t('common.confirm')) ?>"><?= csrf_field() ?><input type="hidden" name="from_domain" value="<?= $id ?>">
-        <span><?= e($a['name']) ?></span><button class="btn-ghost text-xs text-red-600"><?= e(t('common.delete')) ?></button></form>
+        <span><?= e($a['name']) ?><?php if (!empty($a['alias_redirect'])): ?> <span class="badge" title="<?= e(t('ren.alias_redirect_hint')) ?>"><?= e(t('ren.alias_redirect', ['name' => $d['name']])) ?></span><?php endif; ?></span><button class="btn-ghost text-xs text-red-600"><?= e(t('common.delete')) ?></button></form>
     <?php endforeach; ?>
     <?php if (!$aliases): ?><p class="text-sm text-slate-400"><?= e(t('common.empty')) ?></p><?php endif; ?>
     <form method="post" action="/domains" class="flex gap-2"><?= csrf_field() ?>

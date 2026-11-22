@@ -2,6 +2,17 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.9.9] – 2026-11-22
+### Added
+- **Change domain name** (domain → Change domain name, admins; main and addon domains): the site keeps its id, files, databases, FTP accounts, PHP settings, cron jobs and backups, and moves to the new name.
+  - Step 1 shows what will change and whether the new name (also www. and subdomains) already points to this server; step 2 applies it.
+  - Site folder `domains/<old>` → `domains/<new>`, log files (also rotated ones), web server (Nginx / OpenLiteSpeed / LiteSpeed Enterprise) and PHP-FPM configuration; subdomains `x.old` → `x.new` the same way.
+  - FTP/SFTP accounts are mounted on the new folder, cron commands using the old folder (`/home/…/domains/old`, `~/domains/old`) or address are updated, the DNS zone is recreated under the new name, WAF rules follow.
+  - SSL: an own certificate stays when it also covers the new name; otherwise a Let's Encrypt certificate is requested at once (retried until the new name points here).
+  - Optional: the old names (also www. and the old subdomains) stay as parked names that answer with a **301 to the same page on the new name** (Nginx server block / LiteSpeed rewrite; Let's Encrypt checks still answered). Shown as "301 → new" under Aliases.
+  - Optional: the old address is replaced in the **WordPress database** with WP-CLI (serialized and JSON-escaped values, www. and subdomains included; e-mail addresses and GUIDs stay), after a backup of the account's databases. The old folder path and address are always replaced in the site's configuration files (wp-config.php, .env, .htaccess, .user.ini …).
+  - If the new configuration cannot be applied, folders, logs, records and configuration are put back. Renaming back to the old name takes its 301 names back.
+
 ## [0.9.8] – 2026-11-20
 ### Added
 - **Resource usage** (Server → Resource usage, admins): where the server's memory and CPU go.

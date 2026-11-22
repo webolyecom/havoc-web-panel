@@ -205,7 +205,8 @@ NGX;
     private function render(array $vh): string
     {
         $d      = $vh['domain'];
-        $names  = implode(' ', array_merge([$d], $vh['aliases'] ?? []));
+        $moved  = empty($vh['suspended']) ? ($vh['redirect_hosts'] ?? []) : [];   // suspended: the old names show the notice too
+        $names  = implode(' ', array_merge([$d], array_diff($vh['aliases'] ?? [], $moved)));
         $root   = $vh['docroot'];
         $sock   = '/run/havoc-fpm/' . $vh['id'] . '.sock';
         $ssl    = !empty($vh['ssl']['cert']);
@@ -288,6 +289,19 @@ NGX;
                 $out .= "    add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;\n";
             }
             $out .= "$body\n}\n";
+        }
+        if ($moved) {
+            // old names after a rename: everything (except Let's Encrypt checks) moves permanently to the domain
+            $to = ($ssl ? 'https' : 'http') . "://$d";
+            $hosts = implode(' ', $moved);
+            $redirect = "    server_name $hosts;\n"
+                . "    location ^~ /.well-known/acme-challenge/ { root /var/www/havoc-acme; default_type text/plain; try_files \$uri =404; }\n"
+                . "    location / { return 301 $to\$request_uri; }\n";
+            $out .= "server {\n    listen 80;\n    listen [::]:80;\n$redirect}\n";
+            if ($ssl) {
+                $out .= "server {\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    ssl_certificate {$vh['ssl']['cert']};\n    ssl_certificate_key {$vh['ssl']['key']};\n"
+                    . "    ssl_protocols TLSv1.2 TLSv1.3;\n$redirect}\n";
+            }
         }
         return $out;
     }

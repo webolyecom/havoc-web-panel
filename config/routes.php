@@ -44,6 +44,7 @@ return static function (Router $r): void {
     $r->post('/domains/{id}/redirects', [DomainController::class, 'redirectAdd'], ['auth']);
     $r->post('/domains/{id}/redirects/{rid}/delete', [DomainController::class, 'redirectDelete'], ['auth']);
     $r->post('/domains/{id}/delete', [DomainController::class, 'delete'], ['auth']);
+    $r->post('/domains/{id}/rename', [DomainController::class, 'rename'], ['admin']);
     $r->get('/domains/{id}/logs', [DomainController::class, 'logs'], ['auth']);
     $r->get('/domains/{id}/logs/poll', [DomainController::class, 'logPoll'], ['auth']);
 

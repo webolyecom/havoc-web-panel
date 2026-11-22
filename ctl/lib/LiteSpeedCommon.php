@@ -76,6 +76,12 @@ trait LiteSpeedCommon
         }
         // hidden files and folders (.git, .env, the panel's .havoc-incoming uploads ...) are never served, like on Nginx
         $rules[] = 'RewriteRule (^|/)\.(?!well-known/) - [F,L]';
+        if ($vh['redirect_hosts'] ?? []) {
+            // old names after a rename: permanently to the domain (Let's Encrypt checks still answered)
+            $rules[] = 'RewriteCond %{HTTP_HOST} ^(' . implode('|', array_map(static fn($h) => preg_quote($h, '/'), $vh['redirect_hosts'])) . ')\.?(:[0-9]+)?$ [NC]';
+            $rules[] = 'RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/';
+            $rules[] = 'RewriteRule ^(.*)$ ' . ($ssl ? 'https' : 'http') . '://' . $vh['domain'] . '%{REQUEST_URI} [R=301,L]';
+        }
         if (!empty($vh['force_https']) && $ssl) {
             $rules[] = 'RewriteCond %{HTTPS} !on';
             $rules[] = 'RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/';

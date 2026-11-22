@@ -14,8 +14,11 @@ $siteSections = [
     'redirects' => ['redirect', 'domains.redirects', 'domains'],
     'databases' => ['db', 'nav.databases', 'data'],
     'search'    => ['search', 'search.title', 'data'],
+    'rename'    => ['pencil', 'ren.title', 'domains'],
     'delete'    => ['trash', 'dsec.delete', 'danger'],
 ];
+// pages only some may open: rename = admins, for main/addon domains
+$siteShow = static fn(array $d, string $k): bool => $k !== 'rename' || ((\Havoc\Core\Auth::user()['role'] ?? '') === 'admin' && in_array($d['type'], ['main', 'addon'], true));
 $siteHref = static fn(array $d, string $k): string => match ($k) {
     'files' => '/domains/' . (int)$d['id'] . '/files',
     'logs' => '/logs/view?domain_id=' . (int)$d['id'] . '&type=access',

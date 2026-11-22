@@ -27,6 +27,7 @@ $status = [
     'redirects' => [$counts['redirects'] ? t('dsec.n_redirects', ['n' => $counts['redirects']]) : t('dsec.none'), ''],
     'databases' => [$counts['dbs'] ? t('dsec.n_dbs', ['n' => $counts['dbs']]) : t('dsec.none'), ''],
     'search' => $searchOn ? [t('search.on'), 'badge-ok'] : [t('dsec.off'), ''],
+    'rename' => [t('ren.d_tile'), ''],
     'delete' => [t('dsec.d_delete'), ''],
 ];
 $groups = ['site' => 'dsec.g_site', 'php' => 'dsec.g_php', 'security' => 'dsec.g_security', 'domains' => 'dsec.g_domains', 'data' => 'dsec.g_data'];
@@ -66,7 +67,7 @@ $groups = ['site' => 'dsec.g_site', 'php' => 'dsec.g_php', 'security' => 'dsec.g
   <section class="card p-5">
     <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500"><?= e(t($gk)) ?></h2>
     <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-    <?php foreach ($siteSections as $k => [$ic, $tk, $grp]): if ($grp !== $g || ($k === 'search' && $searchOn === null)) continue; [$st, $bc] = $status[$k]; ?>
+    <?php foreach ($siteSections as $k => [$ic, $tk, $grp]): if ($grp !== $g || ($k === 'search' && $searchOn === null) || !$siteShow($d, $k)) continue; [$st, $bc] = $status[$k]; ?>
       <a href="<?= e($siteHref($d, $k)) ?>" class="group flex flex-col items-center gap-2 rounded-xl px-2 py-3 text-center transition hover:bg-brand/5 dark:hover:bg-white/[0.04]">
         <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand transition group-hover:bg-brand group-hover:text-white [&>svg]:h-6 [&>svg]:w-6"><?= $navIcon($ic) ?></span>
         <span class="text-sm font-medium leading-tight text-slate-800 group-hover:text-brand dark:text-slate-100"><?= e(t($tk)) ?></span>

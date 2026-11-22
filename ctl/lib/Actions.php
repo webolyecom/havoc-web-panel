@@ -9,7 +9,7 @@ final class Actions
     public const ALLOWED = [
         'webserver.detect', 'webserver.install', 'webserver.prepare', 'webserver.activate', 'webserver.tuning', 'webserver.tune', 'webserver.cache_purge', 'server.resources', 'php.list', 'php.extensions', 'service.list', 'service.control',
         'account.ensure', 'account.delete', 'domain.apply', 'domain.delete',
-        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'pma.ticket', 'pma.cleanup', 'pma.sso_setup', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply', 'proc.list', 'proc.signal', 'transfer.sizes', 'transfer.export', 'transfer.export_delete', 'transfer.stage', 'transfer.import_files', 'transfer.import_db', 'transfer.patch', 'transfer.wp_replace', 'transfer.check',
+        'ssl.letsencrypt', 'ssl.precheck', 'ssl.install', 'mariadb.status', 'mariadb.tune', 'pma.status', 'pma.install', 'pma.uninstall', 'pma.ticket', 'pma.cleanup', 'pma.sso_setup', 'panel.port_status', 'panel.port_change', 'panel.port_confirm', 'panel.port_revert', 'log.read', 'log.list', 'log.clear', 'log.tail_many', 'log.cat', 'panel.update', 'panel.update_status', 'panel.update_check', 'app.wordpress', 'panel.hostname_ssl', 'panel.hostname_status', 'panel.proxy_apply', 'proc.list', 'proc.signal', 'transfer.sizes', 'transfer.export', 'transfer.export_delete', 'transfer.stage', 'transfer.import_files', 'transfer.import_db', 'transfer.patch', 'transfer.wp_replace', 'transfer.check', 'domain.rename', 'domain.rename_addresses',
         'fs.cat', 'cron.apply', 'cron.run', 'cron.log', 'usage.scan', 'usage.fpm', 'traffic.scan', 'waf.status', 'waf.install', 'waf.apply', 'waf.log', 'redis.status', 'redis.set', 'redis.install', 'redis.uninstall', 'redis.key', 'addon.overview', 'addon.status', 'addon.install', 'addon.uninstall', 'memcached.set', 'memcached.flush', 'fail2ban.apply', 'fail2ban.ban', 'node.globals', 'meili.site_enable', 'meili.site_info', 'meili.site_rotate', 'meili.site_disable', 'meili.site_sizes', 'meili.site_import', 'meili.status', 'meili.install', 'meili.uninstall', 'meili.configure', 'meili.key',
         'fw.status', 'fw.enable', 'fw.disable', 'fw.allow', 'fw.ban', 'fw.whitelist', 'fw.preset', 'fw.delete', 'dns.apply', 'dns.delete', 'ftp.create', 'ftp.update', 'ftp.password', 'ftp.delete', 'backup.create', 'backup.restore', 'backup.delete', 'backup.test', 'backup.about', 'fs.exec', 'db.create', 'db.drop', 'db.password', 'db.remote', 'db.bind', 'db.info', 'db.processlist', 'db.kill',
     ];
@@ -254,6 +254,8 @@ final class Actions
         $vh = [
             'id' => Validator::id($a['id'] ?? ''), 'domain' => $dom, 'account' => $acct,
             'aliases' => array_map([Validator::class, 'domain'], $a['aliases'] ?? []),
+            // old names kept after a rename: answered with a 301 to the domain (they stay in aliases for listeners/certificates)
+            'redirect_hosts' => array_values(array_intersect(array_map([Validator::class, 'domain'], $a['redirect_hosts'] ?? []), array_map([Validator::class, 'domain'], $a['aliases'] ?? []))),
             'docroot' => "/home/$acct/$rel", 'php' => Validator::php($a['php'] ?? ''),
             'extensions' => $a['extensions'] ?? null,
             'opcache' => ['enable' => (int)!empty($a['opcache']['enable']), 'memory' => max(32, min(1024, (int)($a['opcache']['memory'] ?? 128)))],
@@ -1041,6 +1043,8 @@ final class Actions
     public function transfer_patch(array $a): array { return Transfer::patch($a); }
     public function transfer_wp_replace(array $a): array { return Transfer::wpReplace($a); }
     public function transfer_check(array $a): array { return Transfer::check($a); }
+    public function domain_rename(array $a): array { return Rename::move($a); }
+    public function domain_rename_addresses(array $a): array { return Rename::addresses($a); }
     public function addon_overview(array $a): array { return Addons::overview(); }
     public function addon_status(array $a): array { return Addons::status($a); }
     public function addon_install(array $a): array { return Addons::install($a); }

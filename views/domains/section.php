@@ -12,7 +12,7 @@ $id = (int)$d['id'];
   </div>
 </div>
 <nav class="mb-6 flex gap-1.5 overflow-x-auto pb-1 text-sm lg:flex-wrap lg:overflow-visible" aria-label="<?= e($d['name']) ?>">
-  <?php foreach ($siteSections as $k => [$ic, $tk]): if ($k === 'search' && !$searchOn) continue; ?>
+  <?php foreach ($siteSections as $k => [$ic, $tk]): if (($k === 'search' && !$searchOn) || !$siteShow($d, $k)) continue; ?>
     <a href="<?= e($siteHref($d, $k)) ?>" class="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 <?= $k === $section ? 'border-brand bg-brand/10 text-brand' : 'border-slate-200 text-slate-600 hover:border-brand/50 hover:text-brand dark:border-slate-700 dark:text-slate-300' ?>"<?= $k === $section ? ' aria-current="page"' : '' ?>><?= $navIcon($ic) ?><span class="whitespace-nowrap"><?= e(t($tk)) ?></span></a>
   <?php endforeach; ?>
 </nav>
