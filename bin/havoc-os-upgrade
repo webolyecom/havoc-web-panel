@@ -6,7 +6,7 @@
 #   havoc-os-upgrade packages NAME...   only these packages (one piece of software: Nginx, PHP 8.x, MariaDB, Redis …)
 #   havoc-os-upgrade lsws        LiteSpeed Enterprise to the latest release (its own lsup.sh)
 #   havoc-os-upgrade meilisearch latest Meilisearch release; data and binary are copied first and put back if the new
-#                                version does not start (database upgraded in place: MEILI_EXPERIMENTAL_DUMPLESS_UPGRADE)
+#                                version does not start (database upgraded in place: MEILI_UPGRADE_DB)
 #   havoc-os-upgrade phpmyadmin  latest phpMyAdmin (bin/havoc-pma-install replaces it in place)
 # After PHP updates every PHP-FPM is restarted (each site's own master, stock pools, the panel). Finally the list of
 # available updates is refreshed. Output is the log shown in the panel.
@@ -59,19 +59,37 @@ case "$MODE" in
       cp -a $B.pre-update $B; rm -rf $D; mv $D.pre-update $D
       systemctl start meilisearch || true
     }
-    # first start of the new version upgrades the database files in place
-    install -d $DROP; printf '[Service]\nEnvironment=MEILI_EXPERIMENTAL_DUMPLESS_UPGRADE=true\n' > $DROP/havoc-upgrade.conf
+    # first start of the new version upgrades the database files in place: MEILI_UPGRADE_DB since 1.51,
+    # MEILI_EXPERIMENTAL_DUMPLESS_UPGRADE before (a version ignores the name it does not know)
+    install -d $DROP
+    printf '[Service]\nEnvironment=MEILI_UPGRADE_DB=true\nEnvironment=MEILI_EXPERIMENTAL_DUMPLESS_UPGRADE=true\n' > $DROP/havoc-upgrade.conf
     /opt/havoc/bin/havoc-meili-install || true
     KEY=$(sed -n 's/^master_key *= *"\(.*\)"/\1/p' /etc/meilisearch/config.toml)
-    ok=0
+    ok=0; st=starting
     for i in $(seq 1 600); do
       if curl -fsS -m 2 http://127.0.0.1:7700/health 2>/dev/null | grep -q available; then
         st=$(curl -fsS -m 5 -H "Authorization: Bearer $KEY" 'http://127.0.0.1:7700/tasks?types=upgradeDatabase&limit=1' 2>/dev/null | php -r 'echo (string)(json_decode(stream_get_contents(STDIN), true)["results"][0]["status"] ?? "none");')
         case "$st" in succeeded|none) ok=1; break ;; failed|canceled) echo "Database upgrade task: $st"; break ;; esac
+      else
+        # a version that refuses the data stops at once and systemd keeps restarting it: give up after 3 attempts
+        if [ "$(systemctl show -p ActiveState --value meilisearch)" = failed ] || [ "$(systemctl show -p NRestarts --value meilisearch)" -ge 3 ] 2>/dev/null; then
+          echo "Meilisearch $NEW keeps stopping right after it starts."; break
+        fi
       fi
+      [ $((i % 15)) -eq 0 ] && echo "  waiting for Meilisearch: ${i} s (database upgrade: $st)"
       sleep 1
     done
-    if [ $ok -ne 1 ]; then echo "The new version did not start correctly (versions before 1.12 cannot be upgraded in place: create a dump, then import it)."; restore; exit 1; fi
+    if [ $ok -ne 1 ]; then
+      echo "The new version did not start correctly. Its last log lines:"
+      journalctl -u meilisearch -n 12 --no-pager -o cat 2>/dev/null | sed 's/^/  /' | grep -v -i 'master.key' || true
+      restore
+      if curl -fsS -m 2 --retry 10 --retry-delay 1 --retry-all-errors http://127.0.0.1:7700/health 2>/dev/null | grep -q available; then
+        echo "Meilisearch $OLD is running again with its previous data."
+      else
+        echo "Meilisearch $OLD was put back but is not answering yet; check: journalctl -u meilisearch"
+      fi
+      exit 1
+    fi
     rm -f $DROP/havoc-upgrade.conf; systemctl daemon-reload
     echo "Meilisearch $($B --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) is running. The previous data stays in $D.pre-update until the next update."
     rm -f $B.pre-update
