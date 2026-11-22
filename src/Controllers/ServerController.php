@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Havoc\Controllers;
 
+use Havoc\Services\SystemUpdateService;
 use Havoc\Services\UpdateService;
 use Havoc\Core\{Audit, Ctl, Response};
 use Havoc\Services\SystemStats;
@@ -93,6 +94,35 @@ final class ServerController extends Controller
             $this->flash('success', t('update.none'));
         }
         return $this->to('/server/settings#update');
+    }
+
+    /** Monitoring → System updates */
+    public function osUpdates(): Response
+    {
+        $s = SystemUpdateService::status();
+        if (SystemUpdateService::cached()['checked'] === 0 && $s['state'] !== 'running') {
+            SystemUpdateService::check();                         // first visit: there is nothing to show yet
+        }
+        return view('server/updates', ['c' => SystemUpdateService::cached(), 's' => $s]);
+    }
+
+    public function osCheck(): Response
+    {
+        $c = SystemUpdateService::check();
+        $c['error'] !== '' ? $this->flash('error', t('osu.check_failed', ['msg' => $c['error']]))
+            : $this->flash('success', t('osu.checked', ['n' => count($c['packages']), 'i' => (int)$c['important']]));
+        return $this->to('/server/updates');
+    }
+
+    public function osUpgrade(): Response
+    {
+        try {
+            SystemUpdateService::start($this->user(), (string)$this->req->post('mode', 'security'));
+            $this->flash('success', t('osu.started'));
+        } catch (\Throwable $e) {
+            $this->flash('error', $e->getMessage());
+        }
+        return $this->to('/server/updates');
     }
 
     public function updateAuto(): Response

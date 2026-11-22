@@ -196,6 +196,9 @@ return static function (Router $r): void {
     $r->post('/server/update/check', [ServerController::class, 'updateCheck'], ['admin']);
     $r->post('/server/update/auto', [ServerController::class, 'updateAuto'], ['admin']);
     $r->get('/server/settings', [ServerController::class, 'settings'], ['admin']);
+    $r->get('/server/updates', [ServerController::class, 'osUpdates'], ['admin']);
+    $r->post('/server/updates', [ServerController::class, 'osUpgrade'], ['admin']);
+    $r->post('/server/updates/check', [ServerController::class, 'osCheck'], ['admin']);
     $r->get('/server/webserver', [WebServerController::class, 'index'], ['admin']);
     $r->get('/server/webserver/settings', [WebServerController::class, 'settings'], ['admin']);
     $r->post('/server/webserver/settings', [WebServerController::class, 'settingsSave'], ['admin']);

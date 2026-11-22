@@ -41,6 +41,7 @@ $navGroups = [
         ['/server/resources', 'nav.resources', 'cpu', 'admin'],
         ['/server/processes', 'nav.processes', 'list', 'admin'],
         ['/services', 'nav.services', 'server', 'admin'],
+        ['/server/updates', 'nav.os_updates', 'download', 'admin', false, [], ['osu.k_words']],
         ['/server/notifications', 'nav.notifications', 'bell', 'admin'],
     ]],
     ['config', 'nav.g_config', [
@@ -94,6 +95,7 @@ $navIcon = static function (string $name): string {
         'wall' => 'M3 5h14v10H3zM3 10h14M7 5v5M13 5v5M10 10v5',
         'gauge' => 'M4 14a6 6 0 1 1 12 0M10 14l3-4',
         'pulse' => 'M3 10h3l2-5 4 10 2-5h3',
+        'download' => 'M10 3v10m0 0-4-4m4 4 4-4M4 15v2h12v-2',
         'pencil' => 'M13.5 3.5l3 3L7 16H4v-3l9.5-9.5zM11.5 5.5l3 3',
         'cpu' => 'M6 6h8v8H6zM8.5 8.5h3v3h-3zM8 3v3M12 3v3M8 14v3M12 14v3M3 8h3M3 12h3M14 8h3M14 12h3',
         'server' => 'M4 4h12v5H4zM4 11h12v5H4zM7 6.5h.01M7 13.5h.01',

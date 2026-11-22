@@ -1,0 +1,55 @@
+#!/bin/bash
+# Havoc WEB Panel: install operating system updates (started by `havocctl os.upgrade` through systemd-run, unit
+# havoc-os-update, so it keeps running when the panel's PHP is restarted).
+#   havoc-os-upgrade security   only packages from a Debian security suite and PHP packages
+#   havoc-os-upgrade all        apt-get upgrade (never removes packages or installs new ones it does not need)
+# After PHP updates every PHP-FPM is restarted (each site's own master, stock pools, the panel). Finally the list of
+# available updates is refreshed. Output is the log shown in the panel.
+set -uo pipefail
+export LC_ALL=C DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
+LOG=/var/log/havoc/os-update.log
+STATUS=/var/log/havoc/os-update.status
+install -d -m 750 /var/log/havoc
+: > "$LOG"; chmod 640 "$LOG"
+exec > >(tee -a "$LOG") 2>&1
+echo "running $(date -u +%FT%TZ)" > "$STATUS"
+RESULT=failed
+trap 'echo "$RESULT $(date -u +%FT%TZ)" > "$STATUS"' EXIT
+MODE="${1:-security}"
+[[ "$MODE" == security || "$MODE" == all ]] || { echo "Invalid mode: $MODE"; exit 64; }
+APT=(apt-get -y -q -o DPkg::Lock::Timeout=300 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+
+echo "System updates ($MODE) started $(date -u '+%F %T') UTC"
+apt-get update -q -o DPkg::Lock::Timeout=300 || { echo "apt-get update failed"; exit 1; }
+
+# the same selection as the panel's list: security suites and PHP packages
+mapfile -t ALL < <(apt list --upgradable 2>/dev/null | sed -n 's#^\([a-z0-9][a-z0-9+.-]*\)/\([^ ]*\) .*#\1 \2#p')
+PKGS=()
+for l in "${ALL[@]}"; do
+  n=${l%% *}; s=${l#* }
+  if [[ "$MODE" == all || "$s" =~ (^|,)[a-z]+-security(,|$) || "$n" =~ ^(php[0-9]|php-|libapache2-mod-php) ]]; then PKGS+=("$n"); fi
+done
+if [ ${#PKGS[@]} -eq 0 ]; then
+  echo "Nothing to update."
+else
+  echo "Updating ${#PKGS[@]} package(s): ${PKGS[*]}"
+  if [[ "$MODE" == all ]]; then
+    "${APT[@]}" upgrade || { echo "apt-get upgrade failed"; exit 1; }
+  else
+    "${APT[@]}" install --only-upgrade "${PKGS[@]}" || { echo "Installing the updates failed"; exit 1; }
+  fi
+fi
+
+if printf '%s\n' "${PKGS[@]}" | grep -Eq '^(php[0-9]|php-|libapache2-mod-php)'; then
+  echo "Restarting PHP (every site's PHP-FPM, stock pools, panel)"
+  for u in $(systemctl list-units --type=service --state=active --plain --no-legend 'havoc-fpm-*' 'php*-fpm.service' | awk '{print $1}'); do
+    systemctl restart "$u" || echo "  could not restart $u"
+  done
+  # the panel itself last (this job runs in its own unit, so it is not stopped by it)
+  systemctl restart havoc-panel-fpm || true
+fi
+
+echo '{}' | /usr/bin/php /opt/havoc/ctl/havocctl os.check > /dev/null || true
+[ -f /var/run/reboot-required ] && echo "A restart of the server is needed to use the new kernel/system libraries."
+echo "Done $(date -u '+%F %T') UTC"
+RESULT=done

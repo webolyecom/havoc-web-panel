@@ -43,6 +43,11 @@ switch ($cmd) {
         } catch (\Throwable $e) {
             fwrite(STDERR, 'update check: ' . $e->getMessage() . "\n");
         }
+        try {
+            \Havoc\Services\SystemUpdateService::checkDue();
+        } catch (\Throwable $e) {
+            fwrite(STDERR, 'system updates check: ' . $e->getMessage() . "\n");
+        }
         \Havoc\Services\SslService::retryDue();
         try {
             \Havoc\Services\UploadService::cleanup();

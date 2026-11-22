@@ -2,6 +2,15 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.10.1] – 2026-11-22
+### Added
+- **System updates** (Monitoring → System updates, admins): the server's upgradable packages, marked *Security* (Debian security suites) or *PHP* (sury.org PHP releases carry PHP's security fixes, so every PHP update counts as important).
+  - Checked twice a day (periodic job) and on demand; the dashboard warns while security / PHP updates wait or a restart of the server is needed.
+  - Administrators get one notification (e-mail / Telegram, in the notification language) for each new set of security / PHP updates.
+  - One click installs only the security and PHP updates, or all updates (`apt-get upgrade`: never removes packages, keeps changed configuration files). Runs as its own unit (`havoc-os-update`, script `bin/havoc-os-upgrade`) with a live log; after PHP updates every PHP-FPM is restarted (each site's own master, stock pools, the panel), then the list is refreshed.
+### Security
+- **PHP upload progress switched off** for every site (`98-havoc-security.ini` in each site's PHP scan folder) and for the panel's own PHP: it stores visitor-shaped data in session files and is used by CVE-2026-126714 ("phpAfterShell") and CVE-2026-115560. A site that needs it can switch it on in its `.user.ini`. This reduces the risk; installing the fixed PHP versions (8.2.36, 8.3.37, 8.4.28, 8.5.13 or sury's 8.1.34-14) is still needed.
+
 ## [0.10.0] – 2026-11-22
 ### Changed
 - **Sidebar regrouped.** Site work on top, server administration (admins only) below a "Server administration" divider:
