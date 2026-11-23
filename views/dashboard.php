@@ -4,10 +4,14 @@
   <span><span class="font-semibold"><?= e(t('update.banner', ['v' => $newRel['version']])) ?></span> <span class="text-slate-500"><?= e(t('update.banner_hint')) ?></span></span>
   <span class="text-brand">&rarr;</span></a>
 <?php endif; ?>
-<?php if (Havoc\Core\Auth::user()['role'] === 'admin' && ($osu = Havoc\Services\SystemUpdateService::cached()) && ($osu['important'] > 0 || !empty($osu['reboot']['needed']))): ?>
-<a href="/server/updates" class="mb-6 flex items-center justify-between gap-3 rounded-xl border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:hover:bg-rose-500/15">
-  <span><span class="font-semibold text-rose-800 dark:text-rose-200"><?= e($osu['important'] > 0 ? t('osu.banner', ['n' => $osu['important']]) : t('osu.banner_reboot')) ?></span> <span class="text-slate-600 dark:text-slate-400"><?= e(t('osu.banner_hint')) ?></span></span>
-  <span class="text-rose-700 dark:text-rose-300">&rarr;</span></a>
+<?php if (Havoc\Core\Auth::user()['role'] === 'admin' && ($osu = Havoc\Services\SystemUpdateService::banner())): ?>
+<div class="mb-6 flex items-center gap-2 rounded-xl border border-rose-300/60 bg-rose-50 text-sm dark:border-rose-500/30 dark:bg-rose-500/10" id="os-banner">
+  <a href="/server/updates" class="flex flex-1 items-center justify-between gap-3 rounded-l-xl px-4 py-3 hover:bg-rose-100 dark:hover:bg-rose-500/15">
+    <span><span class="font-semibold text-rose-800 dark:text-rose-200"><?= e($osu['important'] > 0 ? t('osu.banner', ['n' => $osu['important']]) . ($osu['reboot'] ? ' ' . t('osu.banner_reboot') : '') : t('osu.banner_reboot')) ?></span> <span class="text-slate-600 dark:text-slate-400"><?= e(t('osu.banner_hint')) ?></span></span>
+    <span class="text-rose-700 dark:text-rose-300">&rarr;</span></a>
+  <form method="post" action="/server/updates/dismiss" class="pr-2"><?= csrf_field() ?><input type="hidden" name="sig" value="<?= e($osu['sig']) ?>">
+    <button class="rounded-lg px-2 py-1 text-lg leading-none text-rose-700 hover:bg-rose-100 dark:text-rose-300 dark:hover:bg-rose-500/15" title="<?= e(t('osu.dismiss_hint')) ?>" aria-label="<?= e(t('osu.dismiss')) ?>">&times;</button></form>
+</div>
 <?php endif; ?>
 <?php if ($info):
   $gb = static fn(int|float $b) => $b >= 1099511627776 ? round($b / 1099511627776, 2) . ' TB' : ($b >= 1073741824 ? round($b / 1073741824, 1) . ' GB' : round($b / 1048576) . ' MB');

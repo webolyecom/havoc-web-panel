@@ -2,6 +2,13 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.11.1] – unreleased
+### Fixed
+- **"A restart of the server is needed" stayed on the dashboard** after the server was restarted: the warning used the saved result of the last check (refreshed every 12 hours). Whether a restart is needed is now read live (`/run/reboot-required`, emptied by a restart).
+- The saved list of updates is treated as out of date when packages changed (also installed outside the panel) or the server restarted after the check: the dashboard does not warn from it, the next periodic job checks again, and opening Monitoring → System updates checks right away.
+### Added
+- The dashboard warning about system updates can be closed (×); it comes back when new updates appear or another restart is needed.
+
 ## [0.11.0] – 2026-11-22
 ### Added
 - **Live site preview**: `https://<panel>:<panel port>/preview/<domain>/<path>` opens a site as it runs on this server, also while its domain still points to another server (moving a site): pages, logging in to its admin and working in it. "Preview" buttons on the domain page and in the sites list.

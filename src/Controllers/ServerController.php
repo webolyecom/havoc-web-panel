@@ -100,8 +100,8 @@ final class ServerController extends Controller
     public function osUpdates(): Response
     {
         $s = SystemUpdateService::status();
-        if (SystemUpdateService::cached()['checked'] === 0 && $s['state'] !== 'running') {
-            SystemUpdateService::check();                         // first visit: there is nothing to show yet
+        if ($s['state'] !== 'running' && SystemUpdateService::stale()) {
+            SystemUpdateService::check();                         // first visit, or packages / restart since the last check
         }
         return view('server/updates', ['c' => SystemUpdateService::cached(), 's' => $s]);
     }
@@ -112,6 +112,13 @@ final class ServerController extends Controller
         $c['error'] !== '' ? $this->flash('error', t('osu.check_failed', ['msg' => $c['error']]))
             : $this->flash('success', t('osu.checked', ['n' => count($c['packages']), 'i' => (int)$c['important']]));
         return $this->to('/server/updates');
+    }
+
+    /** Closes the dashboard warning until the situation changes. */
+    public function osDismiss(): Response
+    {
+        SystemUpdateService::dismiss((string)$this->req->post('sig', ''));
+        return $this->to('/');
     }
 
     public function osUpgrade(): Response

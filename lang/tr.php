@@ -885,4 +885,5 @@ return [
     'osu.sw_confirm_web' => ':name güncellensin mi? Web sunucusu nazikçe yeniden başlatılır; süren istekler önce tamamlanır.',
     'osu.sw_confirm_meili' => ':name güncellensin mi? Güncelleme sırasında durdurulur; verisi ve mevcut sürümü önce kopyalanır, yeni sürüm açılmazsa otomatik olarak geri alınır. Güncelleme sırasında aramalar çalışmaz.',
     'pv.open' => 'Önizle', 'pv.hint' => 'Siteyi bu sunucuda çalıştığı haliyle açar; DNS henüz buraya yönlenmemiş olsa da (yönetimine girip işlem yapabilirsiniz). Adres: panel portu + 1.',
+    'osu.dismiss' => 'Kapat', 'osu.dismiss_hint' => 'Bu uyarıyı gizle; yeni güncelleme çıkınca ya da yeniden başlatma tekrar gerekince yine görünür.',
 ];
