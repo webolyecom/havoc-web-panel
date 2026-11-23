@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Havoc\Controllers;
 
+use Havoc\Services\PhpVersionService;
 use Havoc\Services\SystemUpdateService;
 use Havoc\Services\UpdateService;
 use Havoc\Core\{Audit, Ctl, Response};
@@ -112,6 +113,46 @@ final class ServerController extends Controller
         $c['error'] !== '' ? $this->flash('error', t('osu.check_failed', ['msg' => $c['error']]))
             : $this->flash('success', t('osu.checked', ['n' => count($c['packages']), 'i' => (int)$c['important']]));
         return $this->to('/server/updates');
+    }
+
+    /** Configuration → PHP versions */
+    public function phpVersions(): Response
+    {
+        try {
+            $o = PhpVersionService::overview();
+        } catch (\Throwable $e) {
+            $this->flash('error', $e->getMessage());
+            $o = ['installed' => [], 'available' => [], 'panel' => '', 'cli' => ''];
+        }
+        return view('server/php', ['o' => $o, 's' => SystemUpdateService::status()]);
+    }
+
+    public function phpInstall(): Response
+    {
+        return $this->phpJob(fn(string $v) => PhpVersionService::install($this->user(), $v), 'phpv.install_started');
+    }
+
+    public function phpRemove(): Response
+    {
+        return $this->phpJob(fn(string $v) => PhpVersionService::remove($this->user(), $v), 'phpv.remove_started');
+    }
+
+    private function phpJob(callable $fn, string $msg): Response
+    {
+        $v = (string)$this->req->post('version', '');
+        try {
+            $fn($v);
+            $this->flash('success', t($msg, ['v' => $v]));
+        } catch (\Throwable $e) {
+            $this->flash('error', $e->getMessage());
+        }
+        return $this->to('/server/php');
+    }
+
+    public function phpDismiss(): Response
+    {
+        PhpVersionService::dismiss((string)$this->req->post('sig', ''));
+        return $this->to('/');
     }
 
     /** Closes the dashboard warning until the situation changes. */

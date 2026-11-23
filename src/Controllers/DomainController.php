@@ -205,7 +205,7 @@ final class DomainController extends Controller
     public function php(): Response
     {
         $d = $this->domain();
-        $fields = ['php_version' => Validator::php($this->req->str('php')),
+        $fields = ['php_version' => DomainService::installedPhp($this->req->str('php')),
             'opcache_enabled' => (int)(bool)$this->req->post('opcache'),
             'opcache_memory' => max(32, min(1024, (int)$this->req->post('opcache_memory', 128)))];
         if ($this->req->post('ext_form')) {

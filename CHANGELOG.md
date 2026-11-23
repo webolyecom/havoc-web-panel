@@ -8,6 +8,13 @@ All notable changes to Havoc WEB Panel. The project uses [semantic versioning](h
 - The saved list of updates is treated as out of date when packages changed (also installed outside the panel) or the server restarted after the check: the dashboard does not warn from it, the next periodic job checks again, and opening Monitoring → System updates checks right away.
 ### Added
 - The dashboard warning about system updates can be closed (×); it comes back when new updates appear or another restart is needed.
+- **PHP versions** (Configuration → PHP versions, admins): installed versions with their support state and dates (actively supported / security fixes only / ends within 90 days / ended) and the sites using each one.
+  - **Install** a version the package sources offer (7.4 and 8.0–8.6) with the usual extensions (MySQL, cURL, GD, mbstring, XML, ZIP, intl, BCMath, OPcache, Redis; packages a version does not have are skipped); its stock FPM pool stays off.
+  - **Remove** a version no site uses. Never the one the panel itself runs on (8.2 on Debian 12, 8.4 on Debian 13), the command-line default (`php`, used by cron jobs and WP-CLI) or the last one. Before purging, apt's plan is checked: if anything other than that version's own packages would be removed, it stops and names them.
+  - Both run as the update job with a live log.
+  - Sites on a version whose security support ended or ends within 90 days: a notice on the site's PHP page, the support state next to each version in its selector, and a dashboard notice that can be closed until the list changes.
+### Changed
+- Saving a site's PHP version (also through the Claude connector) only accepts versions installed on this server.
 
 ## [0.11.0] – 2026-11-22
 ### Added

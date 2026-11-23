@@ -13,6 +13,16 @@
     <button class="rounded-lg px-2 py-1 text-lg leading-none text-rose-700 hover:bg-rose-100 dark:text-rose-300 dark:hover:bg-rose-500/15" title="<?= e(t('osu.dismiss_hint')) ?>" aria-label="<?= e(t('osu.dismiss')) ?>">&times;</button></form>
 </div>
 <?php endif; ?>
+<?php if (Havoc\Core\Auth::user()['role'] === 'admin' && ($pvn = Havoc\Services\PhpVersionService::notice())): ?>
+<div class="mb-6 flex items-center gap-2 rounded-xl border border-amber-300/60 bg-amber-50 text-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+  <a href="/server/php" class="flex flex-1 items-center justify-between gap-3 rounded-l-xl px-4 py-3 hover:bg-amber-100 dark:hover:bg-amber-500/15">
+    <span class="text-amber-900 dark:text-amber-200"><?= e(implode(' ', array_map(static fn($v, $x) => t('phpv.notice_' . $x['support']['state'], ['v' => $v, 'n' => $x['n'], 'd' => $x['support']['security']]), array_keys($pvn['versions']), $pvn['versions']))) ?>
+      <span class="text-slate-600 dark:text-slate-400"><?= e(t('nav.php_versions')) ?></span></span>
+    <span class="text-amber-700 dark:text-amber-300">&rarr;</span></a>
+  <form method="post" action="/server/php/dismiss" class="pr-2"><?= csrf_field() ?><input type="hidden" name="sig" value="<?= e($pvn['sig']) ?>">
+    <button class="rounded-lg px-2 py-1 text-lg leading-none text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-500/15" title="<?= e(t('osu.dismiss_hint')) ?>" aria-label="<?= e(t('osu.dismiss')) ?>">&times;</button></form>
+</div>
+<?php endif; ?>
 <?php if ($info):
   $gb = static fn(int|float $b) => $b >= 1099511627776 ? round($b / 1099511627776, 2) . ' TB' : ($b >= 1073741824 ? round($b / 1073741824, 1) . ' GB' : round($b / 1048576) . ' MB');
   $up = (int)$info['uptime']; $upText = ($up >= 86400 ? intdiv($up, 86400) . t('dash.d') . ' ' : '') . intdiv($up % 86400, 3600) . t('dash.h') . ' ' . intdiv($up % 3600, 60) . t('dash.m');

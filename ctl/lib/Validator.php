@@ -6,7 +6,8 @@ namespace Havoc\Ctl;
 /** Strict whitelists. Everything that reaches a file path, config file or command goes through here. */
 final class Validator
 {
-    public const PHP_VERSIONS = ['8.1', '8.2', '8.3', '8.4'];
+    /** PHP versions the panel can install and run (sury.org packages); support dates in PhpVersionService */
+    public const PHP_VERSIONS = ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5', '8.6'];
     public const SERVICES = [
         'nginx', 'lshttpd', 'lsws', 'mariadb', 'redis-server', 'meilisearch', 'memcached', 'proftpd', 'pure-ftpd',
         'bind9', 'named', 'cron', 'fail2ban', 'ufw', 'csf', 'lfd', 'havoc-panel-nginx', 'havoc-panel-fpm',

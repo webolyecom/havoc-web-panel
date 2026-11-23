@@ -8,6 +8,9 @@
 #   havoc-os-upgrade meilisearch latest Meilisearch release; data and binary are copied first and put back if the new
 #                                version does not start (database upgraded in place: MEILI_UPGRADE_DB)
 #   havoc-os-upgrade phpmyadmin  latest phpMyAdmin (bin/havoc-pma-install replaces it in place)
+#   havoc-os-upgrade php-install X.Y   a PHP version with the panel's usual extensions (its stock FPM pool stays off)
+#   havoc-os-upgrade php-remove X.Y    purge a PHP version (never the panel's or the command-line default; the apt plan
+#                                      is checked first and nothing but that version's own packages may go)
 # After PHP updates every PHP-FPM is restarted (each site's own master, stock pools, the panel). Finally the list of
 # available updates is refreshed. Output is the log shown in the panel.
 set -uo pipefail
@@ -93,6 +96,35 @@ case "$MODE" in
     rm -f $DROP/havoc-upgrade.conf; systemctl daemon-reload
     echo "Meilisearch $($B --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) is running. The previous data stays in $D.pre-update until the next update."
     rm -f $B.pre-update
+    refresh; echo "Done $(date -u '+%F %T') UTC"; RESULT=done; exit 0 ;;
+  php-install|php-remove)
+    V="${1:-}"
+    [[ "$V" =~ ^[78]\.[0-9]$ ]] || { echo "Invalid PHP version: $V"; exit 64; }
+    PANEL_V=$(sed -n 's#.*/usr/sbin/php-fpm\([0-9]\.[0-9]\).*#\1#p' /etc/systemd/system/havoc-panel-fpm.service 2>/dev/null | head -1)
+    CLI_V=$(readlink -f /usr/bin/php 2>/dev/null | grep -oE '[0-9]\.[0-9]$')
+    apt-get update -q -o DPkg::Lock::Timeout=300 || { echo "apt-get update failed"; exit 1; }
+    if [ "$MODE" = php-install ]; then
+      echo "Installing PHP $V..."
+      "${APT[@]}" install "php$V-fpm" "php$V-cli" || { echo "PHP $V could not be installed (is it in the package sources?)"; exit 1; }
+      # the panel's usual extensions; one by one, because not every version has every package (8.5: opcache built in)
+      for e in mysql curl gd mbstring xml zip intl bcmath opcache redis; do
+        if apt-cache show "php$V-$e" >/dev/null 2>&1; then "${APT[@]}" install "php$V-$e" >/dev/null 2>&1 && echo "  php$V-$e" || echo "  php$V-$e: could not be installed"; fi
+      done
+      systemctl disable --now "php$V-fpm" 2>/dev/null || true      # sites use their own FPM masters (havoc-fpm-<id>)
+      echo "Installed: $(/usr/sbin/php-fpm$V -v 2>/dev/null | head -1)"
+    else
+      [ "$V" != "$PANEL_V" ] || { echo "PHP $V runs the panel itself and cannot be removed."; exit 1; }
+      [ "$V" != "$CLI_V" ] || { echo "PHP $V is the command-line default and cannot be removed."; exit 1; }
+      if grep -lq "/usr/sbin/php-fpm$V " /etc/systemd/system/havoc-fpm-*.service 2>/dev/null; then echo "A site still runs on PHP $V."; exit 1; fi
+      mapfile -t P < <(dpkg-query -W -f '${Package} ${db:Status-Abbrev}\n' "php$V-*" 2>/dev/null | awk '$2 ~ /^[ir]i/ {print $1}')
+      [ ${#P[@]} -gt 0 ] || { echo "No packages of PHP $V are installed."; refresh; RESULT=done; exit 0; }
+      # what apt would remove: only packages of this version may be in the plan
+      OTHER=$(apt-get -s purge "${P[@]}" 2>/dev/null | sed -n 's/^\(Purg\|Remv\) \([^ ]*\).*/\2/p' | grep -v "^php$V-" || true)
+      if [ -n "$OTHER" ]; then echo "Removing PHP $V would also remove: $(echo $OTHER | tr '\n' ' ')- stopped, nothing was removed."; exit 1; fi
+      echo "Removing PHP $V (${#P[@]} packages): ${P[*]}"
+      "${APT[@]}" purge "${P[@]}" || { echo "Removing PHP $V failed"; exit 1; }
+      rm -rf "/etc/php/$V" 2>/dev/null || true
+    fi
     refresh; echo "Done $(date -u '+%F %T') UTC"; RESULT=done; exit 0 ;;
   *) echo "Invalid mode: $MODE"; exit 64 ;;
 esac

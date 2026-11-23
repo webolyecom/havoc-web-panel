@@ -200,6 +200,10 @@ return static function (Router $r): void {
     $r->post('/server/updates', [ServerController::class, 'osUpgrade'], ['admin']);
     $r->post('/server/updates/check', [ServerController::class, 'osCheck'], ['admin']);
     $r->post('/server/updates/dismiss', [ServerController::class, 'osDismiss'], ['admin']);
+    $r->get('/server/php', [ServerController::class, 'phpVersions'], ['admin']);
+    $r->post('/server/php/install', [ServerController::class, 'phpInstall'], ['admin']);
+    $r->post('/server/php/remove', [ServerController::class, 'phpRemove'], ['admin']);
+    $r->post('/server/php/dismiss', [ServerController::class, 'phpDismiss'], ['admin']);
     $r->get('/server/webserver', [WebServerController::class, 'index'], ['admin']);
     $r->get('/server/webserver/settings', [WebServerController::class, 'settings'], ['admin']);
     $r->post('/server/webserver/settings', [WebServerController::class, 'settingsSave'], ['admin']);

@@ -1,8 +1,12 @@
-<?php $id = (int)$d['id']; ?>
+<?php $id = (int)$d['id']; $phpSup = Havoc\Services\PhpVersionService::support((string)$d['php_version']); ?>
+<?php if (in_array($phpSup['state'], ['ended', 'soon'], true)): ?>
+  <div class="mb-6 rounded-xl border p-4 text-sm <?= $phpSup['state'] === 'ended' ? 'border-red-300/60 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200' : 'border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200' ?>">
+    <?= e(t('phpv.site_' . $phpSup['state'], ['v' => $d['php_version'], 'd' => $phpSup['security']])) ?></div>
+<?php endif; ?>
 <div class="grid gap-6 lg:grid-cols-[minmax(0,22rem)_1fr]">
   <form method="post" action="/domains/<?= $id ?>/php" class="card space-y-4">
     <?= csrf_field() ?><h2 class="h2">PHP</h2>
-    <div><label class="label"><?= e(t('domains.php_version')) ?></label><select class="input" name="php"><?php foreach ($php as $v): ?><option <?= $v === $d['php_version'] ? 'selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div><label class="label"><?= e(t('domains.php_version')) ?></label><select class="input" name="php"><?php foreach ($php as $v): $vs = Havoc\Services\PhpVersionService::support($v)['state']; ?><option value="<?= e($v) ?>" <?= $v === $d['php_version'] ? 'selected' : '' ?>><?= e($v) ?><?= in_array($vs, ['ended', 'soon'], true) ? ' — ' . e(t('phpv.st_' . $vs)) : '' ?></option><?php endforeach; ?></select></div>
     <label class="flex items-center gap-2"><input type="checkbox" name="opcache" value="1" <?= $d['opcache_enabled'] ? 'checked' : '' ?>> OPcache</label>
     <div><label class="label">OPcache MB</label><input class="input" type="number" min="32" max="1024" name="opcache_memory" value="<?= (int)$d['opcache_memory'] ?>"></div>
     <button class="btn"><?= e(t('common.save')) ?></button>
