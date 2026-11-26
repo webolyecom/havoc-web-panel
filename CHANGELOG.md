@@ -2,6 +2,20 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.11.1] – unreleased
+### Fixed
+- **"A restart of the server is needed" stayed on the dashboard** after the server was restarted: the warning used the saved result of the last check (refreshed every 12 hours). Whether a restart is needed is now read live (`/run/reboot-required`, emptied by a restart).
+- The saved list of updates is treated as out of date when packages changed (also installed outside the panel) or the server restarted after the check: the dashboard does not warn from it, the next periodic job checks again, and opening Monitoring → System updates checks right away.
+### Added
+- The dashboard warning about system updates can be closed (×); it comes back when new updates appear or another restart is needed.
+- **PHP versions** (Configuration → PHP versions, admins): installed versions with their support state and dates (actively supported / security fixes only / ends within 90 days / ended) and the sites using each one.
+  - **Install** a version the package sources offer (7.4 and 8.0–8.6) with the usual extensions (MySQL, cURL, GD, mbstring, XML, ZIP, intl, BCMath, OPcache, Redis; packages a version does not have are skipped); its stock FPM pool stays off.
+  - **Remove** a version no site uses. Never the one the panel itself runs on (8.2 on Debian 12, 8.4 on Debian 13), the command-line default (`php`, used by cron jobs and WP-CLI) or the last one. Before purging, apt's plan is checked: if anything other than that version's own packages would be removed, it stops and names them.
+  - Both run as the update job with a live log.
+  - Sites on a version whose security support ended or ends within 90 days: a notice on the site's PHP page, the support state next to each version in its selector, and a dashboard notice that can be closed until the list changes.
+### Changed
+- Saving a site's PHP version (also through the Claude connector) only accepts versions installed on this server.
+
 ## [0.11.0] – 2026-11-22
 ### Added
 - **Live site preview**: `https://<panel>:<panel port>/preview/<domain>/<path>` opens a site as it runs on this server, also while its domain still points to another server (moving a site): pages, logging in to its admin and working in it. "Preview" buttons on the domain page and in the sites list.

@@ -407,7 +407,7 @@ final class McpTools
         $d = $this->d($a);
         $f = [];
         if (isset($a['php_version']) && $a['php_version'] !== '') {
-            $f['php_version'] = Validator::php((string)$a['php_version']);
+            $f['php_version'] = DomainService::installedPhp((string)$a['php_version']);
         }
         if (isset($a['force_https'])) {
             $f['force_https'] = (int)(bool)$a['force_https'];

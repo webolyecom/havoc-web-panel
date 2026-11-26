@@ -18,6 +18,16 @@ final class DomainService
         return $v ?: Config::get('php_versions', ['8.2']);
     }
 
+    /** A PHP version that is supported and installed on this server (domain create / change, API). */
+    public static function installedPhp(string $v): string
+    {
+        Validator::php($v);
+        if (!in_array($v, self::phpVersions(), true)) {
+            throw new \InvalidArgumentException(t('phpv.e_not_installed', ['v' => $v]));
+        }
+        return $v;
+    }
+
     public static function ctlArgs(array $d, array $owner, array $extra = []): array
     {
         $res = PoolService::effective($d, $owner);                     // RAM/CPU limits and the PHP-FPM pool
@@ -45,7 +55,7 @@ final class DomainService
             throw new \DomainException('Forbidden');
         }
         $name = Validator::domain($name);
-        Validator::php($php);
+        self::installedPhp($php);
         if (!in_array($type, ['main', 'addon', 'sub', 'alias'], true)) {
             throw new \InvalidArgumentException('Bad type');
         }

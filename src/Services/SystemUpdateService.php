@@ -64,10 +64,55 @@ final class SystemUpdateService
         Audit::log('server.os_update', $mode === 'component' ? $component : $mode, ['packages' => count(self::cached()['packages'])], $actor);
     }
 
-    /** Periodic: check twice a day; tell the admins once about each new set of security / PHP updates. */
+    /** Read live (the cached check only knows how it was then): /run is emptied by a restart. */
+    public static function rebootNeeded(): array
+    {
+        if (!is_file('/run/reboot-required') && !is_file('/var/run/reboot-required')) {
+            return ['needed' => false, 'packages' => []];
+        }
+        $f = is_file('/run/reboot-required.pkgs') ? '/run/reboot-required.pkgs' : '/var/run/reboot-required.pkgs';
+        return ['needed' => true, 'packages' => is_file($f) ? array_values(array_unique(array_filter(array_map('trim', file($f) ?: [])))) : []];
+    }
+
+    /** The saved list is out of date: packages changed (also outside the panel) or the server restarted after it. */
+    public static function stale(): bool
+    {
+        $checked = (int)self::cached()['checked'];
+        if ($checked === 0) {
+            return true;
+        }
+        $boot = preg_match('/^btime\s+(\d+)/m', (string)@file_get_contents('/proc/stat'), $m) ? (int)$m[1] : 0;
+        return (int)@filemtime('/var/lib/dpkg/status') > $checked || $boot > $checked;
+    }
+
+    /**
+     * Dashboard warning: security / PHP updates waiting (from an up-to-date check) or a restart needed (live).
+     * Null when there is nothing to say or the admin closed this very warning; a new situation shows it again.
+     * @return ?array{important:int, reboot:bool, sig:string}
+     */
+    public static function banner(): ?array
+    {
+        $c = self::cached();
+        $imp = self::stale() ? [] : array_values(array_filter($c['packages'], static fn($p) => $p['security'] || $p['php']));
+        $reboot = self::rebootNeeded();
+        if (!$imp && !$reboot['needed']) {
+            return null;
+        }
+        $sig = sha1(json_encode([array_map(static fn($p) => $p['name'] . '=' . $p['to'], $imp), $reboot]));
+        return Settings::get('os.updates_dismissed') === $sig ? null : ['important' => count($imp), 'reboot' => $reboot['needed'], 'sig' => $sig];
+    }
+
+    public static function dismiss(string $sig): void
+    {
+        if (preg_match('/^[a-f0-9]{40}$/', $sig)) {
+            Settings::set('os.updates_dismissed', $sig);
+        }
+    }
+
+    /** Periodic: check twice a day, and soon after packages changed or the server restarted; tell the admins once about each new set of security / PHP updates. */
     public static function checkDue(): void
     {
-        if (time() - (int)self::cached()['checked'] < self::CHECK_EVERY) {
+        if (time() - (int)self::cached()['checked'] < self::CHECK_EVERY && !self::stale()) {
             return;
         }
         $c = self::check();

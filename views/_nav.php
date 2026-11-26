@@ -46,6 +46,7 @@ $navGroups = [
     ]],
     ['config', 'nav.g_config', [
         ['/server/webserver', 'nav.webserver', 'web', 'admin', false, [], ['nav.ws_settings', 'nav.t_ws_perf']],
+        ['/server/php', 'nav.php_versions', 'php', 'admin', false, [], ['phpv.k_words']],
         ['/databases/tuning', 'nav.mariadb', 'sliders', 'admin', false, ['/server/mysql'], ['nav.db_tuning', 'nav.mysql_procs']],
     ]],
     ['addons', 'nav.g_addons', [
