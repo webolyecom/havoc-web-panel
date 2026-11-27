@@ -519,19 +519,86 @@ final class Apps
         return ['active_state' => $p['ActiveState'], 'sub_state' => $p['SubState'], 'pid' => (int)$p['MainPID'] ?: null,
             'memory_bytes' => $mem, 'cpu_nsec' => ctype_digit($p['CPUUsageNSec']) ? (int)$p['CPUUsageNSec'] : null,
             'uptime_sec' => $uptime, 'restarts' => (int)$p['NRestarts'], 'current_release' => self::currentRef($n),
-            'health' => $health, 'proxy' => self::proxyStatus($n, (string)($a['domain'] ?? ''))];
+            'health' => $health, 'proxy' => self::proxyStatus($n, (string)($a['domain'] ?? ''), !empty($a['with_vhost']))];
     }
 
     /** Reverse-proxy state of the app's vhost: the file, whether it is currently the proxy variant, and when it was last written. */
-    private static function proxyStatus(string $n, string $domain): array
+    private static function proxyStatus(string $n, string $domain, bool $withContent = false): array
     {
         if ($domain === '' || !preg_match('/^[a-z0-9.-]{1,253}$/', $domain)) {
             return ['vhost_file' => null, 'active' => false, 'last_reload' => null];
         }
         $file = '/etc/nginx/conf.d/havoc-' . $domain . '.conf';
-        $active = is_file($file) && str_contains((string)@file_get_contents($file), 'upstream havoc_app_' . $n . ' ');
+        $txt = is_file($file) ? (string)@file_get_contents($file) : null;
+        $active = $txt !== null && str_contains($txt, 'upstream havoc_app_' . $n . ' ');
         $mtime = is_file($file) ? @filemtime($file) : false;
-        return ['vhost_file' => $file, 'active' => $active, 'last_reload' => $mtime ? gmdate('Y-m-d H:i:s', $mtime) . ' UTC' : null];
+        $out = ['vhost_file' => $file, 'active' => $active, 'last_reload' => $mtime ? gmdate('Y-m-d H:i:s', $mtime) . ' UTC' : null];
+        if ($withContent) {
+            $out['content'] = $txt === null ? null : self::maskSecrets($txt);
+        }
+        return $out;
+    }
+
+    /**
+     * Redact credential values before returning vhost text. Our own template carries none; this guards custom rules a user
+     * may have added. Masks the value after a sensitive directive or header name (authorization, cookie, password, secret,
+     * token, api key, auth), and leaves everything else — paths included — untouched.
+     */
+    private static function maskSecrets(string $txt): string
+    {
+        return preg_replace_callback(
+            '/((?:auth_basic_user_file'
+            . '|proxy_set_header\s+(?:Authorization|Cookie|X-[A-Za-z-]*(?:Token|Key|Secret|Auth)[A-Za-z-]*)'
+            . '|set\s+\$[A-Za-z_]*(?:password|secret|token|key|auth)[A-Za-z_]*'
+            . '|[A-Za-z_]*(?:password|secret|token|api[_-]?key|authorization)[A-Za-z_]*)\s+)(\S[^;]*)/i',
+            static fn($m) => rtrim($m[1]) . ' ***',
+            $txt
+        ) ?? $txt;
+    }
+
+    /** Access or error log of the app domain's nginx vhost (the paths written into conf.d/havoc-<domain>.conf). */
+    public static function proxyLog(array $a): array
+    {
+        self::name($a);                                            // validates the app name
+        $domain = (string)($a['domain'] ?? '');
+        if (!preg_match('/^[a-z0-9.-]{1,253}$/', $domain)) {
+            throw new \InvalidArgumentException('Invalid domain');
+        }
+        $type = ($a['type'] ?? 'access') === 'error' ? 'error' : 'access';
+        $lines = max(1, min(5000, (int)($a['lines'] ?? 200)));
+        $file = self::vhostLogPath($domain, $type);
+        if ($file === null) {
+            return ['type' => $type, 'file' => null, 'log' => '',
+                'note' => $type === 'access' ? 'access_log is off for this site' : 'no error_log configured'];
+        }
+        if (!is_file($file)) {
+            return ['type' => $type, 'file' => $file, 'log' => '', 'note' => 'log file not created yet'];
+        }
+        [$c, $o, $e] = Sys::run(['tail', '-n', (string)$lines, '--', $file], null, 40);
+        $text = $c === 0 ? $o : trim($e ?: $o);
+        $grep = (string)($a['grep'] ?? '');
+        if ($grep !== '') {
+            $text = implode("\n", array_filter(explode("\n", $text), static fn($l) => stripos($l, $grep) !== false));
+        }
+        return ['type' => $type, 'file' => $file, 'log' => mb_substr($text, -65536)];
+    }
+
+    /** The access_log / error_log path from the domain's nginx vhost, constrained to /var/log; null when access_log is off. */
+    private static function vhostLogPath(string $domain, string $type): ?string
+    {
+        $vhost = '/etc/nginx/conf.d/havoc-' . $domain . '.conf';
+        $txt = is_file($vhost) ? (string)@file_get_contents($vhost) : '';
+        $file = null;
+        if ($type === 'access' && preg_match('/^\s*access_log\s+(\S+?)(?:\s+\S+)?\s*;/m', $txt, $m)) {
+            $file = $m[1] === 'off' ? null : $m[1];
+        } elseif ($type === 'error' && preg_match('/^\s*error_log\s+(\S+?)(?:\s+\w+)?\s*;/m', $txt, $m)) {
+            $file = $m[1];
+        } else {
+            $file = $txt !== '' && $type === 'access' && preg_match('/access_log\s+off\s*;/', $txt)
+                ? null : '/var/log/havoc/domains/' . $domain . '.' . $type . '.log';   // standard Havoc location
+        }
+        // only ever read inside /var/log, whatever the vhost says (defends against a tampered conf)
+        return ($file !== null && preg_match('#^/var/log/[A-Za-z0-9._/-]+$#', $file) && !str_contains($file, '..')) ? $file : null;
     }
 
     public static function logs(array $a): array
@@ -604,10 +671,24 @@ final class Apps
         } else {
             $body = null;
         }
-        array_push($cmd, 'http://127.0.0.1:' . $port . $path);
+        if (!empty($a['via_proxy'])) {
+            // go through nginx: request the public https URL but pin the connection to this server (correct SNI + Host),
+            // so the proxy layer can be tested separately from the app. -k: a cert mismatch shouldn't mask a routing test.
+            $domain = (string)($a['domain'] ?? '');
+            if (!preg_match('/^[a-z0-9.-]{1,253}$/', $domain)) {
+                throw new \InvalidArgumentException('Invalid domain');
+            }
+            array_push($cmd, '-k', '--resolve', $domain . ':443:127.0.0.1', 'https://' . $domain . $path);
+        } else {
+            if ($port < 1 || $port > 65535) {
+                throw new \InvalidArgumentException('Invalid port');
+            }
+            array_push($cmd, 'http://127.0.0.1:' . $port . $path);
+        }
         [$c, $o, $e] = Sys::run($cmd, $body, 70);
         if ($c !== 0 && $o === '') {
-            throw new \RuntimeException('Request failed: ' . trim($e) . ' (is the application running?)');
+            $hint = !empty($a['via_proxy']) ? ' (is the domain\'s vhost a reverse proxy and nginx running?)' : ' (is the application running?)';
+            throw new \RuntimeException('Request failed: ' . trim($e) . $hint);
         }
         // split the last response's headers from the body (curl -i; handle intermediate 1xx/100-continue)
         $parts = preg_split("/\r\n\r\n/", $o, -1);

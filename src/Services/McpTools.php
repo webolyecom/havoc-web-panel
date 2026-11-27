@@ -144,11 +144,16 @@ final class McpTools
                 'set' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Variables to set, {KEY: value}'],
                 'unset' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Variable names to remove'],
                 'restart' => ['type' => 'boolean', 'default' => false]], ['name'], true),
-            $t('app_http', 'Call the application', 'Sends an HTTP request from this server to the application on 127.0.0.1 and returns the status, headers and body (up to 64 KB). Use this to test endpoints or trigger admin actions like /admin/reload — the application is not reachable from the internet except through its domain.', ['name' => $appName,
+            $t('app_http', 'Call the application', 'Sends an HTTP request from this server to the application on 127.0.0.1 and returns the status, headers and body (up to 64 KB). Use this to test endpoints or trigger admin actions like /admin/reload — the application is not reachable from the internet except through its domain. Set via_proxy to test through nginx instead (the public https://domain path, resolved to this server), which checks the reverse-proxy layer separately from the app.', ['name' => $appName,
                 'method' => ['type' => 'string', 'enum' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'], 'default' => 'GET'],
                 'path' => ['type' => 'string', 'description' => 'Request path, e.g. "/healthz" or "/admin/reload"'],
                 'headers' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                'via_proxy' => ['type' => 'boolean', 'default' => false, 'description' => 'Go through nginx (https://<domain><path>, pinned to this server) instead of straight to 127.0.0.1:<port>'],
                 'body' => ['type' => 'string']], ['name', 'path'], true, false),
+            $t('app_proxy_log', 'Application proxy logs', 'Recent lines from the application domain\'s nginx vhost access or error log — the HTTP layer in front of the app (separate from app_logs, which is the app\'s own journald output).', ['name' => $appName,
+                'type' => ['type' => 'string', 'enum' => ['access', 'error'], 'default' => 'access'],
+                'lines' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 5000, 'default' => 200],
+                'grep' => ['type' => 'string', 'description' => 'Optional: only lines containing this text']], ['name'], false),
             $t('app_exec', 'Run the application binary', 'Runs the application\'s own binary once with the given arguments (as the application user, no shell), e.g. ["-hash-packs"]. For maintenance commands the binary supports; max 60 seconds.', ['name' => $appName,
                 'args' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Arguments passed to the binary, as an array (never a shell string)'],
                 'timeout' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 60, 'default' => 30]], ['name', 'args'], true, false),
@@ -509,7 +514,7 @@ final class McpTools
 
     private function t_app_get(array $a): array
     {
-        $s = WebAppService::status($this->user, $this->appName($a));
+        $s = WebAppService::status($this->user, $this->appName($a), true);   // include the (masked) vhost content
         $s['env_keys'] = WebAppService::envKeys($this->user, $this->appName($a));
         return $s;
     }
@@ -572,7 +577,13 @@ final class McpTools
     private function t_app_http(array $a): array
     {
         return WebAppService::http($this->user, $this->appName($a), (string)($a['method'] ?? 'GET'),
-            (string)($a['path'] ?? '/'), (array)($a['headers'] ?? []), (string)($a['body'] ?? ''));
+            (string)($a['path'] ?? '/'), (array)($a['headers'] ?? []), (string)($a['body'] ?? ''), !empty($a['via_proxy']));
+    }
+
+    private function t_app_proxy_log(array $a): array
+    {
+        return WebAppService::proxyLog($this->user, $this->appName($a), (string)($a['type'] ?? 'access'),
+            (int)($a['lines'] ?? 200), isset($a['grep']) ? (string)$a['grep'] : null);
     }
 
     private function t_app_exec(array $a): array

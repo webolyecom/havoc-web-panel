@@ -249,11 +249,12 @@ final class WebAppService
         return $r;
     }
 
-    public static function status(array $actor, string $name): array
+    public static function status(array $actor, string $name, bool $withVhost = false): array
     {
         $a = self::require($actor, $name);
         $d = DB::one('SELECT name FROM domains WHERE id = ?', [$a['domain_id']]);
-        $rt = Ctl::call('app.status', ['name' => $a['name'], 'port' => (int)$a['port'], 'health_path' => $a['health_path'], 'domain' => $d['name']], 40);
+        $rt = Ctl::call('app.status', ['name' => $a['name'], 'port' => (int)$a['port'], 'health_path' => $a['health_path'],
+            'domain' => $d['name'], 'with_vhost' => $withVhost], 40);
         $proxy = $rt['proxy'] ?? null;
         unset($rt['proxy']);
         return ['name' => $a['name'], 'domain' => $d['name'], 'port' => (int)$a['port'], 'status' => $a['status'],
@@ -274,13 +275,22 @@ final class WebAppService
         return Ctl::call('app.logs', ['name' => $a['name'], 'lines' => max(1, min(2000, $lines)), 'since' => $since, 'grep' => $grep], 40);
     }
 
-    public static function http(array $actor, string $name, string $method, string $path, array $headers, string $body): array
+    public static function http(array $actor, string $name, string $method, string $path, array $headers, string $body, bool $viaProxy = false): array
     {
         $a = self::require($actor, $name);
+        $d = DB::one('SELECT name FROM domains WHERE id = ?', [$a['domain_id']]);
         $r = Ctl::call('app.http', ['name' => $a['name'], 'port' => (int)$a['port'], 'method' => strtoupper($method),
-            'path' => $path, 'headers' => $headers, 'body' => $body], 70);
-        Audit::log('app.http', $a['name'], ['method' => strtoupper($method), 'path' => $path, 'status' => $r['status'] ?? 0], $actor);
+            'path' => $path, 'headers' => $headers, 'body' => $body, 'via_proxy' => $viaProxy, 'domain' => $d['name']], 70);
+        Audit::log('app.http', $a['name'], ['method' => strtoupper($method), 'path' => $path, 'via_proxy' => $viaProxy, 'status' => $r['status'] ?? 0], $actor);
         return $r;
+    }
+
+    public static function proxyLog(array $actor, string $name, string $type, int $lines, ?string $grep): array
+    {
+        $a = self::require($actor, $name);
+        $d = DB::one('SELECT name FROM domains WHERE id = ?', [$a['domain_id']]);
+        return Ctl::call('app.proxy_log', ['name' => $a['name'], 'domain' => $d['name'],
+            'type' => $type === 'error' ? 'error' : 'access', 'lines' => max(1, min(5000, $lines)), 'grep' => $grep], 40);
     }
 
     public static function exec(array $actor, string $name, array $args, int $timeout): array
