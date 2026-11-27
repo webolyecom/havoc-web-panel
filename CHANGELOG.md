@@ -2,6 +2,14 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.12.2] – 2026-11-27
+### Fixed
+- **An application's domain kept serving the static site instead of reverse-proxying to the app.** The vhost builder on the root-helper side dropped the proxy spec the panel passed, so `nginx` was always rendered with the plain site template (static files / PHP-FPM) even though the app was running and healthy on `127.0.0.1`. The proxy spec is now carried through and validated, so the domain renders the reverse-proxy variant: `location /` and each `ws_path` proxy to the app with the WebSocket upgrade headers, `X-Real-IP`/`X-Forwarded-For`/`X-Forwarded-Proto`, and 3600s read/send timeouts, while the ACME challenge and the SSL/HTTPS redirect are preserved. Because the proxy spec travels with every `domain.apply`, an SSL renewal or PHP-version change can no longer overwrite it.
+- **The vhost is re-applied after every deploy** (not only at create), and the config is `nginx -t`-tested and reloaded; on a test failure the previous vhost is restored and the error is returned.
+- **`app_status` mis-reported the runtime** (`active_state` showed the PID, `pid`/`uptime_sec` were null, health looked down though it was up): `systemctl show` output is now parsed as `KEY=VALUE` instead of relying on positional `--value` order, which systemd does not keep in the requested order.
+### Added
+- `app_get`/`app_status` now include `proxy`: the vhost file, whether it is currently the reverse-proxy variant, and when it was last written.
+
 ## [0.12.1] – 2026-11-27
 ### Fixed
 - **`app_deploy` rejected the path `list_uploads` returns** (`Invalid deploy source`): the deploy helper was never told the application's web root, so every upload looked invalid. The upload path is now resolved against the app domain's `public_html`, normalised with `realpath`, and accepted when it stays inside that root (so the hidden `.havoc-incoming` upload folder is allowed; traversal is caught by the realpath-in-root check, not by a hidden-folder ban). Supported extensions are `.zip`, `.tar.gz`, `.tgz`, `.tar`; errors say exactly what is wrong (not found, outside the root, unsupported type, archive could not be opened). After a successful deploy the archive is removed from the web root.
