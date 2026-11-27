@@ -200,7 +200,7 @@ final class WebAppService
         DB::update('web_apps', (int)$a['id'], ['status' => 'deploying', 'note' => null]);
         $ref = gmdate('Ymd-His');
         try {
-            $r = Ctl::call('app.deploy', ['name' => $a['name'], 'account' => 'hv' . $d['user_id'], 'src' => $upload, 'ref' => $ref,
+            $r = Ctl::call('app.deploy', ['name' => $a['name'], 'account' => 'hv' . $d['user_id'], 'domain' => $d['name'], 'src' => $upload, 'ref' => $ref,
                 'start_command' => $a['start_command'], 'health_path' => $a['health_path'], 'shared_paths' => json_decode($a['shared_paths'], true) ?: [],
                 'port' => (int)$a['port'], 'keep' => self::KEEP_RELEASES], 600);
         } catch (\Throwable $e) {
