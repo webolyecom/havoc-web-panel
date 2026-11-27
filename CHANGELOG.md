@@ -2,6 +2,10 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.12.1] – 2026-11-27
+### Fixed
+- **`app_deploy` rejected the path `list_uploads` returns** (`Invalid deploy source`): the deploy helper was never told the application's web root, so every upload looked invalid. The upload path is now resolved against the app domain's `public_html`, normalised with `realpath`, and accepted when it stays inside that root (so the hidden `.havoc-incoming` upload folder is allowed; traversal is caught by the realpath-in-root check, not by a hidden-folder ban). Supported extensions are `.zip`, `.tar.gz`, `.tgz`, `.tar`; errors say exactly what is wrong (not found, outside the root, unsupported type, archive could not be opened). After a successful deploy the archive is removed from the web root.
+
 ## [0.12.0] – 2026-11-27
 ### Added
 - **Applications** (Websites → Applications, admins): run a long-lived process bound to a site's domain and reverse-proxied by nginx — for example a Go game server using WebSocket.
