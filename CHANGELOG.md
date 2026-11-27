@@ -2,6 +2,12 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.12.3] – 2026-11-28
+### Added
+- **`app_proxy_log`** (connector): the application domain's nginx vhost access or error log — the HTTP layer in front of the app, separate from `app_logs` (the app's own journald output). The path is read from `conf.d/havoc-<domain>.conf` and constrained to `/var/log`.
+- **`app_http` `via_proxy`**: send the request through nginx (`https://<domain><path>`, pinned to this server with `--resolve <domain>:443:127.0.0.1`, correct SNI and Host) instead of straight to `127.0.0.1:<port>`, so the reverse-proxy layer can be tested separately from the app.
+- **`app_get`** now returns the vhost file content (`proxy.content`), with any credential-looking values in custom rules masked.
+
 ## [0.12.2] – 2026-11-27
 ### Fixed
 - **An application's domain kept serving the static site instead of reverse-proxying to the app.** The vhost builder on the root-helper side dropped the proxy spec the panel passed, so `nginx` was always rendered with the plain site template (static files / PHP-FPM) even though the app was running and healthy on `127.0.0.1`. The proxy spec is now carried through and validated, so the domain renders the reverse-proxy variant: `location /` and each `ws_path` proxy to the app with the WebSocket upgrade headers, `X-Real-IP`/`X-Forwarded-For`/`X-Forwarded-Proto`, and 3600s read/send timeouts, while the ACME challenge and the SSL/HTTPS redirect are preserved. Because the proxy spec travels with every `domain.apply`, an SSL renewal or PHP-version change can no longer overwrite it.
