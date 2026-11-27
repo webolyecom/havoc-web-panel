@@ -269,6 +269,9 @@ final class Actions
             'redirects' => array_map(static fn($r) => [
                 'source' => Validator::redirectSource($r['source'] ?? ''), 'target' => Validator::redirectTarget($r['target'] ?? ''),
                 'code' => Validator::redirectCode($r['code'] ?? 301)], array_slice((array)($a['redirects'] ?? []), 0, 200)),
+            // reverse proxy to a bound application (set whenever the domain has one); makes render() always emit the proxy
+            // variant, so the plain site template can never overwrite it on an SSL renewal, PHP change, etc.
+            'app' => self::appProxy($a['app'] ?? null),
         ];
         $cert = "/etc/havoc/ssl/$dom/fullchain.pem";
         $le   = "/etc/letsencrypt/live/$dom/fullchain.pem";
@@ -279,6 +282,27 @@ final class Actions
             $vh['ssl'] = ['cert' => $cert, 'key' => "/etc/havoc/ssl/$dom/privkey.pem"];
         }
         return $vh;
+    }
+
+    /** Validate the reverse-proxy spec the panel sends (name / local port / ws paths), or null when the domain has no app. */
+    private function appProxy(mixed $app): ?array
+    {
+        if (!is_array($app) || empty($app['name']) || empty($app['port'])) {
+            return null;
+        }
+        $name = (string)$app['name'];
+        $port = (int)$app['port'];
+        if (!preg_match('/^[a-z][a-z0-9-]{1,30}$/', $name) || $port < 1 || $port > 65535) {
+            return null;
+        }
+        $ws = [];
+        foreach ((array)($app['ws_paths'] ?? []) as $p) {
+            $p = '/' . ltrim((string)$p, '/');
+            if (preg_match('#^/[A-Za-z0-9._~!$&\'()*+,;=:@%/-]{0,200}$#', $p)) {
+                $ws[] = rtrim($p, '/') ?: $p;
+            }
+        }
+        return ['name' => $name, 'port' => $port, 'ws_paths' => array_values(array_unique($ws))];
     }
 
     /**

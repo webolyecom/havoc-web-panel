@@ -498,9 +498,14 @@ final class Apps
     {
         $n = self::name($a);
         $keys = ['ActiveState', 'SubState', 'MainPID', 'MemoryCurrent', 'CPUUsageNSec', 'ActiveEnterTimestamp', 'ExecMainStartTimestamp', 'NRestarts'];
-        $show = Sys::run(['systemctl', 'show', self::unit($n), '-p', implode(',', $keys), '--value'])[1];
-        $vals = array_map('trim', explode("\n", trim($show)));
-        $p = array_combine($keys, array_pad($vals, count($keys), ''));
+        // parse KEY=VALUE, not `--value`: systemctl prints properties in its own order, so positional mapping misaligns them
+        $show = Sys::run(['systemctl', 'show', self::unit($n), '-p', implode(',', $keys)])[1];
+        $p = array_fill_keys($keys, '');
+        foreach (explode("\n", trim($show)) as $line) {
+            if (($eq = strpos($line, '=')) !== false && isset($p[$k = substr($line, 0, $eq)])) {
+                $p[$k] = trim(substr($line, $eq + 1));
+            }
+        }
         $mem = ctype_digit($p['MemoryCurrent']) ? (int)$p['MemoryCurrent'] : null;
         $uptime = null;
         if (($ts = strtotime($p['ExecMainStartTimestamp'] ?: $p['ActiveEnterTimestamp'] ?: '')) !== false && $p['ActiveState'] === 'active') {
@@ -513,7 +518,20 @@ final class Apps
         }
         return ['active_state' => $p['ActiveState'], 'sub_state' => $p['SubState'], 'pid' => (int)$p['MainPID'] ?: null,
             'memory_bytes' => $mem, 'cpu_nsec' => ctype_digit($p['CPUUsageNSec']) ? (int)$p['CPUUsageNSec'] : null,
-            'uptime_sec' => $uptime, 'restarts' => (int)$p['NRestarts'], 'current_release' => self::currentRef($n), 'health' => $health];
+            'uptime_sec' => $uptime, 'restarts' => (int)$p['NRestarts'], 'current_release' => self::currentRef($n),
+            'health' => $health, 'proxy' => self::proxyStatus($n, (string)($a['domain'] ?? ''))];
+    }
+
+    /** Reverse-proxy state of the app's vhost: the file, whether it is currently the proxy variant, and when it was last written. */
+    private static function proxyStatus(string $n, string $domain): array
+    {
+        if ($domain === '' || !preg_match('/^[a-z0-9.-]{1,253}$/', $domain)) {
+            return ['vhost_file' => null, 'active' => false, 'last_reload' => null];
+        }
+        $file = '/etc/nginx/conf.d/havoc-' . $domain . '.conf';
+        $active = is_file($file) && str_contains((string)@file_get_contents($file), 'upstream havoc_app_' . $n . ' ');
+        $mtime = is_file($file) ? @filemtime($file) : false;
+        return ['vhost_file' => $file, 'active' => $active, 'last_reload' => $mtime ? gmdate('Y-m-d H:i:s', $mtime) . ' UTC' : null];
     }
 
     public static function logs(array $a): array

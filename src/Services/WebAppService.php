@@ -207,6 +207,12 @@ final class WebAppService
             DB::update('web_apps', (int)$a['id'], ['status' => 'failed', 'note' => mb_substr($e->getMessage(), 0, 400)]);
             throw $e;
         }
+        // make sure the domain's vhost is the reverse-proxy variant (and nginx reloaded) after every deploy
+        try {
+            DomainService::reapply($d);
+        } catch (\Throwable $e) {
+            $r['proxy_error'] = mb_substr($e->getMessage(), 0, 300);
+        }
         $ok = !empty($r['health']);
         DB::insert('web_app_releases', ['app_id' => (int)$a['id'], 'ref' => $r['ref'] ?? $ref, 'active' => $ok ? 1 : 0,
             'health' => $ok ? 'ok' : 'failed', 'note' => mb_substr((string)($r['note'] ?? ''), 0, 400)]);
@@ -246,12 +252,14 @@ final class WebAppService
     public static function status(array $actor, string $name): array
     {
         $a = self::require($actor, $name);
-        $rt = Ctl::call('app.status', ['name' => $a['name'], 'port' => (int)$a['port'], 'health_path' => $a['health_path']], 40);
         $d = DB::one('SELECT name FROM domains WHERE id = ?', [$a['domain_id']]);
+        $rt = Ctl::call('app.status', ['name' => $a['name'], 'port' => (int)$a['port'], 'health_path' => $a['health_path'], 'domain' => $d['name']], 40);
+        $proxy = $rt['proxy'] ?? null;
+        unset($rt['proxy']);
         return ['name' => $a['name'], 'domain' => $d['name'], 'port' => (int)$a['port'], 'status' => $a['status'],
             'start_command' => $a['start_command'], 'health_path' => $a['health_path'],
             'ws_paths' => json_decode($a['ws_paths'], true) ?: [], 'shared_paths' => json_decode($a['shared_paths'], true) ?: [],
-            'runtime' => $rt, 'releases' => self::releases((int)$a['id'])];
+            'proxy' => $proxy, 'runtime' => $rt, 'releases' => self::releases((int)$a['id'])];
     }
 
     public static function releases(int $appId): array
