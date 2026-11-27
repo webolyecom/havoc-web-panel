@@ -51,6 +51,11 @@ final class NginxDriver implements WebServer
         if (@file_get_contents('/etc/nginx/conf.d/havoc-00-preview.conf') !== $pv) {
             Sys::write('/etc/nginx/conf.d/havoc-00-preview.conf', $pv, 0640);
         }
+        // WebSocket upgrade mapping for application reverse proxies (defined once in the http context)
+        $ws = "# Managed by Havoc WEB Panel - WebSocket upgrade for application proxies\nmap \$http_upgrade \$connection_upgrade { default upgrade; '' close; }\n";
+        if (@file_get_contents('/etc/nginx/conf.d/havoc-01-ws.conf') !== $ws) {
+            Sys::write('/etc/nginx/conf.d/havoc-01-ws.conf', $ws, 0644);
+        }
         $page = '/var/www/havoc-default';
         is_dir($page) || mkdir($page, 0755, true);
         if (!is_file("$page/index.html")) {
@@ -265,6 +270,24 @@ NGX;
             $locs = "    location / { default_type text/plain; return 503 'Temporarily unavailable: the hosting resource quota of this account is exceeded.'; }\n";
         }
 
+        // Application reverse proxy: the whole site forwards to the app's local port; WebSocket upgrades on every ws_path.
+        $appProxy = empty($vh['suspended']) ? ($vh['app'] ?? null) : null;
+        $appUpstream = '';
+        if ($appProxy) {
+            $waf = '';
+            $redir = '';
+            $u = 'havoc_app_' . $appProxy['name'];
+            $appUpstream = "upstream $u { server 127.0.0.1:{$appProxy['port']}; keepalive 32; }\n";
+            $hdr = "        proxy_http_version 1.1;\n        proxy_set_header Host \$host;\n        proxy_set_header X-Real-IP \$remote_addr;\n"
+                . "        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto \$scheme;\n"
+                . "        proxy_set_header Upgrade \$http_upgrade;\n        proxy_set_header Connection \$connection_upgrade;\n"
+                . "        proxy_read_timeout 3600s;\n        proxy_send_timeout 3600s;\n";
+            $locs = "    location / {\n        proxy_pass http://$u;\n$hdr    }\n";
+            foreach ($appProxy['ws_paths'] as $wp) {
+                $locs .= "    location " . $wp . " {\n        proxy_pass http://$u;\n$hdr        proxy_buffering off;\n    }\n";
+            }
+        }
+
         $body = <<<NGX
     root $root;
     # the web server (www-data) is in every account's group: never follow a symlink whose target has another owner
@@ -280,7 +303,7 @@ NGX;
 $redir$locs
 NGX;
 
-        $out = "# Managed by Havoc WEB Panel - do not edit\nserver {\n    listen 80;\n    listen [::]:80;\n    server_name $names;\n";
+        $out = "# Managed by Havoc WEB Panel - do not edit\n" . $appUpstream . "server {\n    listen 80;\n    listen [::]:80;\n    server_name $names;\n";
         if ($ssl && !empty($vh['force_https'])) {
             $out .= "    location ^~ /.well-known/acme-challenge/ { root /var/www/havoc-acme; default_type text/plain; try_files \$uri =404; }\n";
             $out .= "    location / { return 301 https://\$host\$request_uri; }\n}\n";

@@ -187,6 +187,17 @@ return static function (Router $r): void {
     $r->post('/server/processes/signal', [ProcessController::class, 'signal'], ['admin']);
     $r->get('/server/resources', [ResourceController::class, 'index'], ['admin']);
     $r->post('/server/resources/{id}', [ResourceController::class, 'save'], ['admin']);
+
+    $r->get('/apps', [AppController::class, 'index'], ['admin']);
+    $r->post('/apps', [AppController::class, 'create'], ['admin']);
+    $r->get('/apps/{name}', [AppController::class, 'show'], ['admin']);
+    $r->post('/apps/{name}/upload-link', [AppController::class, 'uploadLink'], ['admin']);
+    $r->get('/apps/{name}/logs', [AppController::class, 'logs'], ['admin']);
+    $r->post('/apps/{name}/deploy', [AppController::class, 'deploy'], ['admin']);
+    $r->post('/apps/{name}/control', [AppController::class, 'control'], ['admin']);
+    $r->post('/apps/{name}/rollback', [AppController::class, 'rollback'], ['admin']);
+    $r->post('/apps/{name}/env', [AppController::class, 'setEnv'], ['admin']);
+    $r->post('/apps/{name}/destroy', [AppController::class, 'destroy'], ['admin']);
     $r->get('/server/mysql', [DbProcessController::class, 'index'], ['admin']);
     $r->get('/server/mysql.json', [DbProcessController::class, 'list'], ['admin']);
     $r->post('/server/mysql/kill', [DbProcessController::class, 'kill'], ['admin']);

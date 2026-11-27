@@ -10,6 +10,7 @@ $navGroups = [
     ]],
     ['sites', 'nav.g_sites', [
         ['/domains', 'nav.domains', 'globe', 'user'],
+        ['/apps', 'nav.apps', 'rocket', 'admin', false, [], ['app.k_words']],
         ['/files', 'nav.files', 'folder', 'user'],
         ['/ftp', 'nav.ftp', 'upload', 'user'],
         ['/dns', 'nav.dns', 'dns', 'user'],
@@ -97,6 +98,7 @@ $navIcon = static function (string $name): string {
         'gauge' => 'M4 14a6 6 0 1 1 12 0M10 14l3-4',
         'pulse' => 'M3 10h3l2-5 4 10 2-5h3',
         'eye' => 'M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6zM10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z',
+        'rocket' => 'M10 3c3 1 4.5 3.5 4.5 7l-2 2H7.5l-2-2C5.5 6.5 7 4 10 3zM10 7.5a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4zM7.5 14l-2 3 3-1M12.5 14l2 3-3-1',
         'download' => 'M10 3v10m0 0-4-4m4 4 4-4M4 15v2h12v-2',
         'pencil' => 'M13.5 3.5l3 3L7 16H4v-3l9.5-9.5zM11.5 5.5l3 3',
         'cpu' => 'M6 6h8v8H6zM8.5 8.5h3v3h-3zM8 3v3M12 3v3M8 14v3M12 14v3M3 8h3M3 12h3M14 8h3M14 12h3',
