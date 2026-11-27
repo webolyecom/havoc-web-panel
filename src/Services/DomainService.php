@@ -45,6 +45,7 @@ final class DomainService
             'php_ini_admin' => (string)($d['php_ini_admin'] ?? ''),
             'nginx_custom' => (string)($d['nginx_custom'] ?? ''),
             'nginx_custom_trusted' => !empty($d['nginx_custom_trusted']),
+            'app' => WebAppService::proxyFor((int)$d['id']),           // reverse proxy to a bound application, or null
         ];
     }
 

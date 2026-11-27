@@ -24,6 +24,7 @@ final class McpTools
     {
         $domain = ['type' => 'string', 'description' => 'Domain name as shown in list_domains, e.g. example.com'];
         $path = ['type' => 'string', 'description' => 'Path relative to the website root (public_html), e.g. "index.html", "assets/css/site.css". Empty = the root.'];
+        $appName = ['type' => 'string', 'description' => 'Application name as shown in app_list, e.g. "starminer"'];
         $t = static fn(string $name, string $title, string $desc, array $props, array $req, bool $write, bool $idem = true) => [
             'name' => $name, 'title' => $title, 'description' => $desc,
             'inputSchema' => ['type' => 'object', 'properties' => (object)$props, 'required' => $req, 'additionalProperties' => false],
@@ -112,6 +113,50 @@ final class McpTools
                 'name' => ['type' => 'string', 'description' => 'Short name: 1-16 lowercase letters, digits or _. The full name gets the account prefix (e.g. hv3_shop).'],
                 'domain' => ['type' => 'string', 'description' => 'Optional: the website the database belongs to (shown with the site in the panel).'],
             ], ['name'], true, false),
+
+            // Applications: a long-running process (e.g. a Go server using WebSocket) behind a site's domain, reverse-proxied by nginx.
+            $t('app_list', 'List applications', 'Applications running on this account: name, domain, port, status.', [], [], false),
+            $t('app_get', 'Application details', 'One application: settings, port, release history.', ['name' => $appName], ['name'], false),
+            $t('app_status', 'Application status', 'Live status of an application: systemd state, pid, uptime, memory/CPU, last health check.', ['name' => $appName], ['name'], false),
+            $t('app_logs', 'Application logs', 'Recent log lines of an application (journalctl).', ['name' => $appName,
+                'lines' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 2000, 'default' => 200],
+                'since' => ['type' => 'string', 'description' => 'Optional, e.g. "2026-11-27 20:00" or "-1 hour"'],
+                'grep' => ['type' => 'string', 'description' => 'Optional: only lines containing this text']], ['name'], false),
+            $t('app_create', 'Create application', 'Creates an application bound to one of your websites (its vhost becomes a reverse proxy). No process runs until the first app_deploy. The domain must be a site you manage with no application yet.', [
+                'name' => ['type' => 'string', 'description' => 'Slug: a lowercase letter then 1-30 of [a-z0-9-], e.g. "starminer"'],
+                'domain' => $domain,
+                'start_command' => ['type' => 'string', 'description' => 'Executable relative to the release, e.g. "./starminer-server" (optional arguments allowed)'],
+                'health_path' => ['type' => 'string', 'description' => 'HTTP path that returns 2xx when healthy. Default /healthz'],
+                'ws_paths' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'WebSocket paths, e.g. ["/ws"]'],
+                'shared_paths' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Folders kept across deploys, e.g. ["data","packs","var"]'],
+                'env' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Initial environment variables (values are stored server-side and never returned)'],
+            ], ['name', 'domain', 'start_command'], true, false),
+            $t('app_deploy', 'Deploy application', 'Deploys an uploaded archive (.zip/.tar.gz from create_upload_link or the file manager, on the app\'s domain) as a new release: extract, link shared folders, switch, restart, health-check for 20s, and roll back automatically if it fails. Returns the release id, health result and a log tail.', [
+                'name' => $appName,
+                'upload' => ['type' => 'string', 'description' => 'Archive path on the app\'s domain, as returned by list_uploads'],
+            ], ['name', 'upload'], true, false),
+            $t('app_rollback', 'Roll back application', 'Switches the application back to an earlier release and restarts it.', ['name' => $appName,
+                'release' => ['type' => 'string', 'description' => 'Release id (see app_get). Default: the previous release.']], ['name'], true, false),
+            $t('app_start', 'Start application', 'Starts the application service.', ['name' => $appName], ['name'], true),
+            $t('app_stop', 'Stop application', 'Stops the application service.', ['name' => $appName], ['name'], true),
+            $t('app_restart', 'Restart application', 'Restarts the application service.', ['name' => $appName], ['name'], true),
+            $t('app_set_env', 'Set application env', 'Sets or removes environment variables (the service can be restarted to apply them). Values are stored server-side; only key names are ever returned.', ['name' => $appName,
+                'set' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Variables to set, {KEY: value}'],
+                'unset' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Variable names to remove'],
+                'restart' => ['type' => 'boolean', 'default' => false]], ['name'], true),
+            $t('app_http', 'Call the application', 'Sends an HTTP request from this server to the application on 127.0.0.1 and returns the status, headers and body (up to 64 KB). Use this to test endpoints or trigger admin actions like /admin/reload — the application is not reachable from the internet except through its domain.', ['name' => $appName,
+                'method' => ['type' => 'string', 'enum' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'], 'default' => 'GET'],
+                'path' => ['type' => 'string', 'description' => 'Request path, e.g. "/healthz" or "/admin/reload"'],
+                'headers' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                'body' => ['type' => 'string']], ['name', 'path'], true, false),
+            $t('app_exec', 'Run the application binary', 'Runs the application\'s own binary once with the given arguments (as the application user, no shell), e.g. ["-hash-packs"]. For maintenance commands the binary supports; max 60 seconds.', ['name' => $appName,
+                'args' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Arguments passed to the binary, as an array (never a shell string)'],
+                'timeout' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 60, 'default' => 30]], ['name', 'args'], true, false),
+            $t('app_read_file', 'Read shared file', 'Reads a file under the application\'s shared/ folder (its live content, e.g. "packs/base.json").', ['name' => $appName,
+                'path' => ['type' => 'string', 'description' => 'Path relative to shared/, e.g. "data/config.json"']], ['name', 'path'], false),
+            $t('app_write_file', 'Write shared file', 'Writes a file under the application\'s shared/ folder (the previous version is kept). Use encoding "base64" for binary content.', ['name' => $appName,
+                'path' => ['type' => 'string', 'description' => 'Path relative to shared/'],
+                'content' => ['type' => 'string'], 'encoding' => ['type' => 'string', 'enum' => ['text', 'base64'], 'default' => 'text']], ['name', 'path', 'content'], true, false),
         ];
     }
 
@@ -445,5 +490,104 @@ final class McpTools
         }
         return ['database' => $db['name'], 'user' => $db['user'], 'password' => $db['password'], 'host' => 'localhost',
             'important' => 'Give the user this password now: it is not stored and cannot be shown again.'];
+    }
+
+    // --- Applications -------------------------------------------------------
+
+    private function appName(array $a): string
+    {
+        return (string)($a['name'] ?? '');
+    }
+
+    private function t_app_list(array $a): array
+    {
+        return ['applications' => array_map(static fn($w) => [
+            'name' => $w['name'], 'domain' => $w['domain'], 'port' => (int)$w['port'], 'status' => $w['status'],
+            'start_command' => $w['start_command'], 'url' => 'https://' . $w['domain'] . '/',
+        ], WebAppService::list($this->user))];
+    }
+
+    private function t_app_get(array $a): array
+    {
+        $s = WebAppService::status($this->user, $this->appName($a));
+        $s['env_keys'] = WebAppService::envKeys($this->user, $this->appName($a));
+        return $s;
+    }
+
+    private function t_app_status(array $a): array
+    {
+        return WebAppService::status($this->user, $this->appName($a));
+    }
+
+    private function t_app_logs(array $a): array
+    {
+        return WebAppService::logs($this->user, $this->appName($a), (int)($a['lines'] ?? 200),
+            isset($a['since']) ? (string)$a['since'] : null, isset($a['grep']) ? (string)$a['grep'] : null);
+    }
+
+    private function t_app_create(array $a): array
+    {
+        $w = WebAppService::create($this->user, [
+            'name' => $a['name'] ?? '', 'domain' => $a['domain'] ?? '', 'start_command' => $a['start_command'] ?? '',
+            'health_path' => $a['health_path'] ?? '/healthz', 'ws_paths' => $a['ws_paths'] ?? [],
+            'shared_paths' => $a['shared_paths'] ?? [], 'env' => $a['env'] ?? [],
+        ]);
+        return ['name' => $w['name'], 'port' => (int)$w['port'], 'status' => $w['status'],
+            'next' => 'Upload the build with create_upload_link on domain ' . (DB::one('SELECT name FROM domains WHERE id = ?', [$w['domain_id']])['name'] ?? '') . ', then app_deploy.'];
+    }
+
+    private function t_app_deploy(array $a): array
+    {
+        $r = WebAppService::deploy($this->user, $this->appName($a), (string)($a['upload'] ?? ''));
+        return ['release' => $r['ref'] ?? '', 'health' => !empty($r['health']) ? 'ok' : 'failed',
+            'rolled_back' => (bool)($r['rolled_back'] ?? false), 'active_release' => $r['active_ref'] ?? ($r['ref'] ?? ''),
+            'log' => $r['note'] ?? ''];
+    }
+
+    private function t_app_rollback(array $a): array
+    {
+        return WebAppService::rollback($this->user, $this->appName($a), isset($a['release']) ? (string)$a['release'] : null);
+    }
+
+    private function t_app_start(array $a): array
+    {
+        return WebAppService::control($this->user, $this->appName($a), 'start');
+    }
+
+    private function t_app_stop(array $a): array
+    {
+        return WebAppService::control($this->user, $this->appName($a), 'stop');
+    }
+
+    private function t_app_restart(array $a): array
+    {
+        return WebAppService::control($this->user, $this->appName($a), 'restart');
+    }
+
+    private function t_app_set_env(array $a): array
+    {
+        return WebAppService::setEnv($this->user, $this->appName($a), (array)($a['set'] ?? []), (array)($a['unset'] ?? []), !empty($a['restart']));
+    }
+
+    private function t_app_http(array $a): array
+    {
+        return WebAppService::http($this->user, $this->appName($a), (string)($a['method'] ?? 'GET'),
+            (string)($a['path'] ?? '/'), (array)($a['headers'] ?? []), (string)($a['body'] ?? ''));
+    }
+
+    private function t_app_exec(array $a): array
+    {
+        return WebAppService::exec($this->user, $this->appName($a), (array)($a['args'] ?? []), (int)($a['timeout'] ?? 30));
+    }
+
+    private function t_app_read_file(array $a): array
+    {
+        return WebAppService::readFile($this->user, $this->appName($a), (string)($a['path'] ?? ''));
+    }
+
+    private function t_app_write_file(array $a): array
+    {
+        $content = ($a['encoding'] ?? 'text') === 'base64' ? (string)base64_decode((string)($a['content'] ?? ''), true) : (string)($a['content'] ?? '');
+        return WebAppService::writeFile($this->user, $this->appName($a), (string)($a['path'] ?? ''), $content);
     }
 }
