@@ -111,13 +111,7 @@ final class Apps
         is_dir("$base/shared") || mkdir("$base/shared", 0750, true);
         Sys::ok(['chown', $user . ':' . $user, "$base/shared"]);
         chmod("$base/shared", 0750);
-        foreach ((array)($a['shared_paths'] ?? []) as $sp) {
-            $dir = self::safeUnder("$base/shared", (string)$sp);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0750, true);
-                Sys::ok(['chown', '-R', $user . ':' . $user, $dir]);
-            }
-        }
+        // shared sub-paths are NOT created here: the first deploy seeds them from the release, then never overwrites them.
         // env file (PORT/ADDR always; keep any already-set keys, add the provided ones)
         $env = self::readEnv($n);
         $env['PORT'] = (string)$port;

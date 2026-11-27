@@ -2,6 +2,17 @@
 
 All notable changes to Havoc WEB Panel. The project uses [semantic versioning](https://semver.org/); while in 0.x, minor versions may change behaviour.
 
+## [0.12.0] – 2026-11-27
+### Added
+- **Applications** (Websites → Applications, admins): run a long-lived process bound to a site's domain and reverse-proxied by nginx — for example a Go game server using WebSocket.
+  - Each app gets its own system user (`havoc-<name>`), a hardened systemd service (`NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `ReadWritePaths` limited to its shared folder), and a private port on `127.0.0.1` (never opened in the firewall).
+  - The site's vhost becomes a reverse proxy with WebSocket upgrade on each configured `ws_path` (`proxy_buffering off`, 1-hour read timeout); the Let's Encrypt challenge and the SSL/HTTPS redirect are preserved. The config is tested with `nginx -t` and rolled back on failure.
+  - **Versioned deploys**: upload a `.zip`/`.tar.gz`, it is safely extracted (no symlinks or path escapes) into `releases/<ts>`, shared folders are seeded on the first deploy and never overwritten after, `current` is swapped atomically, the service restarts, and a 20-second health check decides success — a failed deploy **rolls back automatically** to the previous release. The last 5 releases are kept.
+  - Panel UI: status, start/stop/restart, environment editor (values stored server-side at `0600`, only key names shown), live logs, release history with rollback, and removal (panel-only).
+  - **15 connector tools** so a remote assistant can deploy and test without SSH: `app_list/get/status/logs/create/deploy/rollback/start/stop/restart/set_env/http/exec/read_file/write_file`. `app_http` calls the app on `127.0.0.1` (test endpoints, `/admin/reload`); `app_exec` runs the app's own binary with array arguments (no shell). Secrets are never returned; every operation is audit-logged. Deleting an application is panel-only.
+### Security
+- Application operations are administrator-only, in the panel and through the connector. All commands run through argv (never a shell); file and process actions run as the per-app user, never root.
+
 ## [0.11.1] – unreleased
 ### Fixed
 - **"A restart of the server is needed" stayed on the dashboard** after the server was restarted: the warning used the saved result of the last check (refreshed every 12 hours). Whether a restart is needed is now read live (`/run/reboot-required`, emptied by a restart).

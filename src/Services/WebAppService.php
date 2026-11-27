@@ -60,9 +60,18 @@ final class WebAppService
         throw new \RuntimeException(t('app.e_noport'));
     }
 
+    /** Applications create system users and systemd services, so every operation is administrator-only (as in the panel UI). */
+    private static function admin(array $actor): void
+    {
+        if (($actor['role'] ?? '') !== 'admin') {
+            throw new \DomainException(t('app.e_admin'));
+        }
+    }
+
     /** The app row the actor may manage (via its domain), or null. */
     public static function forActor(array $actor, string $name): ?array
     {
+        self::admin($actor);
         $a = DB::one('SELECT * FROM web_apps WHERE name = ?', [strtolower(trim($name))]);
         if (!$a || !Scope::domain($actor, (int)$a['domain_id'])) {
             return null;
@@ -77,6 +86,7 @@ final class WebAppService
 
     public static function list(array $actor): array
     {
+        self::admin($actor);
         $out = [];
         foreach (DB::all('SELECT w.*, d.name AS domain FROM web_apps w JOIN domains d ON d.id = w.domain_id ORDER BY w.name') as $a) {
             if (Scope::domain($actor, (int)$a['domain_id'])) {
@@ -88,6 +98,7 @@ final class WebAppService
 
     public static function domainRow(array $actor, string $domain): array
     {
+        self::admin($actor);
         $d = DB::one('SELECT * FROM domains WHERE name = ?', [strtolower(trim($domain))]);
         $d = $d ? Scope::domain($actor, (int)$d['id']) : null;
         if (!$d) {
