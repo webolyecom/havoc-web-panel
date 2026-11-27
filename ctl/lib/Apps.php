@@ -212,6 +212,49 @@ final class Apps
 
     // ---- deploy / rollback --------------------------------------------------
 
+    /**
+     * Resolve the uploaded archive a deploy should use. The panel passes the account (hvN), the app's domain and
+     * `src` — the path list_uploads returned, relative to the domain's public_html (e.g.
+     * ".havoc-incoming/20261127-201458-starminer-0.1.0.tar.gz"). The path is resolved against that web root and
+     * normalised with realpath; it is accepted only if it is a regular file (not a symlink) still inside the root with a
+     * supported archive extension. Path traversal is caught by the realpath-inside-root check, so the hidden
+     * ".havoc-incoming" upload folder is allowed — there is no "hidden folder" ban here.
+     */
+    private static function resolveUpload(array $a): string
+    {
+        $account = (string)($a['account'] ?? '');
+        $domain  = strtolower(trim((string)($a['domain'] ?? '')));
+        $src     = trim(str_replace('\\', '/', (string)($a['src'] ?? '')), '/');
+        if (!preg_match('#^hv\d+$#', $account)) {
+            throw new \InvalidArgumentException('Invalid account');
+        }
+        if (!preg_match('/^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/', $domain)) {
+            throw new \InvalidArgumentException('Invalid application domain');
+        }
+        if ($src === '' || str_contains($src, "\0") || !preg_match('#^[A-Za-z0-9._/-]+$#', $src) || preg_match('#(^|/)\.\.(/|$)#', $src)) {
+            throw new \InvalidArgumentException('Invalid upload path: ' . $src);
+        }
+        if (!preg_match('/\.(zip|tar\.gz|tgz|tar)$/i', $src)) {   // .tar.gz matched as one extension
+            throw new \InvalidArgumentException('Unsupported archive type (use .zip, .tar.gz, .tgz or .tar): ' . $src);
+        }
+        $root = realpath("/home/$account/domains/$domain/public_html");
+        if ($root === false) {
+            throw new \RuntimeException("Site web root not found for $domain");
+        }
+        $path = $root . '/' . $src;
+        if (is_link($path)) {
+            throw new \RuntimeException('Upload path is a symlink: ' . $src);
+        }
+        $archive = realpath($path);
+        if ($archive === false || !is_file($archive)) {
+            throw new \RuntimeException('Upload not found: ' . $src);
+        }
+        if ($archive !== $root && !str_starts_with($archive, $root . '/')) {
+            throw new \RuntimeException('Upload is outside the site root: ' . $src);
+        }
+        return $archive;
+    }
+
     public static function deploy(array $a): array
     {
         $n = self::name($a);
@@ -224,15 +267,7 @@ final class Apps
         [$bin] = self::startParts((string)($a['start_command'] ?? ''));
         $ref = preg_match('/^[0-9]{8}-[0-9]{6}$/', (string)($a['ref'] ?? '')) ? $a['ref'] : gmdate('Ymd-His');
         $account = (string)($a['account'] ?? '');
-        $docroot = (string)($a['docroot'] ?? '');
-        $src = trim((string)($a['src'] ?? ''), '/');
-        if (!preg_match('#^hv\d+$#', $account) || $docroot === '' || $src === '' || preg_match('#(^|/)\.\.(/|$)#', $src)) {
-            throw new \InvalidArgumentException('Invalid deploy source');
-        }
-        $archive = $docroot . '/' . $src;
-        if (!is_file($archive) || is_link($archive)) {
-            throw new \RuntimeException('Upload not found');
-        }
+        $archive = self::resolveUpload($a);
         $releaseDir = "$base/releases/$ref";
         if (is_dir($releaseDir)) {
             $releaseDir .= '-' . substr(bin2hex(random_bytes(2)), 0, 4);
@@ -263,6 +298,9 @@ final class Apps
         } finally {
             is_dir($stage) && Sys::run(['rm', '-rf', $stage]);
         }
+
+        // the archive has been consumed into the release; don't leave it in the web root (best-effort, as the account)
+        Sys::run([...Sys::asUser($account), 'rm', '-f', '--', $archive]);
 
         // activate atomically and restart
         self::swap($n, $ref);
@@ -380,8 +418,8 @@ final class Apps
     {
         if (preg_match('/\.zip$/i', $archive)) {
             $z = new \ZipArchive();
-            if ($z->open($archive) !== true) {
-                throw new \RuntimeException('Not a readable zip archive');
+            if (($zc = $z->open($archive)) !== true) {
+                throw new \RuntimeException('Archive could not be opened: zip error ' . $zc);
             }
             for ($i = 0; $i < $z->numFiles; $i++) {
                 $st = $z->statIndex($i);
@@ -399,9 +437,9 @@ final class Apps
             }
             $z->close();
         } elseif (preg_match('/\.(tar\.gz|tgz|tar)$/i', $archive)) {
-            [$c, $o] = Sys::run(['tar', '-tf', $archive], null, 120);
+            [$c, $o, $terr] = Sys::run(['tar', '-tf', $archive], null, 120);
             if ($c !== 0) {
-                throw new \RuntimeException('Not a readable tar archive');
+                throw new \RuntimeException('Archive could not be opened: ' . (trim($terr) ?: 'not a readable tar archive'));
             }
             foreach (explode("\n", $o) as $name) {
                 $name = trim($name);
